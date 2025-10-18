@@ -1,284 +1,287 @@
+import * as fs from 'fs-extra';
+import path from 'path';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
-import ora from 'ora';
-import path from 'path';
-import fs from 'fs-extra';
+import ora, { type Ora } from 'ora';
 import { execa } from 'execa';
-import validatePackageName from 'validate-npm-package-name';
-import { generateProjectFiles, type ProjectConfig } from './generator.js';
 
-interface CLIOptions {
-  framework?: string;
-  modules?: string[];
-  skipInstall?: boolean;
+export interface CLIOptions {
   skipGit?: boolean;
 }
 
-const AVAILABLE_MODULES = [
-  { name: 'Authentication & JWT', value: 'auth', checked: true },
-  { name: 'Database ORM (Professional)', value: 'database-orm-pro' },
-  { name: 'Caching (Redis)', value: 'caching' },
-  { name: 'File Upload & Storage', value: 'file-upload' },
-  { name: 'Email Service', value: 'email' },
-  { name: 'Logging & Monitoring', value: 'logging' },
-  { name: 'Rate Limiting', value: 'rate-limiting' },
-  { name: 'WebSocket Support', value: 'websocket' },
-];
-
 export async function createProject(projectName: string | undefined, options: CLIOptions) {
-  // Step 1: Get project name
-  let name = projectName;
-  if (!name) {
-    const answers = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'projectName',
-        message: 'What is your project name?',
-        default: 'my-rapidkit-app',
-        validate: (input: string) => {
-          const validation = validatePackageName(input);
-          if (!validation.validForNewPackages) {
-            return validation.errors?.[0] || 'Invalid project name';
-          }
-          return true;
-        },
-      },
-    ]);
-    name = answers.projectName;
-  }
-
-  if (!name) {
-    console.log(chalk.red('\n❌ Project name is required!'));
-    process.exit(1);
-  }
-
+  // Default to 'rapidkit' directory
+  const name = projectName || 'rapidkit';
   const projectPath = path.resolve(process.cwd(), name);
 
   // Check if directory exists
   if (await fs.pathExists(projectPath)) {
     console.log(chalk.red(`\n❌ Directory "${name}" already exists!`));
+    console.log(chalk.yellow('💡 Please choose a different name or remove the existing directory.\n'));
     process.exit(1);
   }
 
-  // Step 2: Framework selection
-  let framework = options.framework;
-  if (!framework) {
-    const answers = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'framework',
-        message: 'Which framework would you like to use?',
-        choices: [
-          { name: '🐍 FastAPI (Standard)', value: 'fastapi-standard' },
-          { name: '🐍 FastAPI (Advanced)', value: 'fastapi-advanced' },
-          { name: '🟢 NestJS (Standard)', value: 'nestjs-standard' },
-          { name: '🟢 NestJS (Advanced)', value: 'nestjs-advanced' },
-        ],
-      },
-    ]);
-    framework = answers.framework;
-  }
-
-  if (!framework) {
-    console.log(chalk.red('\n❌ Framework selection is required!'));
-    process.exit(1);
-  }
-
-  const isFastAPI = framework.startsWith('fastapi');
-
-  // Step 3: Python/Node configuration
-  let pythonVersion = '3.11';
-  let packageManager: 'poetry' | 'pip' | 'npm' = 'pip';
-
-  if (isFastAPI) {
-    const pythonAnswers = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'pythonVersion',
-        message: 'Select Python version:',
-        choices: ['3.10', '3.11', '3.12'],
-        default: '3.11',
-      },
-      {
-        type: 'list',
-        name: 'packageManager',
-        message: 'Select package manager:',
-        choices: [
-          { name: 'Poetry (Recommended)', value: 'poetry' },
-          { name: 'pip', value: 'pip' },
-        ],
-        default: 'poetry',
-      },
-    ]);
-    pythonVersion = pythonAnswers.pythonVersion;
-    packageManager = pythonAnswers.packageManager;
-  }
-
-  // Step 4: Module selection
-  let selectedModules = options.modules || [];
-  if (!options.modules) {
-    const moduleAnswers = await inquirer.prompt([
-      {
-        type: 'checkbox',
-        name: 'modules',
-        message: 'Select modules to include:',
-        choices: AVAILABLE_MODULES,
-      },
-    ]);
-    selectedModules = moduleAnswers.modules;
-  }
-
-  // Step 5: Additional options
-  const optionsAnswers = await inquirer.prompt([
+  // Step 1: Choose Python version and install method
+  const pythonAnswers = await inquirer.prompt([
     {
-      type: 'confirm',
-      name: 'includeDocker',
-      message: 'Include Docker configuration?',
-      default: true,
+      type: 'list',
+      name: 'pythonVersion',
+      message: 'Select Python version for RapidKit:',
+      choices: ['3.10', '3.11', '3.12'],
+      default: '3.11',
     },
     {
-      type: 'confirm',
-      name: 'includeTesting',
-      message: 'Include testing setup?',
-      default: true,
-    },
-    {
-      type: 'confirm',
-      name: 'includeCI',
-      message: 'Include CI/CD (GitHub Actions)?',
-      default: true,
+      type: 'list',
+      name: 'installMethod',
+      message: 'How would you like to install RapidKit?',
+      choices: [
+        { name: '🎯 Poetry (Recommended - includes virtual env)', value: 'poetry' },
+        { name: '📦 pip with venv (Standard)', value: 'venv' },
+        { name: '🔧 pipx (Global isolated install)', value: 'pipx' },
+      ],
+      default: 'poetry',
     },
   ]);
 
-  // Build configuration
-  const config: ProjectConfig = {
-    projectName: name,
-    framework: framework as any,
-    pythonVersion: pythonVersion as any,
-    packageManager: packageManager as any,
-    selectedModules,
-    includeDocker: optionsAnswers.includeDocker,
-    includeTesting: optionsAnswers.includeTesting,
-    includeCI: optionsAnswers.includeCI,
-  };
-
-  // Generate project
-  console.log(chalk.blue('\n📦 Generating project files...\n'));
-  const spinner = ora('Creating project structure').start();
+  console.log(chalk.blue('\n📦 Setting up RapidKit environment...\n'));
+  const spinner = ora('Creating directory').start();
 
   try {
     // Create directory
     await fs.ensureDir(projectPath);
+    spinner.succeed('Directory created');
 
-    // Generate files
-    const files = generateProjectFiles(config);
-
-    // Write files
-    for (const [filePath, content] of Object.entries(files)) {
-      const fullPath = path.join(projectPath, filePath);
-      await fs.ensureDir(path.dirname(fullPath));
-      await fs.writeFile(fullPath, content, 'utf-8');
+    // Install RapidKit based on method
+    if (pythonAnswers.installMethod === 'poetry') {
+      await installWithPoetry(projectPath, pythonAnswers.pythonVersion, spinner);
+    } else if (pythonAnswers.installMethod === 'venv') {
+      await installWithVenv(projectPath, pythonAnswers.pythonVersion, spinner);
+    } else {
+      await installWithPipx(projectPath, spinner);
     }
 
-    // Create .rapidkit directory with metadata
-    const rapidkitDir = path.join(projectPath, '.rapidkit');
-    await fs.ensureDir(rapidkitDir);
-    const projectMetadata = {
-      framework: config.framework,
-      created_at: new Date().toISOString(),
-      rapidkit_version: '0.1.0',
-      modules: config.selectedModules,
-      config: {
-        pythonVersion: config.pythonVersion,
-        packageManager: config.packageManager,
-        includeDocker: config.includeDocker,
-        includeTesting: config.includeTesting,
-        includeCI: config.includeCI,
-      },
-    };
-    await fs.writeFile(
-      path.join(rapidkitDir, 'project.json'),
-      JSON.stringify(projectMetadata, null, 2),
-      'utf-8'
-    );
+    // Create README with instructions
+    await createReadme(projectPath, pythonAnswers.installMethod);
 
-    spinner.succeed('Project structure created');
+    spinner.succeed('RapidKit environment ready!');
 
     // Git initialization
     if (!options.skipGit) {
-      const gitSpinner = ora('Initializing git repository').start();
+      spinner.start('Initializing git repository');
       try {
         await execa('git', ['init'], { cwd: projectPath });
+        await fs.writeFile(
+          path.join(projectPath, '.gitignore'),
+          '.venv/\n__pycache__/\n*.pyc\n.env\n.rapidkit-workspace/\n',
+          'utf-8'
+        );
         await execa('git', ['add', '.'], { cwd: projectPath });
-        await execa('git', ['commit', '-m', 'Initial commit from create-rapidkit'], {
+        await execa('git', ['commit', '-m', 'Initial commit: RapidKit environment'], {
           cwd: projectPath,
         });
-        gitSpinner.succeed('Git repository initialized');
+        spinner.succeed('Git repository initialized');
       } catch (error) {
-        gitSpinner.warn('Git initialization skipped');
-      }
-    }
-
-    // Install dependencies
-    if (!options.skipInstall) {
-      const installSpinner = ora('Installing dependencies').start();
-      try {
-        if (isFastAPI) {
-          if (packageManager === 'poetry') {
-            await execa('poetry', ['install'], { cwd: projectPath });
-          } else {
-            await execa('pip', ['install', '-r', 'requirements.txt'], { cwd: projectPath });
-          }
-        } else {
-          // Detect package manager
-          const hasYarn = await commandExists('yarn');
-          const hasPnpm = await commandExists('pnpm');
-          
-          if (hasPnpm) {
-            await execa('pnpm', ['install'], { cwd: projectPath });
-          } else if (hasYarn) {
-            await execa('yarn', ['install'], { cwd: projectPath });
-          } else {
-            await execa('npm', ['install'], { cwd: projectPath });
-          }
-        }
-        installSpinner.succeed('Dependencies installed');
-      } catch (error) {
-        installSpinner.fail('Failed to install dependencies');
-        console.log(chalk.yellow('\n⚠️  You can install dependencies manually later.'));
+        spinner.warn('Could not initialize git repository');
       }
     }
 
     // Success message
-    console.log(chalk.green.bold('\n✅ Project created successfully!\n'));
-    console.log(chalk.cyan('📂 Project location:'), projectPath);
-    console.log(chalk.cyan('\n🚀 Next steps:\n'));
-    console.log(chalk.white(`  cd ${name}`));
-    
-    if (isFastAPI) {
-      if (packageManager === 'poetry') {
-        console.log(chalk.white('  poetry run uvicorn src.main:app --reload'));
-      } else {
-        console.log(chalk.white('  pip install -r requirements.txt'));
-        console.log(chalk.white('  uvicorn src.main:app --reload'));
-      }
+    console.log(chalk.green('\n✨ RapidKit environment created successfully!\n'));
+    console.log(chalk.cyan('📂 Location:'), chalk.white(projectPath));
+    console.log(chalk.cyan('🚀 Get started:\n'));
+    console.log(chalk.white(`   cd ${name}`));
+
+    if (pythonAnswers.installMethod === 'poetry') {
+      console.log(chalk.white('   poetry shell'));
+      console.log(chalk.white('   rapidkit create my-project'));
+    } else if (pythonAnswers.installMethod === 'venv') {
+      console.log(chalk.white('   source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate'));
+      console.log(chalk.white('   rapidkit create my-project'));
     } else {
-      console.log(chalk.white('  npm run start:dev'));
+      console.log(chalk.white('   rapidkit create my-project'));
     }
 
-    console.log(chalk.cyan('\n📖 Documentation:'), 'https://rapidkit.dev/docs');
-    console.log(chalk.cyan('💬 Community:'), 'https://github.com/getrapidkit/rapidkit\n');
+    console.log(chalk.white('\n💡 For more information, check the README.md file.'));
+    console.log(chalk.cyan('\n📚 RapidKit commands:'));
+    console.log(chalk.white('   rapidkit create <name>   - Create a new project'));
+    console.log(chalk.white('   rapidkit add <module>    - Add a module to your project'));
+    console.log(chalk.white('   rapidkit list            - List available kits'));
+    console.log(chalk.white('   rapidkit modules         - List available modules'));
+    console.log(chalk.white('   rapidkit --help          - Show all commands\n'));
   } catch (error) {
-    spinner.fail('Failed to create project');
-    throw error;
+    spinner.fail('Failed to create RapidKit environment');
+    console.error(chalk.red('\n❌ Error:'), error);
+
+    // Cleanup on failure
+    try {
+      await fs.remove(projectPath);
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
+
+    process.exit(1);
   }
 }
 
-async function commandExists(command: string): Promise<boolean> {
+// Install RapidKit with Poetry
+async function installWithPoetry(projectPath: string, pythonVersion: string, spinner: Ora) {
+  spinner.start('Checking Poetry installation');
+
   try {
-    await execa('which', [command]);
-    return true;
-  } catch {
-    return false;
+    await execa('poetry', ['--version']);
+    spinner.succeed('Poetry found');
+  } catch (error) {
+    spinner.fail('Poetry not found');
+    console.log(chalk.yellow('\n⚠️  Poetry is not installed.'));
+    console.log(chalk.cyan('Install Poetry: https://python-poetry.org/docs/#installation\n'));
+    process.exit(1);
   }
+
+  spinner.start('Initializing Poetry project');
+  await execa('poetry', ['init', '--no-interaction', '--python', `^${pythonVersion}`], {
+    cwd: projectPath,
+  });
+  spinner.succeed('Poetry project initialized');
+
+  spinner.start('Installing RapidKit');
+  await execa('poetry', ['add', 'rapidkit'], { cwd: projectPath });
+  spinner.succeed('RapidKit installed');
+}
+
+// Install RapidKit with venv + pip
+async function installWithVenv(projectPath: string, pythonVersion: string, spinner: Ora) {
+  spinner.start(`Checking Python ${pythonVersion}`);
+
+  let pythonCmd = 'python3';
+  try {
+    const { stdout } = await execa(pythonCmd, ['--version']);
+    const version = stdout.match(/Python (\d+\.\d+)/)?.[1];
+
+    if (version && parseFloat(version) < parseFloat(pythonVersion)) {
+      throw new Error(`Python ${pythonVersion}+ required, found ${version}`);
+    }
+
+    spinner.succeed(`Python ${version} found`);
+  } catch (error) {
+    spinner.fail('Python not found or version too old');
+    console.log(chalk.red('\n❌ Python 3.10+ is required.'));
+    console.log(chalk.cyan('Install Python: https://www.python.org/downloads/\n'));
+    process.exit(1);
+  }
+
+  spinner.start('Creating virtual environment');
+  await execa(pythonCmd, ['-m', 'venv', '.venv'], { cwd: projectPath });
+  spinner.succeed('Virtual environment created');
+
+  spinner.start('Installing RapidKit');
+  const pipPath = path.join(projectPath, '.venv', 'bin', 'pip');
+  await execa(pipPath, ['install', '--upgrade', 'pip'], { cwd: projectPath });
+  await execa(pipPath, ['install', 'rapidkit'], { cwd: projectPath });
+  spinner.succeed('RapidKit installed');
+}
+
+// Install RapidKit with pipx (global)
+async function installWithPipx(projectPath: string, spinner: Ora) {
+  spinner.start('Checking pipx installation');
+
+  try {
+    await execa('pipx', ['--version']);
+    spinner.succeed('pipx found');
+  } catch (error) {
+    spinner.fail('pipx not found');
+    console.log(chalk.yellow('\n⚠️  pipx is not installed.'));
+    console.log(chalk.cyan('Install pipx: https://pypa.github.io/pipx/installation/\n'));
+    process.exit(1);
+  }
+
+  spinner.start('Installing RapidKit globally with pipx');
+  await execa('pipx', ['install', 'rapidkit']);
+  spinner.succeed('RapidKit installed globally');
+
+  // Create a simple marker file
+  await fs.writeFile(
+    path.join(projectPath, '.rapidkit-global'),
+    'RapidKit installed globally with pipx\n',
+    'utf-8'
+  );
+}
+
+// Create README with usage instructions
+async function createReadme(projectPath: string, installMethod: string) {
+  const activationCmd =
+    installMethod === 'poetry'
+      ? 'poetry shell'
+      : installMethod === 'venv'
+        ? 'source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate'
+        : 'N/A (globally installed)';
+
+  const readme = `# RapidKit Workspace
+
+This directory contains a RapidKit development environment.
+
+## Installation Method
+
+**${installMethod === 'poetry' ? 'Poetry' : installMethod === 'venv' ? 'Python venv + pip' : 'pipx (global)'}**
+
+## Getting Started
+
+### 1. Activate Environment
+
+\`\`\`bash
+${activationCmd}
+\`\`\`
+
+### 2. Create Your First Project
+
+\`\`\`bash
+rapidkit create my-project
+\`\`\`
+
+Choose a kit (e.g., fastapi.standard) and follow the prompts.
+
+### 3. Navigate and Run
+
+\`\`\`bash
+cd my-project
+# For FastAPI projects:
+uvicorn src.main:app --reload
+\`\`\`
+
+## Available Commands
+
+- \`rapidkit create <name>\` - Create a new project
+- \`rapidkit add <module>\` - Add a module to existing project
+- \`rapidkit list\` - List available kits
+- \`rapidkit modules\` - List available modules
+- \`rapidkit upgrade\` - Upgrade RapidKit
+- \`rapidkit doctor\` - Check system requirements
+- \`rapidkit --help\` - Show all commands
+
+## RapidKit Documentation
+
+For full documentation, visit: [RapidKit Docs](https://rapidkit.dev) *(or appropriate URL)*
+
+## Workspace Structure
+
+\`\`\`
+${installMethod === 'venv' ? '.venv/          # Python virtual environment' : ''}
+${installMethod === 'poetry' ? 'pyproject.toml  # Poetry configuration' : ''}
+my-project/     # Your RapidKit projects go here
+README.md       # This file
+\`\`\`
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. Ensure Python 3.10+ is installed: \`python3 --version\`
+2. Check RapidKit installation: \`rapidkit --version\`
+3. Run system check: \`rapidkit doctor\`
+
+---
+
+Generated by create-rapidkit
+`;
+
+  await fs.writeFile(path.join(projectPath, 'README.md'), readme, 'utf-8');
 }
