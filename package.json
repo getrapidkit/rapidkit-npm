@@ -1,6 +1,6 @@
 {
-  "name": "create-rapidkit",
-  "version": "0.1.0",
+  "name": "rapidkit",
+  "version": "1.0.0",
   "type": "module",
   "description": "Create RapidKit projects with a single command",
   "keywords": [
@@ -17,10 +17,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/getrapidkit/create-rapidkit"
+    "url": "git+https://github.com/getrapidkit/rapidkit-npm.git"
   },
   "bin": {
-    "create-rapidkit": "./dist/index.js"
+    "rapidkit": "dist/index.js"
   },
   "files": [
     "dist",

@@ -1,14 +1,14 @@
-# create-rapidkit
+# rapidkit
 
 🚀 The easiest way to get started with RapidKit! This CLI tool sets up a Python environment with RapidKit installed, so you can immediately start creating projects using native RapidKit commands.
 
-## What is create-rapidkit?
+## What is rapidkit?
 
-`create-rapidkit` is an **npx-based installer** that creates a development workspace with RapidKit (Python package) pre-installed in a virtual environment. Think of it as a beginner-friendly onboarding tool that handles the Python setup for you.
+`rapidkit` is an **npx-based installer** that creates a development workspace with RapidKit (Python package) pre-installed in a virtual environment. Think of it as a beginner-friendly onboarding tool that handles the Python setup for you.
 
 **After installation, you use the native `rapidkit` commands** to create and manage your FastAPI/NestJS projects.
 
-## Why use create-rapidkit?
+## Why use rapidkit?
 
 Installing Python packages can be challenging for beginners. This tool:
 - ✅ Handles Python virtual environment creation
@@ -20,7 +20,7 @@ Installing Python packages can be challenging for beginners. This tool:
 ## Quick Start
 
 ```bash
-npx create-rapidkit
+npx rapidkit my-workspace
 ```
 
 That's it! Follow the prompts to choose your installation method.
@@ -29,32 +29,26 @@ That's it! Follow the prompts to choose your installation method.
 
 ### 🎯 Poetry (Recommended)
 ```bash
-npx create-rapidkit my-workspace
+npx rapidkit my-workspace
 # Choose: Poetry
 cd my-workspace
-poetry shell
+poetry install
 rapidkit create my-project
 ```
 
 ### 📦 Python venv + pip
 ```bash
-npx create-rapidkit my-workspace
-# Choose: pip with venv
-cd my-workspace
-source .venv/bin/activate
-rapidkit create my-project
-```
+npx rapidkit my-workspace
+# Select "venv + pip" when prompted
 
 ### 🔧 pipx (Global)
 ```bash
-npx create-rapidkit my-workspace
-# Choose: pipx
-rapidkit create my-project  # Available globally
-```
+npx rapidkit my-workspace
+# Select "pipx (global install)" when prompted
 
 ## What Gets Installed?
 
-`create-rapidkit` creates a directory with:
+`rapidkit` creates a directory with:
 - Python virtual environment (Poetry or venv)
 - RapidKit package installed
 - README with usage instructions
@@ -65,11 +59,15 @@ rapidkit create my-project  # Available globally
 Once your environment is activated, you can use all native RapidKit commands:
 
 ```bash
-# Create a new project
-rapidkit create my-api
+# Create a new project (interactive)
+rapidkit create
+
+# Or create non-interactively:
+rapidkit create project fastapi.standard my-api
 
 # Add modules to existing project
 cd my-api
+rapidkit add settings
 rapidkit add auth
 rapidkit add database
 rapidkit add caching
@@ -99,7 +97,7 @@ RapidKit supports multiple project templates:
 ## CLI Options
 
 ```bash
-npx create-rapidkit [directory-name] [options]
+npx rapidkit [directory-name] [options]
 ```
 
 ### Arguments
@@ -114,18 +112,18 @@ npx create-rapidkit [directory-name] [options]
 
 ### Default workspace
 ```bash
-npx create-rapidkit
+npx rapidkit
 # Creates ./rapidkit/ directory
 ```
 
 ### Custom directory name
 ```bash
-npx create-rapidkit my-rapidkit-workspace
+npx rapidkit my-rapidkit-workspace
 ```
 
 ### Skip git initialization
 ```bash
-npx create-rapidkit --skip-git
+npx rapidkit --skip-git
 ```
 
 ## Requirements
@@ -138,7 +136,7 @@ npx create-rapidkit --skip-git
 
 1. **Install RapidKit environment**:
    ```bash
-   npx create-rapidkit
+   npx rapidkit
    cd rapidkit
    ```
 
@@ -149,7 +147,11 @@ npx create-rapidkit --skip-git
 
 3. **Create your first project**:
    ```bash
-   rapidkit create my-api
+   # Interactive mode (recommended)
+   rapidkit create
+   
+   # Or specify directly:
+   rapidkit create project fastapi.standard my-api
    ```
 
 4. **Choose a kit** (e.g., fastapi.standard)
@@ -249,4 +251,4 @@ MIT
 
 ---
 
-**Note**: `create-rapidkit` is an **installer tool**. The actual project generation is done by the **RapidKit Python package** using native commands like `rapidkit create`.
+**Note**: `rapidkit` is an **installer tool**. The actual project generation is done by the **RapidKit Python package** using native commands like `rapidkit create`.
