@@ -114,18 +114,22 @@ export async function createProject(projectName: string | undefined, options: CL
       }
       
       console.log(chalk.white(`   ${activateCmd}  # Or: poetry run rapidkit`));
-      console.log(chalk.white('   rapidkit create my-project'));
+      console.log(chalk.white('   rapidkit create  # Interactive mode'));
+      console.log(chalk.white('   cd <project-name> && poetry install && rapidkit run dev'));
     } else if (pythonAnswers.installMethod === 'venv') {
       console.log(chalk.white('   source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate'));
-      console.log(chalk.white('   rapidkit create my-project'));
+      console.log(chalk.white('   rapidkit create  # Interactive mode'));
+      console.log(chalk.white('   cd <project-name> && pip install -r requirements.txt && rapidkit run dev'));
     } else {
-      console.log(chalk.white('   rapidkit create my-project'));
+      console.log(chalk.white('   rapidkit create  # Interactive mode'));
+      console.log(chalk.white('   cd <project-name> && rapidkit run dev'));
     }
 
     console.log(chalk.white('\n💡 For more information, check the README.md file.'));
     console.log(chalk.cyan('\n📚 RapidKit commands:'));
-    console.log(chalk.white('   rapidkit create <name>   - Create a new project'));
-    console.log(chalk.white('   rapidkit add <module>    - Add a module to your project'));
+    console.log(chalk.white('   rapidkit create          - Create a new project (interactive)'));
+    console.log(chalk.white('   rapidkit run dev         - Run development server'));
+    console.log(chalk.white('   rapidkit add module <name> - Add a module (e.g., settings)'));
     console.log(chalk.white('   rapidkit list            - List available kits'));
     console.log(chalk.white('   rapidkit modules         - List available modules'));
     console.log(chalk.white('   rapidkit --help          - Show all commands\n'));
@@ -290,27 +294,54 @@ ${activationCmd}
 ### 2. Create Your First Project
 
 \`\`\`bash
-# If you activated the environment:
-rapidkit create my-project
+# Interactive mode (recommended):
+rapidkit create
+# Follow the prompts to choose kit and project name
 
-# Or use poetry run directly (no activation needed):
-poetry run rapidkit create my-project
+# Or specify directly:
+rapidkit create project fastapi.standard my-project
+
+# With poetry run (no activation needed):
+poetry run rapidkit create
 \`\`\`
 
-Choose a kit (e.g., fastapi.standard) and follow the prompts.
+Interactive mode will guide you through selecting a kit and configuring your project.
 
 ### 3. Navigate and Run
 
 \`\`\`bash
 cd my-project
-# For FastAPI projects:
+# Install dependencies:
+poetry install
+
+# Run the server (simplest way):
+rapidkit run dev
+
+# Or with poetry run:
+poetry run rapidkit run dev
+
+# Or manually:
 uvicorn src.main:app --reload
+\`\`\`
+
+### 4. Add Modules (Optional)
+
+\`\`\`bash
+# Add common modules to your project:
+rapidkit add module settings
+rapidkit add module logging
+rapidkit add module database
+
+# List available modules:
+rapidkit modules list
 \`\`\`
 
 ## Available Commands
 
-- \`rapidkit create <name>\` - Create a new project
-- \`rapidkit add <module>\` - Add a module to existing project
+- \`rapidkit create\` - Create a new project (interactive)
+- \`rapidkit create project <kit> <name>\` - Create project with specific kit
+- \`rapidkit run dev\` - Run development server
+- \`rapidkit add module <name>\` - Add a module (e.g., \`rapidkit add module settings\`)
 - \`rapidkit list\` - List available kits
 - \`rapidkit modules\` - List available modules
 - \`rapidkit upgrade\` - Upgrade RapidKit
