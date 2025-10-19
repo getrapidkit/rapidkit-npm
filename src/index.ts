@@ -78,14 +78,28 @@ program
 
       // Normal mode - full RapidKit installation
       console.log(
-        chalk.gray(
-          'This tool will set up a Python environment with RapidKit installed,\nso you can use rapidkit commands to create and manage your projects.\n'
+        chalk.yellow.bold('⚠️  BETA NOTICE\n')
+      );
+      console.log(
+        chalk.yellow(
+          'RapidKit Python package is not yet available on PyPI.\n' +
+          'Full installation mode will be available soon.\n'
         )
       );
+      console.log(
+        chalk.cyan('For now, please use one of these options:\n')
+      );
+      console.log(chalk.white('  1. Demo mode (recommended):'));
+      console.log(chalk.gray('     npx create-rapidkit my-workspace --demo\n'));
+      console.log(chalk.white('  2. Test mode (if you have local RapidKit):'));
+      console.log(chalk.gray('     npx create-rapidkit my-workspace --test-mode\n'));
 
-      if (options.testMode) {
-        console.log(chalk.yellow('⚠️  Running in TEST MODE - Installing from local path\n'));
+      if (!options.testMode) {
+        console.log(chalk.red('❌ Cannot proceed without --demo or --test-mode flag.\n'));
+        process.exit(1);
       }
+
+      console.log(chalk.yellow('⚠️  Running in TEST MODE - Installing from local path\n'));
 
       await createProject(workspaceName, {
         skipGit: options.skipGit,
