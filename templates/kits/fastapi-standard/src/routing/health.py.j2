@@ -1,0 +1,13 @@
+"""Health endpoints."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter
+
+router = APIRouter()
+
+
+@router.get("/", summary="Health check")
+async def heartbeat() -> dict[str, str]:
+    """Return basic service heartbeat."""
+    return {"status": "ok"}

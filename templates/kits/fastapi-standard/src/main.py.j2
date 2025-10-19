@@ -1,0 +1,41 @@
+"""{{ project_name }} application entrypoint."""
+
+from __future__ import annotations
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+# <<<inject:imports>>>
+
+from .routing import api_router
+
+app = FastAPI(
+    title="{{ project_name }}",
+    description="{{ description }}",
+    version="{{ app_version }}",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(api_router, prefix="/api")
+# <<<inject:routes>>>
+
+
+@app.on_event("startup")
+async def _on_startup() -> None:
+    """Execute startup hooks provided by modules."""
+    # <<<inject:startup>>>
+
+
+@app.on_event("shutdown")
+async def _on_shutdown() -> None:
+    """Execute shutdown hooks provided by modules."""
+    # <<<inject:shutdown>>>

@@ -1,0 +1,13 @@
+"""API router assembly."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter
+
+from .health import router as health_router
+# <<<inject:router-imports>>>
+
+api_router = APIRouter()
+
+api_router.include_router(health_router, prefix="/health", tags=["health"])
+# <<<inject:router-mount>>>

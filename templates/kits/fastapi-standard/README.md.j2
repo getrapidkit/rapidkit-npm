@@ -1,0 +1,30 @@
+# {{ project_name | replace('_', ' ') | title }}
+
+A minimal FastAPI service generated with the **FastAPI Standard Kit**. All domain-specific capabilities (configuration, logging, persistence, observability, authentication, etc.) are provided by RapidKit modules.
+
+## Quick start
+
+```bash
+poetry install
+poetry run dev
+```
+
+## Available commands
+
+```bash
+poetry run dev      # 🚀 Start development server with hot reload
+poetry run start    # ⚡ Start production server
+poetry run build    # 📦 Build project for production
+poetry run test     # 🧪 Run tests
+```
+
+## Project layout
+
+- `src/main.py` – FastAPI application entrypoint
+- `src/routing/` – Core routers (health) and anchors for module routers
+- `src/modules/` – Module bootstrap anchors
+- `pyproject.toml` – Poetry configuration and dependencies
+
+## Adding features
+
+Use `rapidkit add module <module-name>` to install optional capabilities. Modules inject imports, routes, and services through the anchors defined in `src/main.py` and `src/routing/__init__.py`.

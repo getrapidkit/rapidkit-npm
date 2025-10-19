@@ -1,29 +1,43 @@
-# rapidkit
+# create-rapidkit
 
-🚀 The easiest way to get started with RapidKit! This CLI tool sets up a Python environment with RapidKit installed, so you can immediately start creating projects using native RapidKit commands.
+> ⚠️ **BETA VERSION** - This is a companion tool for RapidKit Python framework.  
+> The stable production version of RapidKit will be released soon on PyPI.  
+> Until then, use `--demo` mode for standalone FastAPI demos, or `--test-mode` to try the full RapidKit installation locally.
 
-## What is rapidkit?
-
-`rapidkit` is an **npx-based installer** that creates a development workspace with RapidKit (Python package) pre-installed in a virtual environment. Think of it as a beginner-friendly onboarding tool that handles the Python setup for you.
-
-**After installation, you use the native `rapidkit` commands** to create and manage your FastAPI/NestJS projects.
-
-## Why use rapidkit?
-
-Installing Python packages can be challenging for beginners. This tool:
-- ✅ Handles Python virtual environment creation
-- ✅ Installs RapidKit automatically
-- ✅ Supports Poetry, venv, or pipx
-- ✅ Works via familiar `npx` command
-- ✅ No manual Python environment setup needed
+🚀 The easiest way to get started with RapidKit! This CLI tool offers two modes:
+1. **Demo Mode** (`--demo`) - Generate a standalone FastAPI project instantly (no Python setup needed)
+2. **Full Mode** - Set up a Python environment with RapidKit installed (requires RapidKit on PyPI - coming soon!)
 
 ## Quick Start
 
+### 🎨 Demo Mode (Available Now!)
+
+Get a working FastAPI project in seconds - **no waiting for RapidKit release**:
+
 ```bash
-npx rapidkit my-workspace
+npx create-rapidkit my-project --demo
+cd my-project
+poetry install
+poetry run dev
 ```
 
-That's it! Follow the prompts to choose your installation method.
+**Perfect for:**
+- Quick prototyping and demos
+- Learning FastAPI and RapidKit project structure
+- Testing the kit layout before stable release
+- No Python RapidKit dependency required
+- **Try now while waiting for stable RapidKit release!**
+
+### 🚀 Full Mode (Coming Soon with Stable Release)
+
+Once RapidKit is published on PyPI, install for full features and modules:
+
+```bash
+npx create-rapidkit my-workspace
+```
+
+**Note:** Full mode requires RapidKit Python package on PyPI.  
+For now, use `--test-mode` flag if you have local RapidKit installation, or use `--demo` for standalone projects.
 
 ## Installation Methods
 
@@ -97,28 +111,42 @@ RapidKit supports multiple project templates:
 ## CLI Options
 
 ```bash
-npx rapidkit [directory-name] [options]
+npx create-rapidkit [directory-name] [options]
 ```
 
 ### Arguments
 - `directory-name` - Name of directory to create (default: `rapidkit`)
 
 ### Options
-- `--skip-git` - Skip git initialization
+- `--demo` - **[Available Now]** Generate standalone FastAPI demo project instantly (no RapidKit Python required)
+- `--skip-git` - Skip git initialization  
+- `--test-mode` - **[Beta Testing]** Install from local RapidKit path (for development/testing only)
 - `--help` - Display help information
 - `--version` - Show version number
 
+> **Note:** Full installation mode (without `--demo`) will be available once RapidKit is published on PyPI.
+
 ## Examples
+
+### Demo Project (No Python setup)
+```bash
+npx create-rapidkit my-demo --demo
+```
+
+### Full RapidKit Installation
+```bash
+npx create-rapidkit my-workspace
+```
 
 ### Default workspace
 ```bash
-npx rapidkit
+npx create-rapidkit
 # Creates ./rapidkit/ directory
 ```
 
 ### Custom directory name
 ```bash
-npx rapidkit my-rapidkit-workspace
+npx create-rapidkit my-rapidkit-workspace
 ```
 
 ### Skip git initialization
@@ -220,19 +248,44 @@ rapidkit doctor
 
 After setting up your RapidKit environment:
 
-1. Explore RapidKit documentation
-2. Create projects with different kits
-3. Add modules to customize your projects
-4. Build your API and deploy
+## What's Next?
+
+After setting up your demo project:
+
+1. Explore the generated FastAPI structure
+2. Customize routes and add your business logic
+3. **Stay tuned for RapidKit stable release on PyPI**
+4. Upgrade to full RapidKit for modules and advanced features
+
+## Roadmap
+
+### ✅ Current (Beta)
+- Demo mode with FastAPI standard kit
+- Standalone project generation
+- Interactive CLI experience
+
+### 🚧 Coming Soon
+- **RapidKit Python package on PyPI** (main blocker)
+- Full installation mode with all kits
+- Module ecosystem integration
+- NestJS standard kit demos
+- Advanced kit templates
+
+### 🔮 Future
+- More framework support
+- Custom kit marketplace
+- Cloud deployment integrations
+- CI/CD templates
 
 ## Related Projects
 
-- **RapidKit** - The core Python package for project generation
-- **RapidKit Marketplace** - Browse and share RapidKit modules
+- **RapidKit Python** - The core framework (coming soon to PyPI)
+- **RapidKit Marketplace** - Browse and share modules (https://rapidkit.dev)
+- **GitHub**: https://github.com/getrapidkit
 
 ## Contributing
 
-Contributions are welcome! This is a thin wrapper around the RapidKit Python package.
+Contributions welcome! This NPM package is a companion tool for RapidKit.
 
 To contribute:
 1. Fork the repository
@@ -245,10 +298,14 @@ MIT
 
 ## Support
 
-- 🐛 Report issues: GitHub Issues
-- 📚 RapidKit docs: [RapidKit Documentation](https://rapidkit.dev)
-- 💬 Community: RapidKit Discord/Slack
+- 🐛 Report issues: [GitHub Issues](https://github.com/getrapidkit/rapidkit-npm/issues)
+- 📚 Docs: https://rapidkit.dev
+- 💬 Community: Coming soon
 
 ---
 
-**Note**: `rapidkit` is an **installer tool**. The actual project generation is done by the **RapidKit Python package** using native commands like `rapidkit create`.
+### About This Beta
+
+**create-rapidkit** is currently in beta. The `--demo` mode is fully functional and production-ready for generating standalone FastAPI projects. Full RapidKit integration will be available once the Python package is published on PyPI.
+
+**Timeline**: RapidKit stable release expected soon. Follow [@getrapidkit](https://github.com/getrapidkit) for updates!
