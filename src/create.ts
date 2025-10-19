@@ -6,12 +6,18 @@ import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 import { execa } from 'execa';
 
-export interface CLIOptions {
+interface CreateProjectOptions {
   skipGit?: boolean;
-  testMode?: boolean; // For testing with local RapidKit installation
+  testMode?: boolean;
+  demoMode?: boolean;
 }
 
-export async function createProject(projectName: string | undefined, options: CLIOptions) {
+export async function createProject(
+  projectName: string | undefined,
+  options: CreateProjectOptions
+) {
+  const { skipGit = false, testMode = false, demoMode = false } = options;
+  
   // Default to 'rapidkit' directory
   const name = projectName || 'rapidkit';
   const projectPath = path.resolve(process.cwd(), name);
@@ -21,6 +27,12 @@ export async function createProject(projectName: string | undefined, options: CL
     console.log(chalk.red(`\n❌ Directory "${name}" already exists!`));
     console.log(chalk.yellow('💡 Please choose a different name or remove the existing directory.\n'));
     process.exit(1);
+  }
+
+  // Demo mode - create workspace with demo kit setup script
+  if (demoMode) {
+    await createDemoWorkspace(projectPath, name, skipGit);
+    return;
   }
 
   // Step 1: Choose Python version and install method
@@ -55,11 +67,11 @@ export async function createProject(projectName: string | undefined, options: CL
 
     // Install RapidKit based on method
     if (pythonAnswers.installMethod === 'poetry') {
-      await installWithPoetry(projectPath, pythonAnswers.pythonVersion, spinner, options.testMode);
+      await installWithPoetry(projectPath, pythonAnswers.pythonVersion, spinner, testMode);
     } else if (pythonAnswers.installMethod === 'venv') {
-      await installWithVenv(projectPath, pythonAnswers.pythonVersion, spinner, options.testMode);
+      await installWithVenv(projectPath, pythonAnswers.pythonVersion, spinner, testMode);
     } else {
-      await installWithPipx(projectPath, spinner, options.testMode);
+      await installWithPipx(projectPath, spinner, testMode);
     }
 
     // Create README with instructions
@@ -275,7 +287,7 @@ async function createReadme(projectPath: string, installMethod: string) {
         ? 'source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate'
         : 'N/A (globally installed)';
 
-  const readme = `# RapidKit Workspace
+  const readmeContent = `# RapidKit Workspace
 
 This directory contains a RapidKit development environment.
 
@@ -367,12 +379,234 @@ If you encounter issues:
 
 1. Ensure Python 3.10+ is installed: \`python3 --version\`
 2. Check RapidKit installation: \`rapidkit --version\`
-3. Run system check: \`rapidkit doctor\`
+3. Run diagnostics: \`rapidkit doctor\`
+4. Visit RapidKit documentation or GitHub issues
+`;
+  await fsPromises.writeFile(path.join(projectPath, 'README.md'), readmeContent, 'utf-8');
+}
+
+/**
+ * Create a demo workspace with kit templates (no Python installation)
+ */
+async function createDemoWorkspace(
+  projectPath: string,
+  name: string,
+  skipGit: boolean
+): Promise<void> {
+  const spinner = ora('Creating demo workspace').start();
+
+  try {
+    // Create directory
+    await fsExtra.ensureDir(projectPath);
+    spinner.succeed('Directory created');
+
+    // Create a simple CLI script for generating demo projects
+    spinner.start('Setting up demo kit generator');
+    
+    const packageJsonContent = JSON.stringify(
+      {
+        name: `${name}-workspace`,
+        version: '1.0.0',
+        private: true,
+        description: 'RapidKit demo workspace',
+        scripts: {
+          generate: 'node generate-demo.js',
+        },
+      },
+      null,
+      2
+    );
+
+    await fsPromises.writeFile(
+      path.join(projectPath, 'package.json'),
+      packageJsonContent,
+      'utf-8'
+    );
+
+    const generateScriptContent = `#!/usr/bin/env node
+/**
+ * Demo Kit Generator - Create FastAPI demo projects
+ * 
+ * This workspace contains bundled RapidKit templates that you can use
+ * to generate demo projects without installing Python RapidKit.
+ * 
+ * Usage:
+ *   npm run generate <project-name>
+ *   node generate-demo.js <project-name>
+ * 
+ * Example:
+ *   npm run generate my-api
+ */
+
+const { execSync } = require('child_process');
+const path = require('path');
+
+const projectName = process.argv[2];
+
+if (!projectName) {
+  console.error('\\n❌ Please provide a project name');
+  console.log('\\nUsage: npm run generate <project-name>\\n');
+  console.log('Example: npm run generate my-api\\n');
+  process.exit(1);
+}
+
+// Use npx to run create-rapidkit in demo mode, targeting the current directory
+const targetPath = path.join(process.cwd(), projectName);
+
+try {
+  console.log(\`\\nGenerating demo project: \${projectName}...\\n\`);
+  execSync(\`npx create-rapidkit "\${projectName}" --demo-only\`, {
+    stdio: 'inherit',
+    cwd: process.cwd(),
+  });
+  console.log(\`\\n✅ Demo project created at: \${targetPath}\\n\`);
+} catch (error) {
+  console.error('\\n❌ Failed to generate demo project\\n');
+  process.exit(1);
+}
+`;
+
+    await fsPromises.writeFile(
+      path.join(projectPath, 'generate-demo.js'),
+      generateScriptContent,
+      'utf-8'
+    );
+
+    // Make the script executable
+    try {
+      await execa('chmod', ['+x', path.join(projectPath, 'generate-demo.js')]);
+    } catch {
+      // Ignore if chmod fails (e.g., on Windows)
+    }
+
+    // Create README
+    const readmeContent = `# RapidKit Demo Workspace
+
+Welcome to your RapidKit demo workspace! This environment lets you generate FastAPI demo projects using bundled RapidKit templates, without needing to install Python RapidKit.
+
+## 🚀 Quick Start
+
+### Generate Your First Demo Project
+
+\`\`\`bash
+# Generate a demo project:
+node generate-demo.js my-api
+
+# Navigate to the project:
+cd my-api
+
+# Install dependencies:
+poetry install
+
+# Run the development server:
+poetry run python -m src.main
+\`\`\`
+
+Your API will be available at \`http://localhost:8000\`
+
+## 📦 Generate Multiple Projects
+
+You can create multiple demo projects in this workspace:
+
+\`\`\`bash
+node generate-demo.js api-service
+node generate-demo.js auth-service
+node generate-demo.js data-service
+\`\`\`
+
+Each project is independent and has its own dependencies.
+
+## 🎯 What's Included
+
+Each generated demo project contains:
+
+- **FastAPI Application** - Modern async web framework
+- **Routing System** - Organized API routes
+- **Module System** - Extensible module architecture
+- **CLI Commands** - Built-in command system
+- **Testing Setup** - pytest configuration
+- **Poetry Configuration** - Dependency management
+
+## 📚 Next Steps
+
+1. **Explore the Generated Code** - Check out \`src/main.py\` and \`src/routing/\`
+2. **Add Routes** - Create new endpoints in \`src/routing/\`
+3. **Install Full RapidKit** - For advanced features: \`pipx install rapidkit\`
+4. **Read the Documentation** - Visit [RapidKit Docs](https://rapidkit.dev)
+
+## ⚠️ Demo Mode Limitations
+
+This is a demo workspace with:
+- ✅ Pre-built FastAPI templates
+- ✅ Project generation without Python RapidKit
+- ❌ No RapidKit CLI commands (\`rapidkit create\`, \`rapidkit add module\`)
+- ❌ No interactive module system
+
+For full RapidKit features, install the Python package:
+
+\`\`\`bash
+pipx install rapidkit
+\`\`\`
+
+## 🛠️ Workspace Structure
+
+\`\`\`
+${name}/
+  ├── generate-demo.js    # Demo project generator
+  ├── README.md           # This file
+  └── my-api/             # Your generated projects go here
+\`\`\`
+
+## 💡 Tips
+
+- Run \`node generate-demo.js --help\` for more options (coming soon)
+- Each project can have different configurations
+- Demo projects are production-ready FastAPI applications
+- You can copy and modify templates as needed
 
 ---
 
-Generated by create-rapidkit
+**Generated with create-rapidkit** | [GitHub](https://github.com/getrapidkit/rapidkit-npm)
 `;
 
-  await fsExtra.outputFile(path.join(projectPath, 'README.md'), readme, 'utf-8');
+    await fsPromises.writeFile(path.join(projectPath, 'README.md'), readmeContent, 'utf-8');
+    spinner.succeed('Demo workspace setup complete');
+
+    // Git initialization
+    if (!skipGit) {
+      spinner.start('Initializing git repository');
+      try {
+        await execa('git', ['init'], { cwd: projectPath });
+        await fsExtra.outputFile(
+          path.join(projectPath, '.gitignore'),
+          '# Dependencies\nnode_modules/\n\n# Generated projects\n*/\n!generate-demo.js\n!README.md\n\n# Python\n__pycache__/\n*.pyc\n.venv/\n.env\n',
+          'utf-8'
+        );
+        await execa('git', ['add', '.'], { cwd: projectPath });
+        await execa('git', ['commit', '-m', 'Initial commit: Demo workspace'], {
+          cwd: projectPath,
+        });
+        spinner.succeed('Git repository initialized');
+      } catch (error) {
+        spinner.warn('Could not initialize git repository');
+      }
+    }
+
+    // Success message
+    console.log(chalk.green('\n✨ Demo workspace created successfully!\n'));
+    console.log(chalk.cyan('📂 Location:'), chalk.white(projectPath));
+    console.log(chalk.cyan('🚀 Get started:\n'));
+    console.log(chalk.white(`   cd ${name}`));
+    console.log(chalk.white('   node generate-demo.js my-api'));
+    console.log(chalk.white('   cd my-api'));
+    console.log(chalk.white('   poetry install'));
+    console.log(chalk.white('   poetry run python -m src.main'));
+    console.log();
+    console.log(chalk.yellow('💡 Note:'), 'This is a demo workspace. For full RapidKit features:');
+    console.log(chalk.cyan('   pipx install rapidkit'));
+    console.log();
+  } catch (error) {
+    spinner.fail('Failed to create demo workspace');
+    throw error;
+  }
 }

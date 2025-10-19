@@ -11,18 +11,19 @@ const program = new Command();
 
 program
   .name('create-rapidkit')
-  .description('Create a RapidKit development environment with Python virtual environment')
-  .version('1.0.0-beta.1')
-  .argument('[directory-name]', 'Name of the directory to create (default: rapidkit)')
+  .description('Create a RapidKit development environment or workspace')
+  .version('1.0.0-beta.2')
+  .argument('[directory-name]', 'Name of the workspace or project directory')
   .option('--skip-git', 'Skip git initialization')
   .option('--test-mode', 'Install RapidKit from local path (for testing only)')
-  .option('--demo', 'Generate a standalone FastAPI demo project without Python RapidKit')
+  .option('--demo', 'Create workspace with demo kit templates (no Python installation required)')
+  .option('--demo-only', 'Generate a demo project in current directory (used by demo workspace)')
   .action(async (directoryName, options) => {
     try {
       console.log(chalk.blue.bold('\n🚀 Welcome to create-rapidkit!\n'));
 
-      if (options.demo) {
-        // Demo mode - generate standalone project
+      // Demo-only mode - generate project directly without workspace
+      if (options.demoOnly) {
         const projectName = directoryName || 'my-fastapi-project';
         const projectPath = path.resolve(process.cwd(), projectName);
 
@@ -57,6 +58,24 @@ program
         return;
       }
 
+      const workspaceName = directoryName || 'rapidkit-workspace';
+
+      if (options.demo) {
+        // Demo mode - create workspace with demo capabilities
+        console.log(
+          chalk.gray(
+            'This will create a workspace with demo kit templates.\nYou can generate demo projects inside without installing Python RapidKit.\n'
+          )
+        );
+
+        await createProject(workspaceName, {
+          skipGit: options.skipGit,
+          testMode: false,
+          demoMode: true,
+        });
+        return;
+      }
+
       // Normal mode - full RapidKit installation
       console.log(
         chalk.gray(
@@ -68,9 +87,10 @@ program
         console.log(chalk.yellow('⚠️  Running in TEST MODE - Installing from local path\n'));
       }
 
-      await createProject(directoryName, {
+      await createProject(workspaceName, {
         skipGit: options.skipGit,
         testMode: options.testMode,
+        demoMode: false,
       });
     } catch (error) {
       console.error(chalk.red('\n❌ Failed to create RapidKit environment:'), error);

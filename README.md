@@ -2,29 +2,40 @@
 
 > ⚠️ **BETA VERSION** - This is a companion tool for RapidKit Python framework.  
 > The stable production version of RapidKit will be released soon on PyPI.  
-> Until then, use `--demo` mode for standalone FastAPI demos, or `--test-mode` to try the full RapidKit installation locally.
+> Until then, use `--demo` mode to create demo workspaces with bundled templates, or `--test-mode` to try the full RapidKit installation locally.
 
-🚀 The easiest way to get started with RapidKit! This CLI tool offers two modes:
-1. **Demo Mode** (`--demo`) - Generate a standalone FastAPI project instantly (no Python setup needed)
+🚀 The easiest way to get started with RapidKit! This CLI tool creates development workspaces with two modes:
+
+1. **Demo Mode** (`--demo`) - Create a workspace with bundled FastAPI templates (no Python RapidKit required)
 2. **Full Mode** - Set up a Python environment with RapidKit installed (requires RapidKit on PyPI - coming soon!)
 
 ## Quick Start
 
 ### 🎨 Demo Mode (Available Now!)
 
-Get a working FastAPI project in seconds - **no waiting for RapidKit release**:
+Create a demo workspace and generate multiple FastAPI projects instantly:
 
 ```bash
-npx create-rapidkit my-project --demo
-cd my-project
+# Create demo workspace
+npx create-rapidkit my-workspace --demo
+cd my-workspace
+
+# Generate your first project
+node generate-demo.js api-project
+cd api-project
 poetry install
 poetry run dev
+
+# Go back and create more projects
+cd ..
+node generate-demo.js auth-service
+node generate-demo.js data-service
 ```
 
 **Perfect for:**
 - Quick prototyping and demos
 - Learning FastAPI and RapidKit project structure
-- Testing the kit layout before stable release
+- Testing multiple microservices in one workspace
 - No Python RapidKit dependency required
 - **Try now while waiting for stable RapidKit release!**
 
@@ -34,31 +45,85 @@ Once RapidKit is published on PyPI, install for full features and modules:
 
 ```bash
 npx create-rapidkit my-workspace
+cd my-workspace
+source $(poetry env info --path)/bin/activate
+rapidkit create my-project
 ```
 
 **Note:** Full mode requires RapidKit Python package on PyPI.  
-For now, use `--test-mode` flag if you have local RapidKit installation, or use `--demo` for standalone projects.
+For now, use `--test-mode` flag if you have local RapidKit installation, or use `--demo` for workspace with bundled templates.
+
+## Understanding Workspaces
+
+**create-rapidkit** follows a workspace-based architecture:
+
+- **Workspace** = Container directory with development environment
+- **Projects** = Individual FastAPI/NestJS applications inside workspace
+
+### Demo Workspace Structure
+```
+my-workspace/              # Workspace (container)
+├── generate-demo.js       # Project generator script
+├── package.json          # npm configuration
+├── README.md             # Workspace instructions
+├── api-project/          # Project 1
+│   ├── src/
+│   ├── tests/
+│   └── pyproject.toml
+├── auth-service/         # Project 2
+│   ├── src/
+│   ├── tests/
+│   └── pyproject.toml
+└── data-service/         # Project 3
+    ├── src/
+    ├── tests/
+    └── pyproject.toml
+```
+
+### Full Workspace Structure
+```
+my-workspace/              # Workspace (container)
+├── .venv/                 # Virtual environment
+├── pyproject.toml        # Poetry config
+├── README.md             # Workspace instructions
+├── api-project/          # Project 1
+├── auth-service/         # Project 2
+└── data-service/         # Project 3
+```
+
+**Benefits:**
+- Multiple projects share same environment
+- Easy microservices development
+- Organized monorepo structure
+- Isolated from system Python
 
 ## Installation Methods
 
 ### 🎯 Poetry (Recommended)
 ```bash
-npx rapidkit my-workspace
+npx create-rapidkit my-workspace
 # Choose: Poetry
 cd my-workspace
-poetry install
+source $(poetry env info --path)/bin/activate
 rapidkit create my-project
 ```
 
 ### 📦 Python venv + pip
 ```bash
-npx rapidkit my-workspace
+npx create-rapidkit my-workspace
 # Select "venv + pip" when prompted
+cd my-workspace
+source .venv/bin/activate
+rapidkit create my-project
+```
 
 ### 🔧 pipx (Global)
 ```bash
-npx rapidkit my-workspace
+npx create-rapidkit my-workspace
 # Select "pipx (global install)" when prompted
+cd my-workspace
+rapidkit create my-project
+```
 
 ## What Gets Installed?
 
@@ -111,14 +176,15 @@ RapidKit supports multiple project templates:
 ## CLI Options
 
 ```bash
-npx create-rapidkit [directory-name] [options]
+npx create-rapidkit [workspace-name] [options]
 ```
 
 ### Arguments
-- `directory-name` - Name of directory to create (default: `rapidkit`)
+- `workspace-name` - Name of workspace directory to create (default: `rapidkit-workspace`)
 
 ### Options
-- `--demo` - **[Available Now]** Generate standalone FastAPI demo project instantly (no RapidKit Python required)
+- `--demo` - **[Available Now]** Create workspace with bundled FastAPI templates (no Python RapidKit required)
+- `--demo-only` - **[Internal]** Generate a single project in current directory (used by demo workspace script)
 - `--skip-git` - Skip git initialization  
 - `--test-mode` - **[Beta Testing]** Install from local RapidKit path (for development/testing only)
 - `--help` - Display help information
@@ -128,30 +194,37 @@ npx create-rapidkit [directory-name] [options]
 
 ## Examples
 
-### Demo Project (No Python setup)
+### Demo Workspace
 ```bash
-npx create-rapidkit my-demo --demo
+# Create demo workspace
+npx create-rapidkit my-workspace --demo
+cd my-workspace
+
+# Generate projects inside
+node generate-demo.js api-service
+node generate-demo.js auth-service
 ```
 
-### Full RapidKit Installation
+### Full RapidKit Workspace
 ```bash
+# Create workspace with RapidKit installed
 npx create-rapidkit my-workspace
+cd my-workspace
+
+# Create projects using RapidKit CLI
+rapidkit create api-service
+rapidkit create auth-service
 ```
 
 ### Default workspace
 ```bash
-npx create-rapidkit
-# Creates ./rapidkit/ directory
-```
-
-### Custom directory name
-```bash
-npx create-rapidkit my-rapidkit-workspace
+npx create-rapidkit --demo
+# Creates ./rapidkit-workspace/ directory
 ```
 
 ### Skip git initialization
 ```bash
-npx rapidkit --skip-git
+npx create-rapidkit my-workspace --demo --skip-git
 ```
 
 ## Requirements
@@ -162,15 +235,43 @@ npx rapidkit --skip-git
 
 ## Typical Workflow
 
-1. **Install RapidKit environment**:
+### Demo Mode
+1. **Create demo workspace**:
    ```bash
-   npx rapidkit
-   cd rapidkit
+   npx create-rapidkit my-workspace --demo
+   cd my-workspace
+   ```
+
+2. **Generate your first project**:
+   ```bash
+   node generate-demo.js api-service
+   cd api-service
+   ```
+
+3. **Install dependencies and run**:
+   ```bash
+   poetry install
+   poetry run dev
+   ```
+
+4. **Create more projects** (go back to workspace):
+   ```bash
+   cd ..
+   node generate-demo.js auth-service
+   node generate-demo.js data-service
+   ```
+
+### Full Mode (After RapidKit PyPI Release)
+1. **Create RapidKit workspace**:
+   ```bash
+   npx create-rapidkit my-workspace
+   cd my-workspace
    ```
 
 2. **Activate environment**:
    ```bash
-   poetry shell  # or: source .venv/bin/activate
+   source $(poetry env info --path)/bin/activate
+   # Or: poetry shell
    ```
 
 3. **Create your first project**:
@@ -179,32 +280,21 @@ npx rapidkit --skip-git
    rapidkit create
    
    # Or specify directly:
-   rapidkit create project fastapi.standard my-api
+   rapidkit create project fastapi.standard api-service
    ```
 
-4. **Choose a kit** (e.g., fastapi.standard)
-
-5. **Navigate and run**:
+4. **Navigate and run**:
    ```bash
-   cd my-api
-   uvicorn src.main:app --reload
+   cd api-service
+   rapidkit run dev
    ```
 
-## Project Structure
-
-After using `rapidkit create`, your workspace will look like:
-
-```
-my-workspace/
-├── .venv/              # Virtual environment (venv method)
-├── pyproject.toml      # Poetry config (poetry method)
-├── README.md           # Usage instructions
-├── .gitignore
-└── my-project/         # Projects created with rapidkit create
-    ├── src/
-    ├── tests/
-    └── ...
-```
+5. **Create more projects** (from workspace root):
+   ```bash
+   cd ..
+   rapidkit create project fastapi.standard auth-service
+   rapidkit create project nestjs.standard data-service
+   ```
 
 ## Troubleshooting
 
@@ -260,16 +350,18 @@ After setting up your demo project:
 ## Roadmap
 
 ### ✅ Current (Beta)
-- Demo mode with FastAPI standard kit
-- Standalone project generation
-- Interactive CLI experience
+- ✅ Demo workspace with bundled FastAPI templates
+- ✅ Multiple projects per workspace
+- ✅ Interactive project generation
+- ✅ Full FastAPI project structure
 
 ### 🚧 Coming Soon
 - **RapidKit Python package on PyPI** (main blocker)
 - Full installation mode with all kits
-- Module ecosystem integration
+- Module ecosystem integration (`rapidkit add module`)
 - NestJS standard kit demos
 - Advanced kit templates
+- Workspace sharing and templates
 
 ### 🔮 Future
 - More framework support
@@ -306,6 +398,8 @@ MIT
 
 ### About This Beta
 
-**create-rapidkit** is currently in beta. The `--demo` mode is fully functional and production-ready for generating standalone FastAPI projects. Full RapidKit integration will be available once the Python package is published on PyPI.
+**create-rapidkit** is currently in beta. The `--demo` mode is fully functional for creating workspaces with bundled FastAPI templates. You can generate multiple projects within the same workspace without needing Python RapidKit installed.
+
+**Full RapidKit integration** (with `rapidkit create` and `rapidkit add module` commands) will be available once the Python package is published on PyPI.
 
 **Timeline**: RapidKit stable release expected soon. Follow [@getrapidkit](https://github.com/getrapidkit) for updates!
