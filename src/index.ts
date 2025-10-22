@@ -12,7 +12,7 @@ const program = new Command();
 program
   .name('create-rapidkit')
   .description('Create a RapidKit development environment or workspace')
-  .version('1.0.0-beta.3')
+  .version('1.0.0-beta.4')
   .argument('[directory-name]', 'Name of the workspace or project directory')
   .option('--skip-git', 'Skip git initialization')
   .option('--test-mode', 'Install RapidKit from local path (for testing only)')
