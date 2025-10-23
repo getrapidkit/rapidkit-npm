@@ -187,6 +187,9 @@ npx rapidkit [workspace-name] [options]
 - `--demo-only` - **[Internal]** Generate a single project in current directory (used by demo workspace script)
 - `--skip-git` - Skip git initialization  
 - `--test-mode` - **[Beta Testing]** Install from local RapidKit path (for development/testing only)
+- `--debug` - Enable verbose debug logging
+- `--dry-run` - Preview what would be created without creating it
+- `--no-update-check` - Skip checking for newer versions
 - `--help` - Display help information
 - `--version` - Show version number
 
@@ -226,6 +229,45 @@ npx rapidkit --demo
 ```bash
 npx rapidkit my-workspace --demo --skip-git
 ```
+
+### Debug mode
+```bash
+npx rapidkit my-workspace --debug
+```
+
+### Dry-run (preview without creating)
+```bash
+npx rapidkit my-workspace --dry-run
+npx rapidkit my-workspace --demo --dry-run
+```
+
+## Configuration
+
+### User Configuration File
+
+Create `~/.rapidkitrc.json` in your home directory to set default values:
+
+```json
+{
+  "defaultKit": "fastapi.standard",
+  "defaultInstallMethod": "poetry",
+  "pythonVersion": "3.11",
+  "author": "Your Name",
+  "license": "MIT",
+  "skipGit": false
+}
+```
+
+### Environment Variables
+
+For test mode with local RapidKit installation:
+
+```bash
+export RAPIDKIT_DEV_PATH=/path/to/local/rapidkit
+npx rapidkit my-workspace --test-mode
+```
+
+**Priority:** CLI options > Environment variables > Config file > Defaults
 
 ## Requirements
 
@@ -398,7 +440,17 @@ MIT
 
 ### About This Beta
 
-**rapidkit** (npm package) is currently in beta version 1.0.0-beta.4. The `--demo` mode is fully functional for creating workspaces with bundled FastAPI templates. You can generate multiple projects within the same workspace without needing Python RapidKit installed.
+**rapidkit** (npm package) is currently in beta version 1.0.0-beta.5. The `--demo` mode is fully functional for creating workspaces with bundled FastAPI templates. You can generate multiple projects within the same workspace without needing Python RapidKit installed.
+
+**New in beta.5:**
+- 🐛 Custom error classes with detailed messages
+- ✅ Input validation for project names
+- ⚙️ Configuration file support (~/.rapidkitrc.json)
+- 🔍 Debug mode (--debug) and dry-run mode (--dry-run)
+- 🔄 Automatic update checker
+- 🧹 Graceful cleanup on interrupt (Ctrl+C)
+- 🧪 Full test suite with 26 tests
+- 📚 Comprehensive documentation (DEVELOPMENT.md, CHANGELOG.md)
 
 Install with:
 ```bash

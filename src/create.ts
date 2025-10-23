@@ -5,18 +5,36 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 import { execa } from 'execa';
+import { logger } from './logger.js';
+import { UserConfig, getTestRapidKitPath } from './config.js';
+import {
+  DirectoryExistsError,
+  PythonNotFoundError,
+  PoetryNotFoundError,
+  PipxNotFoundError,
+  InstallationError,
+  RapidKitNotAvailableError,
+} from './errors.js';
 
 interface CreateProjectOptions {
   skipGit?: boolean;
   testMode?: boolean;
   demoMode?: boolean;
+  dryRun?: boolean;
+  userConfig?: UserConfig;
 }
 
 export async function createProject(
   projectName: string | undefined,
   options: CreateProjectOptions
 ) {
-  const { skipGit = false, testMode = false, demoMode = false } = options;
+  const { 
+    skipGit = false, 
+    testMode = false, 
+    demoMode = false,
+    dryRun = false,
+    userConfig = {},
+  } = options;
   
   // Default to 'rapidkit' directory
   const name = projectName || 'rapidkit';
@@ -24,9 +42,13 @@ export async function createProject(
 
   // Check if directory exists
   if (await fsExtra.pathExists(projectPath)) {
-    console.log(chalk.red(`\n❌ Directory "${name}" already exists!`));
-    console.log(chalk.yellow('💡 Please choose a different name or remove the existing directory.\n'));
-    process.exit(1);
+    throw new DirectoryExistsError(name);
+  }
+
+  // Dry-run mode - show what would be created
+  if (dryRun) {
+    await showDryRun(projectPath, name, demoMode, userConfig);
+    return;
   }
 
   // Demo mode - create workspace with demo kit setup script
@@ -42,7 +64,7 @@ export async function createProject(
       name: 'pythonVersion',
       message: 'Select Python version for RapidKit:',
       choices: ['3.10', '3.11', '3.12'],
-      default: '3.11',
+      default: userConfig.pythonVersion || '3.11',
     },
     {
       type: 'list',
@@ -53,11 +75,11 @@ export async function createProject(
         { name: '📦 pip with venv (Standard)', value: 'venv' },
         { name: '🔧 pipx (Global isolated install)', value: 'pipx' },
       ],
-      default: 'poetry',
+      default: userConfig.defaultInstallMethod || 'poetry',
     },
   ]);
 
-  console.log(chalk.blue('\n📦 Setting up RapidKit environment...\n'));
+  logger.step(1, 3, 'Setting up RapidKit environment');
   const spinner = ora('Creating directory').start();
 
   try {
@@ -67,11 +89,11 @@ export async function createProject(
 
     // Install RapidKit based on method
     if (pythonAnswers.installMethod === 'poetry') {
-      await installWithPoetry(projectPath, pythonAnswers.pythonVersion, spinner, testMode);
+      await installWithPoetry(projectPath, pythonAnswers.pythonVersion, spinner, testMode, userConfig);
     } else if (pythonAnswers.installMethod === 'venv') {
-      await installWithVenv(projectPath, pythonAnswers.pythonVersion, spinner, testMode);
+      await installWithVenv(projectPath, pythonAnswers.pythonVersion, spinner, testMode, userConfig);
     } else {
-      await installWithPipx(projectPath, spinner, testMode);
+      await installWithPipx(projectPath, spinner, testMode, userConfig);
     }
 
     // Create README with instructions
@@ -161,17 +183,20 @@ export async function createProject(
 }
 
 // Install RapidKit with Poetry
-async function installWithPoetry(projectPath: string, pythonVersion: string, spinner: Ora, testMode?: boolean) {
+async function installWithPoetry(
+  projectPath: string,
+  pythonVersion: string,
+  spinner: Ora,
+  testMode?: boolean,
+  userConfig?: UserConfig
+) {
   spinner.start('Checking Poetry installation');
 
   try {
     await execa('poetry', ['--version']);
     spinner.succeed('Poetry found');
   } catch (error) {
-    spinner.fail('Poetry not found');
-    console.log(chalk.yellow('\n⚠️  Poetry is not installed.'));
-    console.log(chalk.cyan('Install Poetry: https://python-poetry.org/docs/#installation\n'));
-    process.exit(1);
+    throw new PoetryNotFoundError();
   }
 
   spinner.start('Initializing Poetry project');
@@ -192,19 +217,37 @@ async function installWithPoetry(projectPath: string, pythonVersion: string, spi
 
   spinner.start('Installing RapidKit');
   if (testMode) {
-    // Test mode: Install from local path
-    const localRapidKitPath = '/home/debux/WOSP/Rapid/community';
+    // Test mode: Install from local path (configured via environment or config file)
+    const localPath = getTestRapidKitPath(userConfig || {});
+    if (!localPath) {
+      throw new InstallationError(
+        'Test mode installation',
+        new Error('No local RapidKit path configured. Set RAPIDKIT_DEV_PATH environment variable.')
+      );
+    }
+    logger.debug(`Installing from local path: ${localPath}`);
     spinner.text = 'Installing RapidKit from local path (test mode)';
-    await execa('poetry', ['add', localRapidKitPath], { cwd: projectPath });
+    await execa('poetry', ['add', localPath], { cwd: projectPath });
   } else {
     // Production: Install from PyPI
-    await execa('poetry', ['add', 'rapidkit'], { cwd: projectPath });
+    spinner.text = 'Installing RapidKit from PyPI';
+    try {
+      await execa('poetry', ['add', 'rapidkit'], { cwd: projectPath });
+    } catch (error) {
+      throw new RapidKitNotAvailableError();
+    }
   }
   spinner.succeed('RapidKit installed');
 }
 
 // Install RapidKit with venv + pip
-async function installWithVenv(projectPath: string, pythonVersion: string, spinner: Ora, testMode?: boolean) {
+async function installWithVenv(
+  projectPath: string,
+  pythonVersion: string,
+  spinner: Ora,
+  testMode?: boolean,
+  userConfig?: UserConfig
+) {
   spinner.start(`Checking Python ${pythonVersion}`);
 
   let pythonCmd = 'python3';
@@ -213,15 +256,15 @@ async function installWithVenv(projectPath: string, pythonVersion: string, spinn
     const version = stdout.match(/Python (\d+\.\d+)/)?.[1];
 
     if (version && parseFloat(version) < parseFloat(pythonVersion)) {
-      throw new Error(`Python ${pythonVersion}+ required, found ${version}`);
+      throw new PythonNotFoundError(pythonVersion, version);
     }
 
     spinner.succeed(`Python ${version} found`);
   } catch (error) {
-    spinner.fail('Python not found or version too old');
-    console.log(chalk.red('\n❌ Python 3.10+ is required.'));
-    console.log(chalk.cyan('Install Python: https://www.python.org/downloads/\n'));
-    process.exit(1);
+    if (error instanceof PythonNotFoundError) {
+      throw error;
+    }
+    throw new PythonNotFoundError(pythonVersion);
   }
 
   spinner.start('Creating virtual environment');
@@ -233,40 +276,66 @@ async function installWithVenv(projectPath: string, pythonVersion: string, spinn
   await execa(pipPath, ['install', '--upgrade', 'pip'], { cwd: projectPath });
   
   if (testMode) {
-    // Test mode: Install from local path
-    const localRapidKitPath = '/home/debux/WOSP/Rapid/community';
+    // Test mode: Install from local path (configured via environment or config file)
+    const localPath = getTestRapidKitPath(userConfig || {});
+    if (!localPath) {
+      throw new InstallationError(
+        'Test mode installation',
+        new Error('No local RapidKit path configured. Set RAPIDKIT_DEV_PATH environment variable.')
+      );
+    }
+    logger.debug(`Installing from local path: ${localPath}`);
     spinner.text = 'Installing RapidKit from local path (test mode)';
-    await execa(pipPath, ['install', '-e', localRapidKitPath], { cwd: projectPath });
+    await execa(pipPath, ['install', '-e', localPath], { cwd: projectPath });
   } else {
     // Production: Install from PyPI
-    await execa(pipPath, ['install', 'rapidkit'], { cwd: projectPath });
+    spinner.text = 'Installing RapidKit from PyPI';
+    try {
+      await execa(pipPath, ['install', 'rapidkit'], { cwd: projectPath });
+    } catch (error) {
+      throw new RapidKitNotAvailableError();
+    }
   }
   spinner.succeed('RapidKit installed');
 }
 
 // Install RapidKit with pipx (global)
-async function installWithPipx(projectPath: string, spinner: Ora, testMode?: boolean) {
+async function installWithPipx(
+  projectPath: string,
+  spinner: Ora,
+  testMode?: boolean,
+  userConfig?: UserConfig
+) {
   spinner.start('Checking pipx installation');
 
   try {
     await execa('pipx', ['--version']);
     spinner.succeed('pipx found');
   } catch (error) {
-    spinner.fail('pipx not found');
-    console.log(chalk.yellow('\n⚠️  pipx is not installed.'));
-    console.log(chalk.cyan('Install pipx: https://pypa.github.io/pipx/installation/\n'));
-    process.exit(1);
+    throw new PipxNotFoundError();
   }
 
   spinner.start('Installing RapidKit globally with pipx');
   if (testMode) {
-    // Test mode: Install from local path
-    const localRapidKitPath = '/home/debux/WOSP/Rapid/community';
+    // Test mode: Install from local path (configured via environment or config file)
+    const localPath = getTestRapidKitPath(userConfig || {});
+    if (!localPath) {
+      throw new InstallationError(
+        'Test mode installation',
+        new Error('No local RapidKit path configured. Set RAPIDKIT_DEV_PATH environment variable.')
+      );
+    }
+    logger.debug(`Installing from local path: ${localPath}`);
     spinner.text = 'Installing RapidKit from local path (test mode)';
-    await execa('pipx', ['install', '-e', localRapidKitPath]);
+    await execa('pipx', ['install', '-e', localPath]);
   } else {
     // Production: Install from PyPI
-    await execa('pipx', ['install', 'rapidkit']);
+    spinner.text = 'Installing RapidKit from PyPI';
+    try {
+      await execa('pipx', ['install', 'rapidkit']);
+    } catch (error) {
+      throw new RapidKitNotAvailableError();
+    }
   }
   spinner.succeed('RapidKit installed globally');
 
@@ -609,4 +678,45 @@ ${name}/
     spinner.fail('Failed to create demo workspace');
     throw error;
   }
+}
+
+/**
+ * Show what would be created in dry-run mode
+ */
+async function showDryRun(
+  projectPath: string,
+  _name: string,
+  demoMode: boolean,
+  userConfig: UserConfig
+): Promise<void> {
+  console.log(chalk.cyan('\n🔍 Dry-run mode - showing what would be created:\n'));
+  console.log(chalk.white('📂 Project path:'), projectPath);
+  console.log(chalk.white('📦 Project type:'), demoMode ? 'Demo workspace' : 'Full RapidKit environment');
+  
+  if (demoMode) {
+    console.log(chalk.white('\n📝 Files to create:'));
+    console.log(chalk.gray('  - package.json'));
+    console.log(chalk.gray('  - generate-demo.js (project generator)'));
+    console.log(chalk.gray('  - README.md'));
+    console.log(chalk.gray('  - .gitignore'));
+    console.log(chalk.white('\n🎯 Capabilities:'));
+    console.log(chalk.gray('  - Generate multiple FastAPI demo projects'));
+    console.log(chalk.gray('  - No Python RapidKit installation required'));
+    console.log(chalk.gray('  - Bundled templates included'));
+  } else {
+    console.log(chalk.white('\n⚙️  Configuration:'));
+    console.log(chalk.gray(`  - Python version: ${userConfig.pythonVersion || '3.11'}`));
+    console.log(chalk.gray(`  - Install method: ${userConfig.defaultInstallMethod || 'poetry'}`));
+    console.log(chalk.gray(`  - Git initialization: ${userConfig.skipGit ? 'No' : 'Yes'}`));
+    console.log(chalk.white('\n📝 Files to create:'));
+    console.log(chalk.gray('  - pyproject.toml (Poetry) or .venv/ (venv)'));
+    console.log(chalk.gray('  - README.md'));
+    console.log(chalk.gray('  - .gitignore'));
+    console.log(chalk.white('\n🎯 Next steps after creation:'));
+    console.log(chalk.gray('  1. Install RapidKit Python package'));
+    console.log(chalk.gray('  2. Create projects with rapidkit CLI'));
+    console.log(chalk.gray('  3. Add modules and customize'));
+  }
+  
+  console.log(chalk.white('\n💡 To proceed with actual creation, run without --dry-run flag\n'));
 }
