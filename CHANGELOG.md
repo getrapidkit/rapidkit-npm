@@ -5,6 +5,56 @@ All notable changes to create-rapidkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-beta.6] - 2025-10-31
+
+### Added
+- **Code Quality Tools**
+  - ESLint with TypeScript support (latest @typescript-eslint v8.21.0)
+  - Prettier for consistent code formatting
+  - Husky v9 for Git hooks
+  - Lint-staged for pre-commit validation
+  - Pre-commit hooks that auto-fix and format code
+- **Performance Utilities**
+  - Two-layer cache system (memory + disk) with 24-hour TTL
+  - Performance monitoring with metrics tracking
+  - `getCachedOrFetch` helper for easy caching integration
+  - `measure` helper for performance tracking
+  - `measurePerformance` decorator for methods
+- **New NPM Scripts**
+  - `npm run lint` - Check code with ESLint
+  - `npm run lint:fix` - Auto-fix linting errors
+  - `npm run format` - Format code with Prettier
+  - `npm run format:check` - Check formatting
+  - `npm run typecheck` - Type checking without build
+  - `npm run validate` - Complete validation pipeline
+
+### Changed
+- **Documentation** - All documentation converted to English
+  - Reorganized documentation into `docs/` folder
+  - `docs/DEVELOPMENT.md` - Development guide
+  - `docs/SETUP.md` - Quick setup and commands
+  - `docs/OPTIMIZATION_GUIDE.md` - Optimization suggestions
+  - `docs/UTILITIES.md` - Cache and performance utilities
+  - `docs/README.md` - Documentation index
+- **Type Safety Improvements**
+  - Replaced `any` types with proper TypeScript types
+  - Better type inference in cache and performance utilities
+  - Stricter ESLint rules for unused variables
+- **Code Quality**
+  - All TypeScript files formatted with Prettier
+  - Zero linting errors and warnings
+  - All 26 tests passing
+  - Better error handling with proper type guards
+
+### Fixed
+- TypeScript 5.9.3 compatibility (updated @typescript-eslint packages)
+- Unused variable warnings fixed with proper naming conventions
+- Cache type inference issues resolved
+
+### Security
+- Security audit of dependencies performed
+- 7 moderate vulnerabilities identified (in dev dependencies only)
+
 ## [1.0.0-beta.5] - 2025-10-23
 
 ### Added

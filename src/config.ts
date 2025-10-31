@@ -21,13 +21,13 @@ const CONFIG_FILE_NAME = '.rapidkitrc.json';
  */
 export async function loadUserConfig(): Promise<UserConfig> {
   const configPath = path.join(os.homedir(), CONFIG_FILE_NAME);
-  
+
   try {
     const content = await fs.readFile(configPath, 'utf-8');
     const config = JSON.parse(content) as UserConfig;
     logger.debug(`Loaded config from ${configPath}`);
     return config;
-  } catch (error) {
+  } catch (_error) {
     // Config file doesn't exist or is invalid - return empty config
     logger.debug('No user config found, using defaults');
     return {};
@@ -39,11 +39,11 @@ export async function loadUserConfig(): Promise<UserConfig> {
  */
 export async function saveUserConfig(config: UserConfig): Promise<void> {
   const configPath = path.join(os.homedir(), CONFIG_FILE_NAME);
-  
+
   try {
     await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
     logger.debug(`Saved config to ${configPath}`);
-  } catch (error) {
+  } catch (_error) {
     logger.warn('Could not save configuration file');
   }
 }
@@ -53,9 +53,5 @@ export async function saveUserConfig(config: UserConfig): Promise<void> {
  */
 export function getTestRapidKitPath(config: UserConfig): string | undefined {
   // Priority: CLI option > Environment variable > Config file
-  return (
-    process.env.RAPIDKIT_DEV_PATH ||
-    config.testRapidKitPath ||
-    undefined
-  );
+  return process.env.RAPIDKIT_DEV_PATH || config.testRapidKitPath || undefined;
 }

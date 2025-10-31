@@ -19,7 +19,11 @@ export class PythonNotFoundError extends RapidKitError {
     const message = foundVersion
       ? `Python ${requiredVersion}+ required, found ${foundVersion}`
       : `Python ${requiredVersion}+ not found`;
-    super(message, 'PYTHON_NOT_FOUND', `Please install Python from https://www.python.org/downloads/`);
+    super(
+      message,
+      'PYTHON_NOT_FOUND',
+      `Please install Python from https://www.python.org/downloads/`
+    );
   }
 }
 
@@ -55,21 +59,13 @@ export class DirectoryExistsError extends RapidKitError {
 
 export class InvalidProjectNameError extends RapidKitError {
   constructor(name: string, reason: string) {
-    super(
-      `Invalid project name: "${name}"`,
-      'INVALID_PROJECT_NAME',
-      reason
-    );
+    super(`Invalid project name: "${name}"`, 'INVALID_PROJECT_NAME', reason);
   }
 }
 
 export class InstallationError extends RapidKitError {
   constructor(step: string, originalError: Error) {
-    super(
-      `Installation failed at step: ${step}`,
-      'INSTALLATION_ERROR',
-      originalError.message
-    );
+    super(`Installation failed at step: ${step}`, 'INSTALLATION_ERROR', originalError.message);
   }
 }
 

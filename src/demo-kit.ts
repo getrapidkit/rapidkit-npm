@@ -17,10 +17,7 @@ interface KitVariables {
   license?: string;
 }
 
-export async function generateDemoKit(
-  projectPath: string,
-  variables: KitVariables
-): Promise<void> {
+export async function generateDemoKit(projectPath: string, variables: KitVariables): Promise<void> {
   const spinner = ora('Generating FastAPI demo project...').start();
 
   try {
@@ -28,7 +25,7 @@ export async function generateDemoKit(
     // dist/demo-kit.js -> .. (package root) -> templates/kits/fastapi-standard
     const packageRoot = path.resolve(__dirname, '..');
     const templatesPath = path.join(packageRoot, 'templates', 'kits', 'fastapi-standard');
-    
+
     const env = nunjucks.configure(templatesPath, {
       autoescape: false,
       trimBlocks: true,
@@ -61,16 +58,16 @@ export async function generateDemoKit(
     for (const templateFile of files) {
       const templatePath = path.join(templatesPath, templateFile);
       const templateContent = await fs.readFile(templatePath, 'utf-8');
-      
+
       const rendered = env.renderString(templateContent, context);
-      
+
       // Output path is the same but without .j2
       const outputFile = templateFile.replace(/\.j2$/, '');
       const outputPath = path.join(projectPath, outputFile);
-      
+
       // Create directory if needed
       await fs.mkdir(path.dirname(outputPath), { recursive: true });
-      
+
       // Write file
       await fs.writeFile(outputPath, rendered);
     }

@@ -7,15 +7,12 @@ import { InvalidProjectNameError } from './errors.js';
 export function validateProjectName(name: string): boolean {
   // Check npm package name rules
   const npmCheck = validateNpmPackageName(name);
-  
+
   if (!npmCheck.validForNewPackages) {
     const errors = npmCheck.errors || [];
     const warnings = npmCheck.warnings || [];
     const issues = [...errors, ...warnings];
-    throw new InvalidProjectNameError(
-      name,
-      `NPM validation failed: ${issues.join(', ')}`
-    );
+    throw new InvalidProjectNameError(name, `NPM validation failed: ${issues.join(', ')}`);
   }
 
   // Check Python package naming conventions
@@ -29,9 +26,19 @@ export function validateProjectName(name: string): boolean {
 
   // Check for reserved names
   const reservedNames = [
-    'test', 'tests', 'src', 'dist', 'build', 'lib',
-    'python', 'pip', 'poetry', 'node', 'npm',
-    'rapidkit', 'create-rapidkit'
+    'test',
+    'tests',
+    'src',
+    'dist',
+    'build',
+    'lib',
+    'python',
+    'pip',
+    'poetry',
+    'node',
+    'npm',
+    'rapidkit',
+    'create-rapidkit',
   ];
 
   if (reservedNames.includes(name.toLowerCase())) {
@@ -43,17 +50,11 @@ export function validateProjectName(name: string): boolean {
 
   // Check length
   if (name.length < 2) {
-    throw new InvalidProjectNameError(
-      name,
-      'Name must be at least 2 characters long'
-    );
+    throw new InvalidProjectNameError(name, 'Name must be at least 2 characters long');
   }
 
   if (name.length > 214) {
-    throw new InvalidProjectNameError(
-      name,
-      'Name must be less than 214 characters'
-    );
+    throw new InvalidProjectNameError(name, 'Name must be less than 214 characters');
   }
 
   return true;

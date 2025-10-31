@@ -10,25 +10,25 @@ class Logger {
     this.debugEnabled = enabled;
   }
 
-  debug(message: string, ...args: any[]) {
+  debug(message: string, ...args: unknown[]) {
     if (this.debugEnabled) {
       console.log(chalk.gray(`[DEBUG] ${message}`), ...args);
     }
   }
 
-  info(message: string, ...args: any[]) {
+  info(message: string, ...args: unknown[]) {
     console.log(chalk.blue(message), ...args);
   }
 
-  success(message: string, ...args: any[]) {
+  success(message: string, ...args: unknown[]) {
     console.log(chalk.green(message), ...args);
   }
 
-  warn(message: string, ...args: any[]) {
+  warn(message: string, ...args: unknown[]) {
     console.log(chalk.yellow(message), ...args);
   }
 
-  error(message: string, ...args: any[]) {
+  error(message: string, ...args: unknown[]) {
     console.error(chalk.red(message), ...args);
   }
 

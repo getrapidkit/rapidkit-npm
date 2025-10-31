@@ -28,14 +28,14 @@ export async function createProject(
   projectName: string | undefined,
   options: CreateProjectOptions
 ) {
-  const { 
-    skipGit = false, 
-    testMode = false, 
+  const {
+    skipGit = false,
+    testMode = false,
     demoMode = false,
     dryRun = false,
     userConfig = {},
   } = options;
-  
+
   // Default to 'rapidkit' directory
   const name = projectName || 'rapidkit';
   const projectPath = path.resolve(process.cwd(), name);
@@ -89,9 +89,21 @@ export async function createProject(
 
     // Install RapidKit based on method
     if (pythonAnswers.installMethod === 'poetry') {
-      await installWithPoetry(projectPath, pythonAnswers.pythonVersion, spinner, testMode, userConfig);
+      await installWithPoetry(
+        projectPath,
+        pythonAnswers.pythonVersion,
+        spinner,
+        testMode,
+        userConfig
+      );
     } else if (pythonAnswers.installMethod === 'venv') {
-      await installWithVenv(projectPath, pythonAnswers.pythonVersion, spinner, testMode, userConfig);
+      await installWithVenv(
+        projectPath,
+        pythonAnswers.pythonVersion,
+        spinner,
+        testMode,
+        userConfig
+      );
     } else {
       await installWithPipx(projectPath, spinner, testMode, userConfig);
     }
@@ -116,7 +128,7 @@ export async function createProject(
           cwd: projectPath,
         });
         spinner.succeed('Git repository initialized');
-      } catch (error) {
+      } catch (_error) {
         spinner.warn('Could not initialize git repository');
       }
     }
@@ -143,17 +155,21 @@ export async function createProject(
             activateCmd = 'poetry shell';
           }
         }
-      } catch (error) {
+      } catch (_error) {
         // Default to Poetry 2.0+ syntax
       }
-      
+
       console.log(chalk.white(`   ${activateCmd}  # Or: poetry run rapidkit`));
       console.log(chalk.white('   rapidkit create  # Interactive mode'));
       console.log(chalk.white('   cd <project-name> && poetry install && rapidkit run dev'));
     } else if (pythonAnswers.installMethod === 'venv') {
-      console.log(chalk.white('   source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate'));
+      console.log(
+        chalk.white('   source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate')
+      );
       console.log(chalk.white('   rapidkit create  # Interactive mode'));
-      console.log(chalk.white('   cd <project-name> && pip install -r requirements.txt && rapidkit run dev'));
+      console.log(
+        chalk.white('   cd <project-name> && pip install -r requirements.txt && rapidkit run dev')
+      );
     } else {
       console.log(chalk.white('   rapidkit create  # Interactive mode'));
       console.log(chalk.white('   cd <project-name> && rapidkit run dev'));
@@ -167,14 +183,14 @@ export async function createProject(
     console.log(chalk.white('   rapidkit list            - List available kits'));
     console.log(chalk.white('   rapidkit modules         - List available modules'));
     console.log(chalk.white('   rapidkit --help          - Show all commands\n'));
-  } catch (error) {
+  } catch (_error) {
     spinner.fail('Failed to create RapidKit environment');
-    console.error(chalk.red('\n❌ Error:'), error);
+    console.error(chalk.red('\n❌ Error:'), _error);
 
     // Cleanup on failure
     try {
       await fsExtra.remove(projectPath);
-    } catch (cleanupError) {
+    } catch (_cleanupError) {
       // Ignore cleanup errors
     }
 
@@ -195,7 +211,7 @@ async function installWithPoetry(
   try {
     await execa('poetry', ['--version']);
     spinner.succeed('Poetry found');
-  } catch (error) {
+  } catch (_error) {
     throw new PoetryNotFoundError();
   }
 
@@ -203,7 +219,7 @@ async function installWithPoetry(
   await execa('poetry', ['init', '--no-interaction', '--python', `^${pythonVersion}`], {
     cwd: projectPath,
   });
-  
+
   // Set package-mode = false since this is a workspace, not a package
   const pyprojectPath = path.join(projectPath, 'pyproject.toml');
   const pyprojectContent = await fsPromises.readFile(pyprojectPath, 'utf-8');
@@ -212,7 +228,7 @@ async function installWithPoetry(
     '[tool.poetry]\npackage-mode = false'
   );
   await fsPromises.writeFile(pyprojectPath, updatedContent, 'utf-8');
-  
+
   spinner.succeed('Poetry project initialized');
 
   spinner.start('Installing RapidKit');
@@ -233,7 +249,7 @@ async function installWithPoetry(
     spinner.text = 'Installing RapidKit from PyPI';
     try {
       await execa('poetry', ['add', 'rapidkit'], { cwd: projectPath });
-    } catch (error) {
+    } catch (_error) {
       throw new RapidKitNotAvailableError();
     }
   }
@@ -250,7 +266,7 @@ async function installWithVenv(
 ) {
   spinner.start(`Checking Python ${pythonVersion}`);
 
-  let pythonCmd = 'python3';
+  const pythonCmd = 'python3';
   try {
     const { stdout } = await execa(pythonCmd, ['--version']);
     const version = stdout.match(/Python (\d+\.\d+)/)?.[1];
@@ -260,9 +276,9 @@ async function installWithVenv(
     }
 
     spinner.succeed(`Python ${version} found`);
-  } catch (error) {
-    if (error instanceof PythonNotFoundError) {
-      throw error;
+  } catch (_error) {
+    if (_error instanceof PythonNotFoundError) {
+      throw _error;
     }
     throw new PythonNotFoundError(pythonVersion);
   }
@@ -274,7 +290,7 @@ async function installWithVenv(
   spinner.start('Installing RapidKit');
   const pipPath = path.join(projectPath, '.venv', 'bin', 'pip');
   await execa(pipPath, ['install', '--upgrade', 'pip'], { cwd: projectPath });
-  
+
   if (testMode) {
     // Test mode: Install from local path (configured via environment or config file)
     const localPath = getTestRapidKitPath(userConfig || {});
@@ -292,7 +308,7 @@ async function installWithVenv(
     spinner.text = 'Installing RapidKit from PyPI';
     try {
       await execa(pipPath, ['install', 'rapidkit'], { cwd: projectPath });
-    } catch (error) {
+    } catch (_error) {
       throw new RapidKitNotAvailableError();
     }
   }
@@ -311,7 +327,7 @@ async function installWithPipx(
   try {
     await execa('pipx', ['--version']);
     spinner.succeed('pipx found');
-  } catch (error) {
+  } catch (_error) {
     throw new PipxNotFoundError();
   }
 
@@ -333,7 +349,7 @@ async function installWithPipx(
     spinner.text = 'Installing RapidKit from PyPI';
     try {
       await execa('pipx', ['install', 'rapidkit']);
-    } catch (error) {
+    } catch (_error) {
       throw new RapidKitNotAvailableError();
     }
   }
@@ -471,7 +487,7 @@ async function createDemoWorkspace(
 
     // Create a simple CLI script for generating demo projects
     spinner.start('Setting up demo kit generator');
-    
+
     const packageJsonContent = JSON.stringify(
       {
         name: `${name}-workspace`,
@@ -486,11 +502,7 @@ async function createDemoWorkspace(
       2
     );
 
-    await fsPromises.writeFile(
-      path.join(projectPath, 'package.json'),
-      packageJsonContent,
-      'utf-8'
-    );
+    await fsPromises.writeFile(path.join(projectPath, 'package.json'), packageJsonContent, 'utf-8');
 
     const generateScriptContent = `#!/usr/bin/env node
 /**
@@ -529,7 +541,7 @@ try {
     cwd: process.cwd(),
   });
   console.log(\`\\n✅ Demo project created at: \${targetPath}\\n\`);
-} catch (error) {
+} catch (_error) {
   console.error('\\n❌ Failed to generate demo project\\n');
   process.exit(1);
 }
@@ -656,7 +668,7 @@ ${name}/
           cwd: projectPath,
         });
         spinner.succeed('Git repository initialized');
-      } catch (error) {
+      } catch (_error) {
         spinner.warn('Could not initialize git repository');
       }
     }
@@ -674,9 +686,9 @@ ${name}/
     console.log(chalk.yellow('💡 Note:'), 'This is a demo workspace. For full RapidKit features:');
     console.log(chalk.cyan('   pipx install rapidkit'));
     console.log();
-  } catch (error) {
+  } catch (_error) {
     spinner.fail('Failed to create demo workspace');
-    throw error;
+    throw _error;
   }
 }
 
@@ -691,8 +703,11 @@ async function showDryRun(
 ): Promise<void> {
   console.log(chalk.cyan('\n🔍 Dry-run mode - showing what would be created:\n'));
   console.log(chalk.white('📂 Project path:'), projectPath);
-  console.log(chalk.white('📦 Project type:'), demoMode ? 'Demo workspace' : 'Full RapidKit environment');
-  
+  console.log(
+    chalk.white('📦 Project type:'),
+    demoMode ? 'Demo workspace' : 'Full RapidKit environment'
+  );
+
   if (demoMode) {
     console.log(chalk.white('\n📝 Files to create:'));
     console.log(chalk.gray('  - package.json'));
@@ -717,6 +732,6 @@ async function showDryRun(
     console.log(chalk.gray('  2. Create projects with rapidkit CLI'));
     console.log(chalk.gray('  3. Add modules and customize'));
   }
-  
+
   console.log(chalk.white('\n💡 To proceed with actual creation, run without --dry-run flag\n'));
 }

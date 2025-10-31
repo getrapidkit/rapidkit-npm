@@ -53,7 +53,7 @@ program
       // Demo-only mode - generate project directly without workspace
       if (options.demoOnly) {
         const projectName = directoryName || 'my-fastapi-project';
-        
+
         // Validate project name
         try {
           validateProjectName(projectName);
@@ -70,7 +70,7 @@ program
 
         const projectPath = path.resolve(process.cwd(), projectName);
         currentProjectPath = projectPath;
-        
+
         // Dry-run mode
         if (options.dryRun) {
           console.log(chalk.cyan('\n🔍 Dry-run mode - showing what would be created:\n'));
@@ -118,7 +118,7 @@ program
       }
 
       const workspaceName = directoryName || 'rapidkit-workspace';
-      
+
       // Validate workspace name
       try {
         validateProjectName(workspaceName);
@@ -132,7 +132,7 @@ program
         }
         throw error;
       }
-      
+
       currentProjectPath = path.resolve(process.cwd(), workspaceName);
 
       if (options.demo) {
@@ -154,18 +154,14 @@ program
       }
 
       // Normal mode - full RapidKit installation
-      console.log(
-        chalk.yellow.bold('⚠️  BETA NOTICE\n')
-      );
+      console.log(chalk.yellow.bold('⚠️  BETA NOTICE\n'));
       console.log(
         chalk.yellow(
           'RapidKit Python package is not yet available on PyPI.\n' +
-          'Full installation mode will be available soon.\n'
+            'Full installation mode will be available soon.\n'
         )
       );
-      console.log(
-        chalk.cyan('For now, please use one of these options:\n')
-      );
+      console.log(chalk.cyan('For now, please use one of these options:\n'));
       console.log(chalk.white('  1. Demo mode (recommended):'));
       console.log(chalk.gray('     npx create-rapidkit my-workspace --demo\n'));
       console.log(chalk.white('  2. Test mode (if you have local RapidKit):'));
@@ -205,11 +201,11 @@ program
 // Handle process interruption (Ctrl+C)
 process.on('SIGINT', async () => {
   if (cleanupInProgress) return;
-  
+
   cleanupInProgress = true;
   console.log(chalk.yellow('\n\n⚠️  Interrupted by user'));
-  
-  if (currentProjectPath && await fsExtra.pathExists(currentProjectPath)) {
+
+  if (currentProjectPath && (await fsExtra.pathExists(currentProjectPath))) {
     console.log(chalk.gray('Cleaning up partial installation...'));
     try {
       await fsExtra.remove(currentProjectPath);
@@ -218,25 +214,25 @@ process.on('SIGINT', async () => {
       logger.debug('Cleanup failed:', error);
     }
   }
-  
+
   process.exit(130);
 });
 
 // Handle termination signal
 process.on('SIGTERM', async () => {
   if (cleanupInProgress) return;
-  
+
   cleanupInProgress = true;
   logger.debug('Received SIGTERM');
-  
-  if (currentProjectPath && await fsExtra.pathExists(currentProjectPath)) {
+
+  if (currentProjectPath && (await fsExtra.pathExists(currentProjectPath))) {
     try {
       await fsExtra.remove(currentProjectPath);
     } catch (error) {
       logger.debug('Cleanup failed:', error);
     }
   }
-  
+
   process.exit(143);
 });
 

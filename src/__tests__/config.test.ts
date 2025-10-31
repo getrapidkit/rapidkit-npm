@@ -1,6 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import os from 'os';
-import path from 'path';
 import { getTestRapidKitPath } from '../config.js';
 import type { UserConfig } from '../config.js';
 
@@ -17,7 +15,7 @@ describe('getTestRapidKitPath', () => {
   it('should return environment variable if set', () => {
     process.env.RAPIDKIT_DEV_PATH = '/test/env/path';
     const config: UserConfig = { testRapidKitPath: '/test/config/path' };
-    
+
     const result = getTestRapidKitPath(config);
     expect(result).toBe('/test/env/path');
   });
@@ -25,7 +23,7 @@ describe('getTestRapidKitPath', () => {
   it('should return config path if env is not set', () => {
     delete process.env.RAPIDKIT_DEV_PATH;
     const config: UserConfig = { testRapidKitPath: '/test/config/path' };
-    
+
     const result = getTestRapidKitPath(config);
     expect(result).toBe('/test/config/path');
   });
@@ -33,7 +31,7 @@ describe('getTestRapidKitPath', () => {
   it('should return undefined if neither is set', () => {
     delete process.env.RAPIDKIT_DEV_PATH;
     const config: UserConfig = {};
-    
+
     const result = getTestRapidKitPath(config);
     expect(result).toBeUndefined();
   });
@@ -41,7 +39,7 @@ describe('getTestRapidKitPath', () => {
   it('should prioritize env over config', () => {
     process.env.RAPIDKIT_DEV_PATH = '/priority/env';
     const config: UserConfig = { testRapidKitPath: '/priority/config' };
-    
+
     const result = getTestRapidKitPath(config);
     expect(result).toBe('/priority/env');
   });
