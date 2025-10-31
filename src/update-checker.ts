@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { logger } from './logger.js';
 
 const PACKAGE_NAME = 'rapidkit';
-const CURRENT_VERSION = '1.0.0-beta.6';
+const CURRENT_VERSION = '1.0.0-beta.7';
 
 /**
  * Check if a newer version of create-rapidkit is available on npm
