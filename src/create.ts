@@ -536,7 +536,7 @@ const targetPath = path.join(process.cwd(), projectName);
 
 try {
   console.log(\`\\nGenerating demo project: \${projectName}...\\n\`);
-  execSync(\`npx create-rapidkit "\${projectName}" --demo-only\`, {
+  execSync(\`npx rapidkit "\${projectName}" --demo-only\`, {
     stdio: 'inherit',
     cwd: process.cwd(),
   });

@@ -163,9 +163,9 @@ program
       );
       console.log(chalk.cyan('For now, please use one of these options:\n'));
       console.log(chalk.white('  1. Demo mode (recommended):'));
-      console.log(chalk.gray('     npx create-rapidkit my-workspace --demo\n'));
+      console.log(chalk.gray('     npx rapidkit my-workspace --demo\n'));
       console.log(chalk.white('  2. Test mode (if you have local RapidKit):'));
-      console.log(chalk.gray('     npx create-rapidkit my-workspace --test-mode\n'));
+      console.log(chalk.gray('     npx rapidkit my-workspace --test-mode\n'));
 
       if (!options.testMode) {
         console.log(chalk.red('❌ Cannot proceed without --demo or --test-mode flag.\n'));
