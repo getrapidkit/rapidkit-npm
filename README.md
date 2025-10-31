@@ -1,5 +1,10 @@
 # rapidkit
 
+[![npm version](https://img.shields.io/npm/v/rapidkit.svg?style=flat-square)](https://www.npmjs.com/package/rapidkit)
+[![npm downloads](https://img.shields.io/npm/dm/rapidkit.svg?style=flat-square)](https://www.npmjs.com/package/rapidkit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![GitHub Stars](https://img.shields.io/github/stars/getrapidkit/rapidkit-npm.svg?style=flat-square)](https://github.com/getrapidkit/rapidkit-npm/stargazers)
+
 > ⚠️ **BETA VERSION** - This is a companion tool for RapidKit Python framework.  
 > The stable production version of RapidKit will be released soon on PyPI.  
 > Until then, use `--demo` mode to create demo workspaces with bundled templates, or `--test-mode` to try the full RapidKit installation locally.
