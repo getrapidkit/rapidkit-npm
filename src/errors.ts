@@ -1,5 +1,5 @@
 /**
- * Custom error classes for create-rapidkit
+ * Custom error classes for rapidkit
  */
 
 export class RapidKitError extends Error {

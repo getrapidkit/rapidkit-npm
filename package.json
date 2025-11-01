@@ -1,6 +1,6 @@
 {
   "name": "rapidkit",
-  "version": "1.0.0-beta.7",
+  "version": "1.0.0-beta.8",
   "type": "module",
   "description": "Create RapidKit projects with a single command - The official CLI for RapidKit framework",
   "keywords": [
@@ -21,7 +21,7 @@
     "url": "git+https://github.com/getrapidkit/rapidkit-npm.git"
   },
   "bin": {
-    "create-rapidkit": "dist/index.js"
+    "rapidkit": "dist/index.js"
   },
   "files": [
     "dist",
@@ -76,5 +76,6 @@
       "eslint --fix",
       "prettier --write"
     ]
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

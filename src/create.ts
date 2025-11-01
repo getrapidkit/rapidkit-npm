@@ -531,7 +531,7 @@ if (!projectName) {
   process.exit(1);
 }
 
-// Use npx to run create-rapidkit in demo mode, targeting the current directory
+// Use npx to run rapidkit in demo mode, targeting the current directory
 const targetPath = path.join(process.cwd(), projectName);
 
 try {
@@ -647,7 +647,7 @@ ${name}/
 
 ---
 
-**Generated with create-rapidkit** | [GitHub](https://github.com/getrapidkit/rapidkit-npm)
+**Generated with RapidKit** | [GitHub](https://github.com/getrapidkit/rapidkit-npm)
 `;
 
     await fsPromises.writeFile(path.join(projectPath, 'README.md'), readmeContent, 'utf-8');

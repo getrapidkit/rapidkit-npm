@@ -38,7 +38,7 @@ export function validateProjectName(name: string): boolean {
     'node',
     'npm',
     'rapidkit',
-    'create-rapidkit',
+    'rapidkit',
   ];
 
   if (reservedNames.includes(name.toLowerCase())) {

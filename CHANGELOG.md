@@ -1,9 +1,23 @@
 # Changelog
 
-All notable changes to create-rapidkit will be documented in this file.
+All notable changes to RapidKit will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0-beta.8] - 2025-11-01
+
+### Changed
+- 🎯 **Simplified CLI command** - Changed bin name from `create-rapidkit` to `rapidkit`
+  - Now use `npx rapidkit` instead of `npx create-rapidkit`
+  - More intuitive and aligned with package name
+- ✨ **Updated command name** in CLI from `create-rapidkit` to `rapidkit`
+- 📝 **Updated welcome messages** to use "RapidKit" branding
+- 🔧 **Updated internal references** - All comments and documentation updated
+- 🐛 **Fixed VS Code extension integration** - CLI wrapper now uses correct command name
+
+### Fixed
+- Reserved package names validation updated to reflect new bin name
 
 ## [1.0.0-beta.7] - 2025-10-31
 

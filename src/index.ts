@@ -20,7 +20,7 @@ let cleanupInProgress = false;
 const program = new Command();
 
 program
-  .name('create-rapidkit')
+  .name('rapidkit')
   .description('Create a RapidKit development environment or workspace')
   .version(getVersion())
   .argument('[directory-name]', 'Name of the workspace or project directory')
@@ -48,7 +48,7 @@ program
         await checkForUpdates();
       }
 
-      console.log(chalk.blue.bold('\n🚀 Welcome to create-rapidkit!\n'));
+      console.log(chalk.blue.bold('\n🚀 Welcome to RapidKit!\n'));
 
       // Demo-only mode - generate project directly without workspace
       if (options.demoOnly) {
