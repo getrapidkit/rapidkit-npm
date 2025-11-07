@@ -65,7 +65,9 @@ export class InvalidProjectNameError extends RapidKitError {
 
 export class InstallationError extends RapidKitError {
   constructor(step: string, originalError: Error) {
-    super(`Installation failed at step: ${step}`, 'INSTALLATION_ERROR', originalError.message);
+    const message = `Installation failed at: ${step}`;
+    const details = `${originalError.message}\n\nTroubleshooting:\n- Check your internet connection\n- Verify Python/Poetry installation\n- Try running with --debug flag for more details`;
+    super(message, 'INSTALLATION_ERROR', details);
   }
 }
 
@@ -74,7 +76,27 @@ export class RapidKitNotAvailableError extends RapidKitError {
     super(
       'RapidKit Python package is not yet available on PyPI',
       'RAPIDKIT_NOT_AVAILABLE',
-      'Please use --demo mode or --test-mode with a local RapidKit installation'
+      'Available options:\n  1. Demo mode: npx rapidkit my-workspace --demo\n  2. Test mode: npx rapidkit my-workspace --test-mode (requires local RapidKit)\n  3. Wait for official PyPI release (coming soon)'
+    );
+  }
+}
+
+export class NetworkError extends RapidKitError {
+  constructor(operation: string, originalError?: Error) {
+    super(
+      `Network error during ${operation}`,
+      'NETWORK_ERROR',
+      `Failed to complete network operation.\n${originalError?.message || ''}\n\nPlease check:\n- Internet connection\n- Firewall settings\n- Proxy configuration`
+    );
+  }
+}
+
+export class FileSystemError extends RapidKitError {
+  constructor(operation: string, path: string, originalError?: Error) {
+    super(
+      `File system error: ${operation}`,
+      'FILESYSTEM_ERROR',
+      `Failed to ${operation} at: ${path}\n${originalError?.message || ''}\n\nPlease check:\n- File/directory permissions\n- Available disk space\n- Path validity`
     );
   }
 }

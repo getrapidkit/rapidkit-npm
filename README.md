@@ -445,17 +445,15 @@ MIT
 
 ### About This Beta
 
-**rapidkit** (npm package) is currently in beta version 1.0.0-beta.5. The `--demo` mode is fully functional for creating workspaces with bundled FastAPI templates. You can generate multiple projects within the same workspace without needing Python RapidKit installed.
+**rapidkit** (npm package) is currently in beta version 1.0.0-beta.9. The `--demo` mode is fully functional for creating workspaces with bundled FastAPI templates. You can generate multiple projects within the same workspace without needing Python RapidKit installed.
 
-**New in beta.5:**
-- 🐛 Custom error classes with detailed messages
-- ✅ Input validation for project names
-- ⚙️ Configuration file support (~/.rapidkitrc.json)
-- 🔍 Debug mode (--debug) and dry-run mode (--dry-run)
-- 🔄 Automatic update checker
-- 🧹 Graceful cleanup on interrupt (Ctrl+C)
-- 🧪 Full test suite with 26 tests
-- 📚 Comprehensive documentation (DEVELOPMENT.md, CHANGELOG.md)
+**New in beta.9:**
+- ✅ E2E integration tests for reliability
+- ✅ CI/CD pipeline with GitHub Actions
+- ✅ Enhanced error messages with troubleshooting steps
+- ✅ Security audit automation
+- ✅ Bundle size monitoring
+- ✅ Multi-platform testing (Ubuntu, macOS, Windows)
 
 Install with:
 ```bash
