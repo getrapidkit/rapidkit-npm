@@ -63,7 +63,8 @@ describe('Error classes', () => {
     const error = new InstallationError('Installing dependencies', originalError);
     expect(error.message).toContain('Installing dependencies');
     expect(error.code).toBe('INSTALLATION_ERROR');
-    expect(error.details).toBe('Connection timeout');
+    expect(error.details).toContain('Connection timeout');
+    expect(error.details).toContain('Troubleshooting');
   });
 
   it('should create RapidKitNotAvailableError', () => {
