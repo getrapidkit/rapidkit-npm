@@ -1,9 +1,18 @@
 import { execa } from 'execa';
 import chalk from 'chalk';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { logger } from './logger.js';
 
 const PACKAGE_NAME = 'rapidkit';
-const CURRENT_VERSION = '1.0.0-beta.7';
+
+// Get package version from package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJsonPath = join(__dirname, '..', 'package.json');
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+const CURRENT_VERSION = packageJson.version;
 
 /**
  * Check if a newer version of rapidkit is available on npm
