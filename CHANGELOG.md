@@ -5,6 +5,24 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2025-11-08
+
+### Changed
+- ⚡ **Bundle Optimization** - Migrated from TypeScript compiler to tsup
+  - 80% bundle size reduction (208KB → 40KB)
+  - Production build now minified and tree-shaked
+  - Removed source maps from production builds
+  - Single bundled file for faster installation
+  - Optimized for Node.js 18+ with modern features
+- 🔄 **Versioning Strategy** - Switched from beta to 0.x.x versioning
+  - Indicates pre-stable development phase
+  - Will release 1.0.0 when RapidKit Python is published on PyPI
+
+### Developer Experience
+- 🛠️ **Build System** - Added tsup configuration for optimized builds
+- 📦 **Bundle Size** - Automated bundle size monitoring in build process
+- 🚀 **Performance** - Faster CLI startup time with optimized bundle
+
 ## [1.0.0-beta.9] - 2025-11-07
 
 ### Added

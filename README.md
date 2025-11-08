@@ -14,6 +14,8 @@
 1. **Demo Mode** (`--demo`) - Create a workspace with bundled FastAPI templates (no Python RapidKit required)
 2. **Full Mode** - Set up a Python environment with RapidKit installed (requires RapidKit on PyPI - coming soon!)
 
+**💡 Tip:** Use the [RapidKit VS Code Extension](https://marketplace.visualstudio.com/items?itemName=rapidkit.rapidkit-vscode) for a visual interface to create workspaces and projects!
+
 ## Quick Start
 
 ### 🎨 Demo Mode (Available Now!)
@@ -430,6 +432,47 @@ To contribute:
 1. Fork the repository
 2. Create a feature branch
 3. Submit a pull request
+
+### Development
+
+```bash
+# Clone the repository
+git clone https://github.com/getrapidkit/rapidkit-npm.git
+cd rapidkit-npm
+
+# Install dependencies
+npm install
+
+# Build the project (optimized with tsup)
+npm run build
+
+# Run in watch mode during development
+npm run dev
+
+# Run tests
+npm test
+
+# Type checking
+npm run typecheck
+
+# Linting
+npm run lint
+
+# Format code
+npm run format
+
+# Full validation (typecheck + lint + format + test)
+npm run validate
+
+# Check bundle size
+npm run bundle-size
+```
+
+**Bundle Optimization:**
+- Built with [tsup](https://github.com/egoist/tsup) for optimal performance
+- Minified and tree-shaked for smallest bundle size
+- ~40KB total bundle size (80% reduction from unoptimized)
+- No source maps in production
 
 ## License
 
