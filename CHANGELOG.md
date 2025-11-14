@@ -5,7 +5,44 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.1] - 2025-11-08
+## [0.11.1] - 2025-11-14
+
+### Added
+- ✅ **Enhanced Test Coverage** - Increased from 72.69% to 74.63% (426 tests)
+  - 37 new CLI integration tests for index.ts
+  - 6 new decorator tests for performance monitoring
+  - 3 new error handling tests for demo workspace creation
+  - Test coverage for version, help, dry-run, debug modes
+  - Edge case testing for invalid inputs, special characters
+  - Git failure and error recovery testing
+
+### Changed
+- 🔧 **TypeScript Configuration** - Enabled experimental decorators
+  - Added `experimentalDecorators` for performance decorator support
+  - Added `emitDecoratorMetadata` for enhanced decorator functionality
+
+### Fixed
+- 🐛 **Test Suite** - Fixed async/await syntax error in create-helpers.test.ts
+  - Path operation tests now properly handle async imports
+- 🐛 **Performance Utilities** - Achieved 100% test coverage
+  - All decorator edge cases covered
+  - Error handling in decorated methods validated
+  - Context preservation (this binding) tested
+
+### Testing
+- **Total Tests**: 426 (up from 393)
+- **Coverage**: 74.63% overall
+  - config.ts: 100%
+  - errors.ts: 100%
+  - logger.ts: 100%
+  - update-checker.ts: 100%
+  - performance.ts: 100% (improved from 79%)
+  - cache.ts: 96.7%
+  - validation.ts: 96%
+  - demo-kit.ts: 94.82%
+  - create.ts: 91.06% (improved from 90.07%)
+
+## [0.11.0] - 2025-11-14
 
 ### Fixed
 - 🐛 **Version Display** - Fixed version command showing incorrect hardcoded version

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { PerformanceMonitor, measure } from '../utils/performance.js';
+import { PerformanceMonitor, measure, measurePerformance } from '../utils/performance.js';
 
 describe('PerformanceMonitor', () => {
   let monitor: PerformanceMonitor;
@@ -35,7 +35,7 @@ describe('PerformanceMonitor', () => {
     it('should track multiple timers', () => {
       monitor.start('timer-1');
       monitor.start('timer-2');
-      
+
       const duration1 = monitor.end('timer-1');
       const duration2 = monitor.end('timer-2');
 
@@ -124,18 +124,14 @@ describe('PerformanceMonitor', () => {
     it('should display performance summary', () => {
       monitor.start('operation-1');
       monitor.end('operation-1');
-      
+
       monitor.start('operation-2');
       monitor.end('operation-2');
 
       monitor.summary();
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Performance Summary')
-      );
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Total:')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Performance Summary'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Total:'));
     });
 
     it('should not display summary when no metrics', () => {
@@ -184,9 +180,7 @@ describe('PerformanceMonitor', () => {
 
       monitor.summary();
 
-      const summaryCall = consoleLogSpy.mock.calls.find((call) =>
-        String(call[0]).includes('test')
-      );
+      const summaryCall = consoleLogSpy.mock.calls.find((call) => String(call[0]).includes('test'));
 
       if (summaryCall) {
         expect(String(summaryCall[0])).toMatch(/\d+\.\d{2}ms/);
@@ -201,9 +195,7 @@ describe('PerformanceMonitor', () => {
 
       monitor.summary();
 
-      const totalCall = consoleLogSpy.mock.calls.find((call) =>
-        String(call[0]).includes('Total:')
-      );
+      const totalCall = consoleLogSpy.mock.calls.find((call) => String(call[0]).includes('Total:'));
 
       expect(totalCall).toBeDefined();
     });
@@ -278,11 +270,134 @@ describe('measure helper', () => {
 
   it('should handle promise rejection', async () => {
     const error = new Error('Rejected');
-    
+
     await expect(
       measure('rejection', async () => {
         return Promise.reject(error);
       })
     ).rejects.toThrow('Rejected');
+  });
+});
+
+describe('measurePerformance Decorator', () => {
+  let monitor: PerformanceMonitor;
+
+  beforeEach(() => {
+    monitor = PerformanceMonitor.getInstance();
+    monitor.clear();
+  });
+
+  it('should measure decorated async method performance', async () => {
+    class TestClass {
+      @measurePerformance
+      async testMethod(): Promise<string> {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return 'result';
+      }
+    }
+
+    const instance = new TestClass();
+    const result = await instance.testMethod();
+
+    expect(result).toBe('result');
+
+    const metrics = monitor.getMetrics();
+    expect(metrics).toHaveLength(1);
+    expect(metrics[0].name).toBe('TestClass.testMethod');
+    expect(metrics[0].duration).toBeGreaterThan(0);
+  });
+
+  it('should measure decorated method with parameters', async () => {
+    class Calculator {
+      @measurePerformance
+      async add(a: number, b: number): Promise<number> {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return a + b;
+      }
+    }
+
+    const calc = new Calculator();
+    const result = await calc.add(5, 3);
+
+    expect(result).toBe(8);
+
+    const metrics = monitor.getMetrics();
+    expect(metrics).toHaveLength(1);
+    expect(metrics[0].name).toBe('Calculator.add');
+  });
+
+  it('should handle decorated method errors', async () => {
+    class ErrorClass {
+      @measurePerformance
+      async failingMethod(): Promise<void> {
+        throw new Error('Method error');
+      }
+    }
+
+    const instance = new ErrorClass();
+
+    await expect(instance.failingMethod()).rejects.toThrow('Method error');
+
+    // Should still record the measurement
+    const metrics = monitor.getMetrics();
+    expect(metrics).toHaveLength(1);
+    expect(metrics[0].name).toBe('ErrorClass.failingMethod');
+  });
+
+  it('should preserve method context (this)', async () => {
+    class ContextClass {
+      value = 42;
+
+      @measurePerformance
+      async getValue(): Promise<number> {
+        return this.value;
+      }
+    }
+
+    const instance = new ContextClass();
+    const result = await instance.getValue();
+
+    expect(result).toBe(42);
+  });
+
+  it('should work with multiple decorated methods', async () => {
+    class MultiMethod {
+      @measurePerformance
+      async method1(): Promise<number> {
+        return 1;
+      }
+
+      @measurePerformance
+      async method2(): Promise<number> {
+        return 2;
+      }
+    }
+
+    const instance = new MultiMethod();
+    await instance.method1();
+    await instance.method2();
+
+    const metrics = monitor.getMetrics();
+    expect(metrics).toHaveLength(2);
+    expect(metrics.map((m) => m.name)).toContain('MultiMethod.method1');
+    expect(metrics.map((m) => m.name)).toContain('MultiMethod.method2');
+  });
+
+  it('should handle decorated method with complex return types', async () => {
+    class DataClass {
+      @measurePerformance
+      async fetchData(): Promise<{ id: number; data: string[] }> {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return { id: 1, data: ['a', 'b', 'c'] };
+      }
+    }
+
+    const instance = new DataClass();
+    const result = await instance.fetchData();
+
+    expect(result).toEqual({ id: 1, data: ['a', 'b', 'c'] });
+
+    const metrics = monitor.getMetrics();
+    expect(metrics[0].name).toBe('DataClass.fetchData');
   });
 });

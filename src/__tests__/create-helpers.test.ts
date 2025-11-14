@@ -69,7 +69,12 @@ describe('Create Module Helpers', () => {
       } as any);
 
       await execa('poetry', ['init', '--no-interaction', '--python', '^3.11']);
-      expect(execa).toHaveBeenCalledWith('poetry', ['init', '--no-interaction', '--python', '^3.11']);
+      expect(execa).toHaveBeenCalledWith('poetry', [
+        'init',
+        '--no-interaction',
+        '--python',
+        '^3.11',
+      ]);
     });
 
     it('should add package with poetry', async () => {
@@ -230,12 +235,14 @@ describe('Create Module Helpers', () => {
         pythonVersion: '3.11',
       });
 
-      const answer = await inquirer.prompt([{
-        type: 'list',
-        name: 'pythonVersion',
-        message: 'Select Python version',
-        choices: ['3.10', '3.11', '3.12'],
-      }]);
+      const answer = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'pythonVersion',
+          message: 'Select Python version',
+          choices: ['3.10', '3.11', '3.12'],
+        },
+      ]);
 
       expect(answer.pythonVersion).toBe('3.11');
     });
@@ -245,12 +252,14 @@ describe('Create Module Helpers', () => {
         installMethod: 'poetry',
       });
 
-      const answer = await inquirer.prompt([{
-        type: 'list',
-        name: 'installMethod',
-        message: 'How to install?',
-        choices: ['poetry', 'venv', 'pipx'],
-      }]);
+      const answer = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'installMethod',
+          message: 'How to install?',
+          choices: ['poetry', 'venv', 'pipx'],
+        },
+      ]);
 
       expect(answer.installMethod).toBe('poetry');
     });
@@ -289,7 +298,7 @@ describe('Create Module Helpers', () => {
     it('should parse Python version', () => {
       const stdout = 'Python 3.11.5';
       const match = stdout.match(/Python (\d+\.\d+)/);
-      
+
       expect(match).toBeTruthy();
       expect(match?.[1]).toBe('3.11');
     });
@@ -297,7 +306,7 @@ describe('Create Module Helpers', () => {
     it('should parse Poetry version', () => {
       const stdout = 'Poetry (version 1.7.0)';
       const match = stdout.match(/Poetry.*?(\d+)\.(\d+)/);
-      
+
       expect(match).toBeTruthy();
       expect(match?.[1]).toBe('1');
       expect(match?.[2]).toBe('7');
@@ -306,24 +315,24 @@ describe('Create Module Helpers', () => {
     it('should compare versions', () => {
       const version1 = '3.11';
       const version2 = '3.10';
-      
+
       expect(parseFloat(version1)).toBeGreaterThan(parseFloat(version2));
     });
   });
 
   describe('Path Operations', () => {
-    it('should resolve paths correctly', () => {
-      const { resolve, join } = require('path');
-      
+    it('should resolve paths correctly', async () => {
+      const { resolve, join } = await import('path');
+
       const resolved = resolve(process.cwd(), 'test-project');
       expect(resolved).toContain('test-project');
-      
+
       const joined = join('/base', 'sub', 'file.txt');
       expect(joined).toContain('file.txt');
     });
 
-    it('should handle path separators', () => {
-      const { sep } = require('path');
+    it('should handle path separators', async () => {
+      const { sep } = await import('path');
       expect(sep).toBeDefined();
     });
   });
@@ -332,7 +341,7 @@ describe('Create Module Helpers', () => {
     it('should stringify JSON', () => {
       const obj = { name: 'test', version: '1.0.0' };
       const json = JSON.stringify(obj, null, 2);
-      
+
       expect(json).toContain('"name"');
       expect(json).toContain('"test"');
     });
@@ -340,7 +349,7 @@ describe('Create Module Helpers', () => {
     it('should parse JSON', () => {
       const json = '{"name": "test"}';
       const obj = JSON.parse(json);
-      
+
       expect(obj.name).toBe('test');
     });
   });
@@ -359,7 +368,7 @@ poetry install
 poetry run dev
 \`\`\`
 `;
-      
+
       expect(content).toContain('RapidKit');
       expect(content).toContain('Getting Started');
       expect(content).toContain('poetry');
@@ -367,8 +376,8 @@ poetry run dev
 
     it('should support different install methods', () => {
       const methods = ['poetry', 'venv', 'pipx'];
-      
-      methods.forEach(method => {
+
+      methods.forEach((method) => {
         expect(method).toBeTruthy();
         expect(method.length).toBeGreaterThan(0);
       });

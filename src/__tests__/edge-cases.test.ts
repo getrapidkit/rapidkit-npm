@@ -37,7 +37,7 @@ describe('Edge Cases and Error Scenarios', () => {
   });
 
   describe('Path Edge Cases', () => {
-    it('should handle absolute paths', () => {
+    it('should handle absolute paths', async () => {
       const path = '/home/user/project';
       expect(path.startsWith('/')).toBe(true);
     });
@@ -63,9 +63,10 @@ describe('Edge Cases and Error Scenarios', () => {
       expect(path.endsWith('/')).toBe(true);
     });
 
-    it('should normalize paths', () => {
+    it('should normalize paths', async () => {
       const path = '/home//user/./project/../project';
-      const normalized = require('path').normalize(path);
+      const pathModule = await import('path');
+      const normalized = pathModule.normalize(path);
       expect(normalized).toBeDefined();
     });
   });
@@ -148,15 +149,15 @@ describe('Edge Cases and Error Scenarios', () => {
     });
 
     it('should handle sparse arrays', () => {
-      const arr = [1, , , 4];
+      const arr = [1, undefined, undefined, 4];
       expect(arr).toHaveLength(4);
       expect(arr[1]).toBeUndefined();
     });
 
     it('should handle array methods', () => {
       const arr = [1, 2, 3];
-      expect(arr.map(x => x * 2)).toEqual([2, 4, 6]);
-      expect(arr.filter(x => x > 1)).toEqual([2, 3]);
+      expect(arr.map((x) => x * 2)).toEqual([2, 4, 6]);
+      expect(arr.filter((x) => x > 1)).toEqual([2, 3]);
       expect(arr.reduce((a, b) => a + b, 0)).toBe(6);
     });
   });
@@ -165,7 +166,9 @@ describe('Edge Cases and Error Scenarios', () => {
     it('should handle zero', () => {
       expect(0).toBe(0);
       // In JavaScript, -0 and 0 are different in Object.is but equal with ==
-      expect(-0 == 0).toBe(true);
+      const negZero = -0;
+      // eslint-disable-next-line eqeqeq
+      expect(negZero == 0).toBe(true);
     });
 
     it('should handle negative numbers', () => {
@@ -306,7 +309,7 @@ describe('Edge Cases and Error Scenarios', () => {
     it('should handle Promise.race', async () => {
       const result = await Promise.race([
         Promise.resolve('first'),
-        new Promise(resolve => setTimeout(() => resolve('second'), 100)),
+        new Promise((resolve) => setTimeout(() => resolve('second'), 100)),
       ]);
       expect(result).toBe('first');
     });
@@ -315,7 +318,7 @@ describe('Edge Cases and Error Scenarios', () => {
   describe('Timeout Edge Cases', () => {
     it('should handle setTimeout', async () => {
       const start = Date.now();
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       const elapsed = Date.now() - start;
       expect(elapsed).toBeGreaterThanOrEqual(9);
     });

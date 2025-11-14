@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createProject } from '../create.js';
 import * as fsExtra from 'fs-extra';
-import { DirectoryExistsError, PoetryNotFoundError, PythonNotFoundError, PipxNotFoundError, InstallationError, RapidKitNotAvailableError } from '../errors.js';
+import { DirectoryExistsError } from '../errors';
 import path from 'path';
 import { execa } from 'execa';
 
@@ -38,9 +38,9 @@ describe('Create Project', () => {
     it('should throw error if directory already exists', async () => {
       vi.mocked(fsExtra.pathExists).mockResolvedValue(true);
 
-      await expect(
-        createProject('existing-project', { demoMode: true })
-      ).rejects.toThrow(DirectoryExistsError);
+      await expect(createProject('existing-project', { demoMode: true })).rejects.toThrow(
+        DirectoryExistsError
+      );
     });
 
     it('should use default name if not provided', async () => {
@@ -209,7 +209,7 @@ describe('Create Project', () => {
   describe('Python Version Check', () => {
     it('should verify Python version', async () => {
       vi.mocked(fsExtra.pathExists).mockResolvedValue(false);
-      
+
       await createProject('test', { dryRun: true });
       expect(fsExtra.pathExists).toHaveBeenCalled();
     });
@@ -222,7 +222,7 @@ describe('Create Project', () => {
       vi.mocked(fsExtra.outputFile).mockResolvedValue(undefined);
 
       const { promises: fsPromises } = await import('fs');
-      
+
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await createProject('demo-ws', { demoMode: true });
@@ -255,7 +255,7 @@ describe('Create Project', () => {
 
       const { promises: fsPromises } = await import('fs');
       expect(fsPromises.writeFile).toHaveBeenCalled();
-      
+
       consoleLogSpy.mockRestore();
     });
 
@@ -271,6 +271,36 @@ describe('Create Project', () => {
       expect(fsExtra.ensureDir).toHaveBeenCalled();
       consoleLogSpy.mockRestore();
     });
+
+    it('should handle git initialization failure gracefully in demo mode', async () => {
+      vi.mocked(fsExtra.pathExists).mockResolvedValue(false);
+      vi.mocked(fsExtra.ensureDir).mockResolvedValue(undefined);
+      vi.mocked(fsExtra.outputFile).mockResolvedValue(undefined);
+
+      // Mock execa to throw error on git init
+      const { execa } = await import('execa');
+      vi.mocked(execa).mockRejectedValueOnce(new Error('git not found'));
+
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      // Should not throw, should warn instead
+      await createProject('demo', { demoMode: true, skipGit: false });
+
+      expect(fsExtra.ensureDir).toHaveBeenCalled();
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should handle general error in demo workspace creation', async () => {
+      vi.mocked(fsExtra.pathExists).mockResolvedValue(false);
+      vi.mocked(fsExtra.ensureDir).mockRejectedValue(new Error('Disk full'));
+
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      // Should throw the error
+      await expect(createProject('demo', { demoMode: true })).rejects.toThrow('Disk full');
+
+      consoleLogSpy.mockRestore();
+    });
   });
 
   describe('Dry Run Mode', () => {
@@ -282,9 +312,9 @@ describe('Create Project', () => {
       await createProject('test-dry', { dryRun: true, demoMode: true });
 
       expect(consoleLogSpy).toHaveBeenCalled();
-      expect(consoleLogSpy.mock.calls.some(call => 
-        call[0]?.toString().includes('Dry-run')
-      )).toBe(true);
+      expect(consoleLogSpy.mock.calls.some((call) => call[0]?.toString().includes('Dry-run'))).toBe(
+        true
+      );
 
       consoleLogSpy.mockRestore();
     });
