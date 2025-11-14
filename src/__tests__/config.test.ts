@@ -37,7 +37,7 @@ describe('Config', () => {
       vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(mockConfig));
 
       const result = await loadUserConfig();
-      
+
       expect(result).toEqual(mockConfig);
       expect(fs.readFile).toHaveBeenCalledWith(
         path.join(os.homedir(), '.rapidkitrc.json'),
@@ -49,7 +49,7 @@ describe('Config', () => {
       vi.mocked(fs.readFile).mockRejectedValue(new Error('ENOENT: file not found'));
 
       const result = await loadUserConfig();
-      
+
       expect(result).toEqual({});
     });
 
@@ -57,7 +57,7 @@ describe('Config', () => {
       vi.mocked(fs.readFile).mockResolvedValue('invalid json {{{');
 
       const result = await loadUserConfig();
-      
+
       expect(result).toEqual({});
     });
 
@@ -75,7 +75,7 @@ describe('Config', () => {
       vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(mockConfig));
 
       const result = await loadUserConfig();
-      
+
       expect(result).toEqual(mockConfig);
       expect(result.pythonVersion).toBe('3.12');
       expect(result.skipGit).toBe(true);

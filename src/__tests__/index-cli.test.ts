@@ -39,9 +39,7 @@ describe('CLI Command Structure', () => {
 
   describe('Create Command', () => {
     it('should define create command', () => {
-      program
-        .command('create [project-name]')
-        .description('Create a new RapidKit workspace');
+      program.command('create [project-name]').description('Create a new RapidKit workspace');
 
       const commands = program.commands;
       expect(commands.length).toBeGreaterThan(0);
@@ -49,9 +47,7 @@ describe('CLI Command Structure', () => {
     });
 
     it('should accept project-name argument', () => {
-      const cmd = program
-        .command('create [project-name]')
-        .description('Create workspace');
+      const cmd = program.command('create [project-name]').description('Create workspace');
 
       const args = cmd.registeredArguments;
       expect(args.length).toBe(1);
@@ -59,35 +55,27 @@ describe('CLI Command Structure', () => {
     });
 
     it('should support --demo option', () => {
-      const cmd = program
-        .command('create')
-        .option('--demo', 'Create demo workspace');
+      const cmd = program.command('create').option('--demo', 'Create demo workspace');
 
-      expect(cmd.options.some(opt => opt.long === '--demo')).toBe(true);
+      expect(cmd.options.some((opt) => opt.long === '--demo')).toBe(true);
     });
 
     it('should support --test option', () => {
-      const cmd = program
-        .command('create')
-        .option('--test', 'Enable test mode');
+      const cmd = program.command('create').option('--test', 'Enable test mode');
 
-      expect(cmd.options.some(opt => opt.long === '--test')).toBe(true);
+      expect(cmd.options.some((opt) => opt.long === '--test')).toBe(true);
     });
 
     it('should support --dry-run option', () => {
-      const cmd = program
-        .command('create')
-        .option('--dry-run', 'Show what would be done');
+      const cmd = program.command('create').option('--dry-run', 'Show what would be done');
 
-      expect(cmd.options.some(opt => opt.long === '--dry-run')).toBe(true);
+      expect(cmd.options.some((opt) => opt.long === '--dry-run')).toBe(true);
     });
 
     it('should support --python-version option', () => {
-      const cmd = program
-        .command('create')
-        .option('--python-version <version>', 'Python version');
+      const cmd = program.command('create').option('--python-version <version>', 'Python version');
 
-      expect(cmd.options.some(opt => opt.long === '--python-version')).toBe(true);
+      expect(cmd.options.some((opt) => opt.long === '--python-version')).toBe(true);
     });
 
     it('should support --install-method option', () => {
@@ -95,15 +83,13 @@ describe('CLI Command Structure', () => {
         .command('create')
         .option('--install-method <method>', 'Installation method');
 
-      expect(cmd.options.some(opt => opt.long === '--install-method')).toBe(true);
+      expect(cmd.options.some((opt) => opt.long === '--install-method')).toBe(true);
     });
 
     it('should support --no-git option', () => {
-      const cmd = program
-        .command('create')
-        .option('--no-git', 'Skip git initialization');
+      const cmd = program.command('create').option('--no-git', 'Skip git initialization');
 
-      expect(cmd.options.some(opt => opt.long === '--no-git')).toBe(true);
+      expect(cmd.options.some((opt) => opt.long === '--no-git')).toBe(true);
     });
 
     it('should support --skip-install option', () => {
@@ -111,7 +97,7 @@ describe('CLI Command Structure', () => {
         .command('create')
         .option('--skip-install', 'Skip dependency installation');
 
-      expect(cmd.options.some(opt => opt.long === '--skip-install')).toBe(true);
+      expect(cmd.options.some((opt) => opt.long === '--skip-install')).toBe(true);
     });
   });
 
@@ -150,19 +136,14 @@ describe('CLI Command Structure', () => {
 
   describe('Help Text', () => {
     it('should generate help text', () => {
-      program
-        .name('rapidkit')
-        .description('CLI for RapidKit')
-        .version('0.10.1');
+      program.name('rapidkit').description('CLI for RapidKit').version('0.10.1');
 
       const help = program.helpInformation();
       expect(help).toContain('rapidkit');
     });
 
     it('should show command usage', () => {
-      const cmd = program
-        .command('create [project-name]')
-        .description('Create workspace');
+      const cmd = program.command('create [project-name]').description('Create workspace');
 
       const usage = cmd.usage();
       expect(usage).toContain('[project-name]');
@@ -203,11 +184,7 @@ describe('CLI Command Structure', () => {
 
   describe('Command Chaining', () => {
     it('should support multiple options', () => {
-      const cmd = program
-        .command('create')
-        .option('--demo')
-        .option('--test')
-        .option('--dry-run');
+      const cmd = program.command('create').option('--demo').option('--test').option('--dry-run');
 
       expect(cmd.options.length).toBe(3);
     });
@@ -217,7 +194,7 @@ describe('CLI Command Structure', () => {
         .command('create')
         .option('--python-version <version>', 'Python version', '3.11');
 
-      const opt = cmd.options.find(o => o.long === '--python-version');
+      const opt = cmd.options.find((o) => o.long === '--python-version');
       expect(opt?.defaultValue).toBe('3.11');
     });
   });
@@ -267,7 +244,7 @@ describe('CLI Integration Points', () => {
     const program = new Command();
     program.version('0.10.1', '-v, --version', 'Output version');
 
-    const versionOption = program.options.find(opt => opt.long === '--version');
+    const versionOption = program.options.find((opt) => opt.long === '--version');
     expect(versionOption).toBeDefined();
   });
 

@@ -1,26 +1,33 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-echo "🔍 Running pre-push checks..."
+echo "🔍 Running pre-push validation..."
 
-# Run linting (only errors, not warnings)
-echo "📝 Checking code style with ESLint..."
-npm run lint -- --quiet || {
-  echo "❌ ESLint found errors. Please fix them before pushing."
+# Run Prettier format check
+echo "  → Checking code formatting..."
+npm run format:check || {
+  echo "❌ Code formatting issues found. Run 'npm run format' to fix."
   exit 1
 }
 
-# Run type checking
-echo "🔧 Running TypeScript type checking..."
+# Run ESLint (errors only)
+echo "  → Checking for lint errors..."
+npm run lint -- --quiet || {
+  echo "❌ Lint errors found. Fix them before pushing."
+  exit 1
+}
+
+# Run TypeScript type checking
+echo "  → Running type checks..."
 npm run typecheck || {
-  echo "❌ Type checking failed. Please fix type errors before pushing."
+  echo "❌ Type check failed. Fix type errors before pushing."
   exit 1
 }
 
 # Run tests
-echo "🧪 Running tests..."
+echo "  → Running tests..."
 npm test || {
-  echo "❌ Tests failed. Please fix failing tests before pushing."
+  echo "❌ Tests failed. Fix failing tests before pushing."
   exit 1
 }
 

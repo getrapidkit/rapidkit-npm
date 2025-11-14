@@ -21,9 +21,7 @@ describe('Logger', () => {
     it('should enable debug mode', () => {
       logger.setDebug(true);
       logger.debug('test message');
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        chalk.gray('[DEBUG] test message')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(chalk.gray('[DEBUG] test message'));
     });
 
     it('should disable debug mode', () => {
@@ -59,11 +57,7 @@ describe('Logger', () => {
 
     it('should log info messages with additional arguments', () => {
       logger.info('info message', 'arg1', 'arg2');
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        chalk.blue('info message'),
-        'arg1',
-        'arg2'
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(chalk.blue('info message'), 'arg1', 'arg2');
     });
   });
 
@@ -75,10 +69,7 @@ describe('Logger', () => {
 
     it('should log success messages with additional arguments', () => {
       logger.success('success message', { key: 'value' });
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        chalk.green('success message'),
-        { key: 'value' }
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(chalk.green('success message'), { key: 'value' });
     });
   });
 
@@ -90,10 +81,7 @@ describe('Logger', () => {
 
     it('should log warning messages with additional arguments', () => {
       logger.warn('warning message', 123);
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        chalk.yellow('warning message'),
-        123
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(chalk.yellow('warning message'), 123);
     });
   });
 
@@ -106,28 +94,19 @@ describe('Logger', () => {
     it('should log error messages with additional arguments', () => {
       const errorObj = new Error('test error');
       logger.error('error message', errorObj);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        chalk.red('error message'),
-        errorObj
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(chalk.red('error message'), errorObj);
     });
   });
 
   describe('step', () => {
     it('should log step messages with progress', () => {
       logger.step(1, 5, 'First step');
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        chalk.cyan('\n[1/5]'),
-        chalk.white('First step')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(chalk.cyan('\n[1/5]'), chalk.white('First step'));
     });
 
     it('should log step messages with different numbers', () => {
       logger.step(3, 10, 'Third step');
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        chalk.cyan('\n[3/10]'),
-        chalk.white('Third step')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(chalk.cyan('\n[3/10]'), chalk.white('Third step'));
     });
   });
 });

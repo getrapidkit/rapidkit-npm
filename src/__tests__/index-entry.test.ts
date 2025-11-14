@@ -94,15 +94,9 @@ describe('Index Entry Point', () => {
 
   describe('Command Validation', () => {
     it('should accept valid project names', () => {
-      const validNames = [
-        'my-project',
-        'my_project',
-        'project123',
-        'test-api',
-        'myapp',
-      ];
+      const validNames = ['my-project', 'my_project', 'project123', 'test-api', 'myapp'];
 
-      validNames.forEach(name => {
+      validNames.forEach((name) => {
         expect(name).toBeTruthy();
         expect(name.length).toBeGreaterThan(0);
       });
@@ -110,14 +104,14 @@ describe('Index Entry Point', () => {
 
     it('should validate python version format', () => {
       const versions = ['3.10', '3.11', '3.12'];
-      versions.forEach(v => {
+      versions.forEach((v) => {
         expect(v).toMatch(/^\d+\.\d+$/);
       });
     });
 
     it('should validate install methods', () => {
       const methods = ['poetry', 'venv', 'pipx'];
-      methods.forEach(m => {
+      methods.forEach((m) => {
         expect(['poetry', 'venv', 'pipx']).toContain(m);
       });
     });

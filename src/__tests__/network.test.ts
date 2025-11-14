@@ -56,9 +56,9 @@ describe('Network Operations', () => {
     it('should handle network timeout', async () => {
       vi.mocked(execa).mockRejectedValue(new Error('Request timeout'));
 
-      await expect(
-        execa('npm', ['view', 'rapidkit'], { timeout: 100 })
-      ).rejects.toThrow('Request timeout');
+      await expect(execa('npm', ['view', 'rapidkit'], { timeout: 100 })).rejects.toThrow(
+        'Request timeout'
+      );
     });
 
     it('should fetch latest version', async () => {
@@ -100,9 +100,7 @@ describe('Network Operations', () => {
 
       global.fetch = fetchMock;
 
-      const response = await fetch(
-        'https://api.github.com/repos/getrapidkit/rapidkit-npm'
-      );
+      const response = await fetch('https://api.github.com/repos/getrapidkit/rapidkit-npm');
       const data = await response.json();
 
       expect(data.name).toBe('rapidkit-npm');
@@ -133,9 +131,7 @@ describe('Network Operations', () => {
       const fetchMock = vi.fn().mockRejectedValue(new Error('Network error'));
       global.fetch = fetchMock;
 
-      await expect(fetch('https://api.github.com/test')).rejects.toThrow(
-        'Network error'
-      );
+      await expect(fetch('https://api.github.com/test')).rejects.toThrow('Network error');
     });
   });
 
@@ -154,7 +150,7 @@ describe('Network Operations', () => {
       const response = await fetch('https://api.example.com/data', {
         method: 'GET',
         headers: {
-          'Authorization': 'Bearer token',
+          Authorization: 'Bearer token',
           'Content-Type': 'application/json',
         },
       });
@@ -165,7 +161,7 @@ describe('Network Operations', () => {
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer token',
+            Authorization: 'Bearer token',
           }),
         })
       );
@@ -281,9 +277,7 @@ describe('Network Operations', () => {
         throw lastError;
       };
 
-      await expect(retryFetch('https://api.example.com/data')).rejects.toThrow(
-        'Permanent failure'
-      );
+      await expect(retryFetch('https://api.example.com/data')).rejects.toThrow('Permanent failure');
       expect(fetchMock).toHaveBeenCalledTimes(3);
     });
   });
@@ -291,7 +285,7 @@ describe('Network Operations', () => {
   describe('Request Caching', () => {
     it('should cache successful responses', async () => {
       const cache = new Map<string, unknown>();
-      
+
       const cachedFetch = async (url: string) => {
         if (cache.has(url)) {
           return cache.get(url);
