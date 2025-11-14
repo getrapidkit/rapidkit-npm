@@ -1,8 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
-import { execa } from 'execa';
 
 // Integration tests for CLI workflows
 describe('CLI Integration Tests', () => {
@@ -30,10 +29,7 @@ describe('CLI Integration Tests', () => {
 
       // Simulate workspace creation
       await fs.mkdir(workspacePath, { recursive: true });
-      await fs.writeFile(
-        path.join(workspacePath, 'README.md'),
-        '# Test Workspace'
-      );
+      await fs.writeFile(path.join(workspacePath, 'README.md'), '# Test Workspace');
       await fs.writeFile(
         path.join(workspacePath, 'package.json'),
         JSON.stringify({ name: workspaceName, version: '1.0.0' })
@@ -44,10 +40,7 @@ describe('CLI Integration Tests', () => {
       expect(files).toContain('README.md');
       expect(files).toContain('package.json');
 
-      const readmeContent = await fs.readFile(
-        path.join(workspacePath, 'README.md'),
-        'utf-8'
-      );
+      const readmeContent = await fs.readFile(path.join(workspacePath, 'README.md'), 'utf-8');
       expect(readmeContent).toContain('Test Workspace');
     });
 
@@ -60,8 +53,8 @@ describe('CLI Integration Tests', () => {
       ];
 
       for (const name of invalidNames) {
-        const workspacePath = path.join(testDir, name);
-        
+        const _workspacePath = path.join(testDir, name);
+
         // Should not create workspace with invalid name
         // In real CLI, this would be caught by validation
         expect(name).not.toMatch(/^[a-z][a-z0-9-_]*$/);
@@ -89,10 +82,7 @@ fs.writeFileSync(
 console.log('Created:', projectName);
       `;
 
-      await fs.writeFile(
-        path.join(workspacePath, 'generate-demo.js'),
-        generatorScript
-      );
+      await fs.writeFile(path.join(workspacePath, 'generate-demo.js'), generatorScript);
 
       // Verify generator exists
       const files = await fs.readdir(workspacePath);
@@ -116,10 +106,7 @@ console.log('Created:', projectName);
 
       // Copy file
       await fs.mkdir(destPath, { recursive: true });
-      await fs.copyFile(
-        path.join(sourcePath, 'template.txt'),
-        path.join(destPath, 'template.txt')
-      );
+      await fs.copyFile(path.join(sourcePath, 'template.txt'), path.join(destPath, 'template.txt'));
 
       const content = await fs.readFile(path.join(destPath, 'template.txt'), 'utf-8');
       expect(content).toBe('Template content');
@@ -127,7 +114,7 @@ console.log('Created:', projectName);
 
     it('should handle nested directory creation', async () => {
       const nestedPath = path.join(testDir, 'level1', 'level2', 'level3');
-      
+
       await fs.mkdir(nestedPath, { recursive: true });
 
       const stat = await fs.stat(nestedPath);
@@ -192,11 +179,9 @@ console.log('Created:', projectName);
       // Try to make it readonly (may not work on all systems)
       try {
         await fs.chmod(filePath, 0o444);
-        
+
         // Attempt to write should fail
-        await expect(
-          fs.writeFile(filePath, 'new content')
-        ).rejects.toThrow();
+        await expect(fs.writeFile(filePath, 'new content')).rejects.toThrow();
       } catch {
         // Skip on systems where chmod doesn't work
       }
@@ -254,15 +239,9 @@ __pycache__/
 .env
       `.trim();
 
-      await fs.writeFile(
-        path.join(workspacePath, '.gitignore'),
-        gitignoreContent
-      );
+      await fs.writeFile(path.join(workspacePath, '.gitignore'), gitignoreContent);
 
-      const content = await fs.readFile(
-        path.join(workspacePath, '.gitignore'),
-        'utf-8'
-      );
+      const content = await fs.readFile(path.join(workspacePath, '.gitignore'), 'utf-8');
 
       expect(content).toContain('node_modules/');
       expect(content).toContain('.venv/');
@@ -277,7 +256,7 @@ __pycache__/
         version: '1.0.0',
         type: 'module',
         scripts: {
-          'generate': 'node generate-demo.js',
+          generate: 'node generate-demo.js',
         },
         dependencies: {},
       };
@@ -289,10 +268,7 @@ __pycache__/
         JSON.stringify(packageJson, null, 2)
       );
 
-      const content = await fs.readFile(
-        path.join(workspacePath, 'package.json'),
-        'utf-8'
-      );
+      const content = await fs.readFile(path.join(workspacePath, 'package.json'), 'utf-8');
       const parsed = JSON.parse(content);
 
       expect(parsed.name).toBe('test-workspace');
@@ -318,15 +294,9 @@ build-backend = "poetry.core.masonry.api"
 
       const projectPath = path.join(testDir, 'python-project');
       await fs.mkdir(projectPath, { recursive: true });
-      await fs.writeFile(
-        path.join(projectPath, 'pyproject.toml'),
-        pyprojectToml
-      );
+      await fs.writeFile(path.join(projectPath, 'pyproject.toml'), pyprojectToml);
 
-      const content = await fs.readFile(
-        path.join(projectPath, 'pyproject.toml'),
-        'utf-8'
-      );
+      const content = await fs.readFile(path.join(projectPath, 'pyproject.toml'), 'utf-8');
 
       expect(content).toContain('[tool.poetry]');
       expect(content).toContain('fastapi');

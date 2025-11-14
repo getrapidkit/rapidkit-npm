@@ -4,12 +4,7 @@ import { execa } from 'execa';
 import inquirer from 'inquirer';
 import { promises as fsPromises } from 'fs';
 import { createProject } from '../create';
-import {
-  DirectoryExistsError,
-  PoetryNotFoundError,
-  PipxNotFoundError,
-  InstallationError,
-} from '../errors';
+import { DirectoryExistsError } from '../errors';
 
 vi.mock('fs-extra');
 vi.mock('execa');
@@ -76,7 +71,11 @@ describe('Create Module - Internal Functions', () => {
         installMethod: 'poetry',
       });
 
-      vi.mocked(execa).mockResolvedValue({ stdout: 'Poetry 1.7.0', stderr: '', exitCode: 0 } as any);
+      vi.mocked(execa).mockResolvedValue({
+        stdout: 'Poetry 1.7.0',
+        stderr: '',
+        exitCode: 0,
+      } as any);
       vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]');
 
       await createProject('test-project', {});
@@ -180,11 +179,7 @@ describe('Create Module - Internal Functions', () => {
       await createProject('test-project', {});
 
       expect(execa).toHaveBeenCalledWith('python3', ['--version']);
-      expect(execa).toHaveBeenCalledWith(
-        'python3',
-        ['-m', 'venv', '.venv'],
-        expect.any(Object)
-      );
+      expect(execa).toHaveBeenCalledWith('python3', ['-m', 'venv', '.venv'], expect.any(Object));
     });
 
     it('should throw error when Python not found', async () => {
@@ -367,7 +362,7 @@ describe('Create Module - Internal Functions', () => {
 
       await createProject('test-project', { skipGit: true });
 
-      const gitCalls = vi.mocked(execa).mock.calls.filter(call => call[0] === 'git');
+      const gitCalls = vi.mocked(execa).mock.calls.filter((call) => call[0] === 'git');
       expect(gitCalls.length).toBe(0);
     });
 

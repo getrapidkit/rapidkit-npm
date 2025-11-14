@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { generateDemoKit } from '../demo-kit.js';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -61,8 +61,14 @@ describe('Demo Kit Generator', () => {
       const srcPath = path.join(projectPath, 'src');
       const testsPath = path.join(projectPath, 'tests');
 
-      const srcExists = await fs.stat(srcPath).then(() => true).catch(() => false);
-      const testsExists = await fs.stat(testsPath).then(() => true).catch(() => false);
+      const srcExists = await fs
+        .stat(srcPath)
+        .then(() => true)
+        .catch(() => false);
+      const testsExists = await fs
+        .stat(testsPath)
+        .then(() => true)
+        .catch(() => false);
 
       expect(srcExists || testsExists).toBeTruthy();
     });
@@ -106,8 +112,8 @@ describe('Demo Kit Generator', () => {
     });
 
     it('should throw error if templates directory not found', async () => {
-      const projectPath = path.join(testDir, 'error-project');
-      const variables = {
+      const _projectPath = path.join(testDir, 'error-project');
+      const _variables = {
         project_name: 'error_project',
       };
 
@@ -125,7 +131,10 @@ describe('Demo Kit Generator', () => {
           project_name: project.replace(/-/g, '_'),
         });
 
-        const exists = await fs.stat(projectPath).then(() => true).catch(() => false);
+        const exists = await fs
+          .stat(projectPath)
+          .then(() => true)
+          .catch(() => false);
         expect(exists).toBe(true);
       }
     });

@@ -28,7 +28,7 @@ describe('Update Checker', () => {
 
   describe('checkForUpdates', () => {
     it('should notify when a newer version is available', async () => {
-      const currentVersion = getVersion();
+      const _currentVersion = getVersion();
       const newerVersion = '99.99.99';
 
       vi.mocked(execa).mockResolvedValue({
@@ -53,12 +53,8 @@ describe('Update Checker', () => {
       expect(execa).toHaveBeenCalledWith('npm', ['view', 'rapidkit', 'version'], {
         timeout: 3000,
       });
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Update available')
-      );
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining(newerVersion)
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Update available'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(newerVersion));
     });
 
     it('should not notify when on latest version', async () => {
@@ -87,9 +83,7 @@ describe('Update Checker', () => {
         timeout: 3000,
       });
       // Should not show update notification
-      expect(consoleLogSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining('Update available')
-      );
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining('Update available'));
     });
 
     it('should handle network errors gracefully', async () => {
@@ -99,9 +93,7 @@ describe('Update Checker', () => {
       await expect(checkForUpdates()).resolves.not.toThrow();
 
       // Should not show error to user
-      expect(consoleLogSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining('error')
-      );
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining('error'));
     });
 
     it('should handle timeout gracefully', async () => {

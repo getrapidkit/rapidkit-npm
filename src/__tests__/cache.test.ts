@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Cache, getCachedOrFetch } from '../utils/cache.js';
-import { promises as fs } from 'fs';
-import path from 'path';
-import os from 'os';
-
-const CACHE_DIR = path.join(os.homedir(), '.rapidkit', 'cache');
 
 describe('Cache', () => {
   let cache: Cache;
@@ -43,7 +38,7 @@ describe('Cache', () => {
 
       // Clear memory cache and get from disk
       cache['memoryCache'].clear();
-      
+
       const result = await cache.get<typeof testData>('disk-key');
       expect(result).toEqual(testData);
     });
@@ -120,11 +115,11 @@ describe('Cache', () => {
   describe('cache expiration', () => {
     it('should expire old cache entries', async () => {
       const testData = { name: 'expired' };
-      
+
       // Mock Date.now before setting cache
       const originalNow = Date.now();
       const dateNowSpy = vi.spyOn(Date, 'now');
-      
+
       // Set cache at current time
       dateNowSpy.mockReturnValue(originalNow);
       await cache.set('expire-key', testData);
@@ -151,7 +146,7 @@ describe('Cache', () => {
       const testData = { data: 'ttl-test' };
       const now = Date.now();
       const dateNowSpy = vi.spyOn(Date, 'now');
-      
+
       dateNowSpy.mockReturnValue(now);
       await cache.set('ttl-key', testData);
 
@@ -219,16 +214,14 @@ describe('getCachedOrFetch', () => {
     expect(fetcher2).toHaveBeenCalledTimes(1);
 
     // Get version 1 again from cache (may refetch if memory cache cleared)
-    const result3 = await getCachedOrFetch('version-key-v1', fetcher1, '1.0');
+    const _result3 = await getCachedOrFetch('version-key-v1', fetcher1, '1.0');
     expect(fetcher1).toHaveBeenCalledTimes(2); // New key, so refetch
   });
 
   it('should handle fetcher errors', async () => {
     const fetcher = vi.fn().mockRejectedValue(new Error('Fetch failed'));
 
-    await expect(getCachedOrFetch('error-key', fetcher)).rejects.toThrow(
-      'Fetch failed'
-    );
+    await expect(getCachedOrFetch('error-key', fetcher)).rejects.toThrow('Fetch failed');
   });
 
   it('should cache different data types', async () => {
@@ -247,7 +240,7 @@ describe('getCachedOrFetch', () => {
 
   it('should handle async fetchers', async () => {
     const asyncFetcher = vi.fn().mockImplementation(async () => {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       return { async: true };
     });
 
@@ -292,8 +285,8 @@ describe('getCachedOrFetch', () => {
     ];
 
     const results = await Promise.all(promises);
-    
-    results.forEach(result => {
+
+    results.forEach((result) => {
       expect(result).toEqual({ concurrent: true });
     });
 
