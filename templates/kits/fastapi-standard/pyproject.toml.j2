@@ -7,6 +7,7 @@ license = "{{ license }}"
 packages = [{ include = "src" }]
 
 [tool.poetry.scripts]
+rapidkit = ".rapidkit.cli:main"
 dev = "src.cli:dev"
 start = "src.cli:start"
 build = "src.cli:build"

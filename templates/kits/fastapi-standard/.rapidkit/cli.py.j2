@@ -74,11 +74,13 @@ def dev(port: int = 8000, host: str = "0.0.0.0", allow_global_runtime: bool = Fa
 
     if ptype == "python":
         venv_dir = root / ".venv"
+        _print_banner("📁", f"Working directory: {root}")
+        _print_banner("🌐", f"Server will be available at: http://{host}:{port}")
 
         if venv_dir.exists():
             if not _venv_has_uvicorn(venv_dir):
                 print("❌ Project .venv was found but uvicorn/fastapi doesn't appear installed.")
-                print("💡 Run 'poetry install' to install dependencies.")
+                print("💡 Run 'rapidkit init' to install dependencies.")
                 sys.exit(1)
         else:
             if not allow_global_runtime:
@@ -86,7 +88,7 @@ def dev(port: int = 8000, host: str = "0.0.0.0", allow_global_runtime: bool = Fa
                 print("")
                 print("💡 Initialize and install dependencies with:")
                 print("")
-                print("  poetry install")
+                print("  rapidkit init")
                 print("")
                 print("If you intentionally want to use the system Python, run:")
                 print("")
@@ -97,12 +99,12 @@ def dev(port: int = 8000, host: str = "0.0.0.0", allow_global_runtime: bool = Fa
             if shutil.which("uvicorn") is None:
                 print("❌ No uvicorn executable found on PATH and no .venv present.")
                 print("")
-                print("💡 Install dependencies with: poetry install")
+                print("💡 Install dependencies with: rapidkit init")
                 print("")
                 sys.exit(1)
             print("⚠️  Running with system/global Python runtime.")
 
-        rc = _run(sys.executable, "-m", "uvicorn", "src.main:app", "--reload", "--host", host, "--port", str(port))
+        rc = _run(sys.executable, "-m", "uvicorn", "src.main:app", "--reload", "--reload-dir", "src", "--host", host, "--port", str(port))
         if rc != 0:
             sys.exit(rc)
     else:

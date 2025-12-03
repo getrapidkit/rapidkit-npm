@@ -76,7 +76,7 @@ export class RapidKitNotAvailableError extends RapidKitError {
     super(
       'RapidKit Python package is not yet available on PyPI',
       'RAPIDKIT_NOT_AVAILABLE',
-      'Available options:\n  1. Demo mode: npx rapidkit my-workspace --demo\n  2. Test mode: npx rapidkit my-workspace --test-mode (requires local RapidKit)\n  3. Wait for official PyPI release (coming soon)'
+      'Available options:\n  1. Template mode: npx rapidkit my-api --template fastapi\n  2. Test mode: npx rapidkit my-workspace --test-mode (requires local RapidKit)\n  3. Wait for official PyPI release (coming soon)'
     );
   }
 }

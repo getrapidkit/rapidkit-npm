@@ -1,0 +1,24 @@
+#!/bin/bash
+# RapidKit Environment Activation
+# Usage: source .rapidkit/activate
+
+# Get the directory where this script is located
+RAPIDKIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$RAPIDKIT_DIR")"
+
+# Add project root to PATH (where rapidkit script lives)
+if [[ ":$PATH:" != *":$PROJECT_ROOT:"* ]]; then
+    export PATH="$PROJECT_ROOT:$PATH"
+    echo "✅ RapidKit activated! You can now use 'rapidkit' commands directly."
+else
+    echo "ℹ️  RapidKit already activated."
+fi
+
+# Show available commands
+echo ""
+echo "📚 Available commands:"
+echo "   rapidkit dev      - Start development server"
+echo "   rapidkit init     - Install dependencies"
+echo "   rapidkit test     - Run tests"
+echo "   rapidkit --help   - Show all commands"
+echo ""

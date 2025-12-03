@@ -5,6 +5,37 @@
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
+show_help() {
+  cat << 'EOF'
+📚 RapidKit FastAPI Project Commands
+
+Usage: rapidkit <command> [options]
+
+Commands:
+  init         📦 Initialize project (poetry install)
+  dev          🚀 Start development server with hot reload
+  start        ⚡ Start production server
+  test         🧪 Run tests
+  lint         🔧 Lint code
+  format       ✨ Format code
+  help         📚 Show this help
+
+Examples:
+  rapidkit init      # Install dependencies
+  rapidkit dev       # Start dev server
+
+💡 Note: Commands are run through Poetry.
+EOF
+}
+
+# Handle help
+case "${1:-}" in
+  help|--help|-h|"")
+    show_help
+    exit 0
+    ;;
+esac
+
 # Detect project type
 if [ -f "$ROOT_DIR/pyproject.toml" ]; then
   PKG_TYPE="python"

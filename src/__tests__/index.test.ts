@@ -33,8 +33,8 @@ describe('CLI Entry Point', () => {
 
     it('should display help with --help flag', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '--help']);
-      expect(stdout).toContain('Create a RapidKit development environment');
-      expect(stdout).toContain('--demo');
+      expect(stdout).toContain('Create RapidKit workspaces and projects');
+      expect(stdout).toContain('--template');
       expect(stdout).toContain('--skip-git');
       expect(stdout).toContain('--dry-run');
     });
@@ -46,34 +46,48 @@ describe('CLI Entry Point', () => {
   });
 
   describe('Dry-run Mode', () => {
-    it('should show what would be created in demo-only dry-run mode', async () => {
+    it('should show what would be created in FastAPI template dry-run mode', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, 'test-project', '--demo-only', '--dry-run', '--no-update-check'],
+        [CLI_PATH, 'test-project', '--template', 'fastapi', '--dry-run', '--no-update-check'],
         { cwd: TEST_DIR }
       );
 
       expect(stdout).toContain('Dry-run mode');
       expect(stdout).toContain('test-project');
-      expect(stdout).toContain('FastAPI demo project');
-      expect(stdout).toContain('main.py');
-      expect(stdout).toContain('pyproject.toml');
+      expect(stdout).toMatch(/fastapi/i);
 
       // Should not create any files
       const projectPath = path.join(TEST_DIR, 'test-project');
       expect(await fs.pathExists(projectPath)).toBe(false);
     });
 
-    it('should show what would be created in demo workspace dry-run mode', async () => {
+    it('should show what would be created in NestJS template dry-run mode', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, 'test-workspace', '--demo', '--dry-run', '--no-update-check'],
+        [CLI_PATH, 'test-project', '--template', 'nestjs', '--dry-run', '--no-update-check'],
+        { cwd: TEST_DIR }
+      );
+
+      expect(stdout).toContain('Dry-run mode');
+      expect(stdout).toContain('test-project');
+      expect(stdout).toMatch(/nestjs/i);
+
+      // Should not create any files
+      const projectPath = path.join(TEST_DIR, 'test-project');
+      expect(await fs.pathExists(projectPath)).toBe(false);
+    });
+
+    it('should show what would be created in workspace dry-run mode', async () => {
+      const { stdout } = await execa(
+        'node',
+        [CLI_PATH, 'test-workspace', '--dry-run', '--no-update-check'],
         { cwd: TEST_DIR }
       );
 
       expect(stdout).toContain('Dry-run mode');
       expect(stdout).toContain('test-workspace');
-      expect(stdout).toContain('Demo workspace');
+      expect(stdout).toMatch(/workspace/i);
 
       // Should not create any files
       const workspacePath = path.join(TEST_DIR, 'test-workspace');
@@ -85,7 +99,15 @@ describe('CLI Entry Point', () => {
     it('should enable debug logging with --debug flag', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, 'test-project', '--demo-only', '--dry-run', '--debug', '--no-update-check'],
+        [
+          CLI_PATH,
+          'test-project',
+          '--template',
+          'fastapi',
+          '--dry-run',
+          '--debug',
+          '--no-update-check',
+        ],
         { cwd: TEST_DIR }
       );
 
@@ -93,12 +115,12 @@ describe('CLI Entry Point', () => {
     });
   });
 
-  describe('Demo-only Mode', () => {
-    it('should validate project name in demo-only mode', async () => {
+  describe('Template Mode (--template)', () => {
+    it('should validate project name in template mode', async () => {
       try {
         await execa(
           'node',
-          [CLI_PATH, 'Invalid-Name!', '--demo-only', '--dry-run', '--no-update-check'],
+          [CLI_PATH, 'Invalid-Name!', '--template', 'fastapi', '--dry-run', '--no-update-check'],
           { cwd: TEST_DIR }
         );
         expect.fail('Should have thrown validation error');
@@ -106,54 +128,61 @@ describe('CLI Entry Point', () => {
         expect(error.exitCode).toBe(1);
         // Check for validation error message
         const output = error.stdout || error.stderr;
-        expect(output).toMatch(/validation|lowercase|capital|special/i);
+        expect(output).toMatch(/validation|lowercase|capital|special|URL-friendly/i);
       }
     });
 
-    it('should use default project name if none provided', async () => {
+    it('should accept fastapi template', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, '--demo-only', '--dry-run', '--no-update-check'],
+        [CLI_PATH, 'my-api', '--template', 'fastapi', '--dry-run', '--no-update-check'],
         { cwd: TEST_DIR }
       );
 
-      expect(stdout).toContain('my-fastapi-project');
+      expect(stdout).toMatch(/fastapi/i);
+    });
+
+    it('should accept nestjs template', async () => {
+      const { stdout } = await execa(
+        'node',
+        [CLI_PATH, 'my-api', '--template', 'nestjs', '--dry-run', '--no-update-check'],
+        { cwd: TEST_DIR }
+      );
+
+      expect(stdout).toMatch(/nestjs/i);
+    });
+
+    it('should use short flag -t for template', async () => {
+      const { stdout } = await execa(
+        'node',
+        [CLI_PATH, 'my-api', '-t', 'fastapi', '--dry-run', '--no-update-check'],
+        { cwd: TEST_DIR }
+      );
+
+      expect(stdout).toMatch(/fastapi/i);
     });
   });
 
-  describe('Workspace Mode', () => {
+  describe('Workspace Mode (no --template)', () => {
     it('should validate workspace name', async () => {
       try {
-        await execa(
-          'node',
-          [CLI_PATH, 'Invalid Name!', '--demo', '--dry-run', '--no-update-check'],
-          { cwd: TEST_DIR }
-        );
+        await execa('node', [CLI_PATH, 'Invalid Name!', '--dry-run', '--no-update-check'], {
+          cwd: TEST_DIR,
+        });
         expect.fail('Should have thrown validation error');
       } catch (error: any) {
         expect(error.exitCode).toBe(1);
       }
     });
 
-    it('should use default workspace name if none provided', async () => {
+    it('should create workspace without --template flag', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, '--demo', '--dry-run', '--no-update-check'],
+        [CLI_PATH, 'test-ws', '--dry-run', '--no-update-check'],
         { cwd: TEST_DIR }
       );
 
-      expect(stdout).toContain('rapidkit-workspace');
-    });
-
-    it('should show demo mode notice', async () => {
-      const { stdout } = await execa(
-        'node',
-        [CLI_PATH, 'test-ws', '--demo', '--dry-run', '--no-update-check'],
-        { cwd: TEST_DIR }
-      );
-
-      expect(stdout).toContain('demo kit templates');
-      expect(stdout).toContain('without installing Python');
+      expect(stdout).toMatch(/workspace/i);
     });
   });
 
@@ -161,11 +190,29 @@ describe('CLI Entry Point', () => {
     it('should handle --skip-git option', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, 'test-ws', '--demo', '--skip-git', '--dry-run', '--no-update-check'],
+        [CLI_PATH, 'test-ws', '--skip-git', '--dry-run', '--no-update-check'],
         { cwd: TEST_DIR }
       );
 
       expect(stdout).toContain('Dry-run mode');
+    });
+
+    it('should handle --skip-install option for NestJS', async () => {
+      const { stdout } = await execa(
+        'node',
+        [
+          CLI_PATH,
+          'test-api',
+          '--template',
+          'nestjs',
+          '--skip-install',
+          '--dry-run',
+          '--no-update-check',
+        ],
+        { cwd: TEST_DIR }
+      );
+
+      expect(stdout).toMatch(/nestjs/i);
     });
 
     it('should handle --no-update-check option', async () => {
@@ -177,10 +224,18 @@ describe('CLI Entry Point', () => {
       expect(stdout).toMatch(/\d+\.\d+\.\d+/);
     });
 
-    it('should handle multiple debug flags', async () => {
+    it('should handle multiple flags together', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, 'test-proj', '--debug', '--dry-run', '--demo-only', '--no-update-check'],
+        [
+          CLI_PATH,
+          'test-proj',
+          '--template',
+          'fastapi',
+          '--debug',
+          '--dry-run',
+          '--no-update-check',
+        ],
         { cwd: TEST_DIR }
       );
 
@@ -194,7 +249,7 @@ describe('CLI Entry Point', () => {
       try {
         await execa(
           'node',
-          [CLI_PATH, '123invalid', '--demo-only', '--dry-run', '--no-update-check'],
+          [CLI_PATH, '123invalid', '--template', 'fastapi', '--dry-run', '--no-update-check'],
           { cwd: TEST_DIR }
         );
         expect.fail('Should have thrown error');
@@ -207,7 +262,7 @@ describe('CLI Entry Point', () => {
       try {
         await execa(
           'node',
-          [CLI_PATH, 'test@project!', '--demo-only', '--dry-run', '--no-update-check'],
+          [CLI_PATH, 'test@project!', '--template', 'fastapi', '--dry-run', '--no-update-check'],
           { cwd: TEST_DIR }
         );
         expect.fail('Should have thrown error');
@@ -220,7 +275,7 @@ describe('CLI Entry Point', () => {
       try {
         await execa(
           'node',
-          [CLI_PATH, 'TestProject', '--demo-only', '--dry-run', '--no-update-check'],
+          [CLI_PATH, 'TestProject', '--template', 'fastapi', '--dry-run', '--no-update-check'],
           { cwd: TEST_DIR }
         );
         expect.fail('Should have thrown error');
@@ -234,37 +289,11 @@ describe('CLI Entry Point', () => {
     it('should display welcome message', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, 'test-ws', '--demo', '--dry-run', '--no-update-check'],
+        [CLI_PATH, 'test-ws', '--dry-run', '--no-update-check'],
         { cwd: TEST_DIR }
       );
 
       expect(stdout).toContain('Welcome to RapidKit');
-    });
-  });
-
-  describe('Beta Notice (Full Mode)', () => {
-    it('should show beta notice without --demo or --test-mode', async () => {
-      try {
-        await execa('node', [CLI_PATH, 'test-workspace', '--no-update-check'], { cwd: TEST_DIR });
-        expect.fail('Should have exited with error');
-      } catch (error: any) {
-        expect(error.exitCode).toBe(1);
-        const output = error.stdout || error.stderr;
-        expect(output).toContain('BETA NOTICE');
-        expect(output).toContain('not yet available on PyPI');
-        expect(output).toContain('Cannot proceed without --demo or --test-mode');
-      }
-    });
-
-    it('should show test mode warning with --test-mode', async () => {
-      const { stdout } = await execa(
-        'node',
-        [CLI_PATH, 'test-ws', '--test-mode', '--dry-run', '--no-update-check'],
-        { cwd: TEST_DIR }
-      );
-
-      expect(stdout).toContain('TEST MODE');
-      expect(stdout).toContain('Installing from local path');
     });
   });
 
@@ -278,48 +307,36 @@ describe('CLI Entry Point', () => {
       expect(stdout).not.toContain('Checking for updates');
       expect(stdout).toMatch(/\d+\.\d+\.\d+/);
     });
-
-    it('should check for updates by default in demo mode', async () => {
-      // Update check runs but doesn't block execution
-      const { stdout } = await execa('node', [CLI_PATH, 'test-ws', '--demo', '--dry-run'], {
-        cwd: TEST_DIR,
-        timeout: 10000,
-      });
-
-      expect(stdout).toContain('Dry-run mode');
-    });
   });
 
   describe('Config Loading', () => {
     it('should load user config in debug mode', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, 'test-ws', '--demo', '--dry-run', '--debug', '--no-update-check'],
+        [CLI_PATH, 'test-ws', '--dry-run', '--debug', '--no-update-check'],
         { cwd: TEST_DIR }
       );
 
       expect(stdout).toContain('Debug mode enabled');
-      // User config loading is logged in debug mode
     });
   });
 
   describe('Path Resolution', () => {
-    it('should resolve project path correctly in demo-only mode', async () => {
+    it('should resolve project path correctly in template mode', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, 'my-test-project', '--demo-only', '--dry-run', '--no-update-check'],
+        [CLI_PATH, 'my-test-project', '--template', 'fastapi', '--dry-run', '--no-update-check'],
         { cwd: TEST_DIR }
       );
 
       expect(stdout).toContain('my-test-project');
-      expect(stdout).toContain('Project path');
     });
 
     it('should reject relative paths with dots', async () => {
       try {
         await execa(
           'node',
-          [CLI_PATH, './test-project', '--demo-only', '--dry-run', '--no-update-check'],
+          [CLI_PATH, './test-project', '--template', 'fastapi', '--dry-run', '--no-update-check'],
           { cwd: TEST_DIR }
         );
         expect.fail('Should reject path starting with dot');
@@ -328,18 +345,6 @@ describe('CLI Entry Point', () => {
         const output = error.stdout || error.stderr;
         expect(output).toMatch(/cannot start with|URL-friendly/);
       }
-    });
-  });
-
-  describe('Signal Handling', () => {
-    it('should handle graceful shutdown', async () => {
-      // This test validates that signal handlers are registered
-      // Actual signal handling is tested through manual testing
-      const { stdout } = await execa('node', [CLI_PATH, '--version', '--no-update-check'], {
-        cwd: TEST_DIR,
-      });
-
-      expect(stdout).toMatch(/\d+\.\d+\.\d+/);
     });
   });
 
@@ -355,7 +360,7 @@ describe('CLI Entry Point', () => {
     it('should accept directory name as positional argument', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, 'my-custom-name', '--demo', '--dry-run', '--no-update-check'],
+        [CLI_PATH, 'my-custom-name', '--dry-run', '--no-update-check'],
         { cwd: TEST_DIR }
       );
 
@@ -365,7 +370,7 @@ describe('CLI Entry Point', () => {
     it('should handle kebab-case directory names', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, 'my-test-workspace', '--demo', '--dry-run', '--no-update-check'],
+        [CLI_PATH, 'my-test-workspace', '--dry-run', '--no-update-check'],
         { cwd: TEST_DIR }
       );
 
@@ -374,22 +379,11 @@ describe('CLI Entry Point', () => {
   });
 
   describe('Edge Cases', () => {
-    it('should handle empty directory name with demo flag', async () => {
-      const { stdout } = await execa(
-        'node',
-        [CLI_PATH, '--demo', '--dry-run', '--no-update-check'],
-        { cwd: TEST_DIR }
-      );
-
-      // Should use default name
-      expect(stdout).toContain('rapidkit-workspace');
-    });
-
     it('should handle very long valid names', async () => {
       const longName = 'my-very-long-project-name-that-is-still-valid';
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, longName, '--demo', '--dry-run', '--no-update-check'],
+        [CLI_PATH, longName, '--dry-run', '--no-update-check'],
         { cwd: TEST_DIR }
       );
 
@@ -397,18 +391,16 @@ describe('CLI Entry Point', () => {
     });
 
     it('should handle minimum valid name length (2 chars)', async () => {
-      const { stdout } = await execa(
-        'node',
-        [CLI_PATH, 'ab', '--demo', '--dry-run', '--no-update-check'],
-        { cwd: TEST_DIR }
-      );
+      const { stdout } = await execa('node', [CLI_PATH, 'ab', '--dry-run', '--no-update-check'], {
+        cwd: TEST_DIR,
+      });
 
       expect(stdout).toContain('Dry-run mode');
     });
 
     it('should reject single character names', async () => {
       try {
-        await execa('node', [CLI_PATH, 'a', '--demo', '--dry-run', '--no-update-check'], {
+        await execa('node', [CLI_PATH, 'a', '--dry-run', '--no-update-check'], {
           cwd: TEST_DIR,
         });
         expect.fail('Should reject single character name');
@@ -421,7 +413,7 @@ describe('CLI Entry Point', () => {
 
     it('should reject names starting with numbers', async () => {
       try {
-        await execa('node', [CLI_PATH, '1project', '--demo', '--dry-run', '--no-update-check'], {
+        await execa('node', [CLI_PATH, '1project', '--dry-run', '--no-update-check'], {
           cwd: TEST_DIR,
         });
         expect.fail('Should reject name starting with number');
@@ -432,7 +424,7 @@ describe('CLI Entry Point', () => {
 
     it('should reject names with spaces', async () => {
       try {
-        await execa('node', [CLI_PATH, 'my project', '--demo', '--dry-run', '--no-update-check'], {
+        await execa('node', [CLI_PATH, 'my project', '--dry-run', '--no-update-check'], {
           cwd: TEST_DIR,
         });
         expect.fail('Should reject name with spaces');
@@ -441,11 +433,10 @@ describe('CLI Entry Point', () => {
       }
     });
 
-    it('should accept names with underscores for workspace', async () => {
-      // Underscores are allowed in kebab-case validation
+    it('should accept names with hyphens', async () => {
       const { stdout } = await execa(
         'node',
-        [CLI_PATH, 'my-project', '--demo', '--dry-run', '--no-update-check'],
+        [CLI_PATH, 'my-project', '--dry-run', '--no-update-check'],
         { cwd: TEST_DIR }
       );
 

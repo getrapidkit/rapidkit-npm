@@ -2,8 +2,6 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { createProject } from './create.js';
-import { generateDemoKit } from './demo-kit.js';
 import inquirer from 'inquirer';
 import path from 'path';
 import { logger } from './logger.js';
@@ -12,6 +10,7 @@ import { loadUserConfig } from './config.js';
 import { validateProjectName } from './validation.js';
 import { RapidKitError } from './errors.js';
 import * as fsExtra from 'fs-extra';
+import { createWorkspace, createProject } from './workspace.js';
 
 // Track current project path for cleanup on interrupt
 let currentProjectPath: string | null = null;
@@ -21,17 +20,23 @@ const program = new Command();
 
 program
   .name('rapidkit')
-  .description('Create a RapidKit development environment or workspace')
-  .version(getVersion())
-  .argument('[directory-name]', 'Name of the workspace or project directory')
+  .description('Create RapidKit workspaces and projects')
+  .version(getVersion());
+
+// Main command: npx rapidkit <name>
+program
+  .argument('[name]', 'Name of the workspace or project directory')
+  .option(
+    '-t, --template <template>',
+    'Create project with template (fastapi, nestjs) instead of workspace'
+  )
+  .option('-y, --yes', 'Skip prompts and use defaults')
   .option('--skip-git', 'Skip git initialization')
-  .option('--test-mode', 'Install RapidKit from local path (for development/testing only)')
-  .option('--demo', 'Create workspace with demo kit templates (no Python installation required)')
-  .option('--demo-only', 'Generate a demo project in current directory (used by demo workspace)')
+  .option('--skip-install', 'Skip installing dependencies')
   .option('--debug', 'Enable debug logging')
   .option('--dry-run', 'Show what would be created without creating it')
   .option('--no-update-check', 'Skip checking for updates')
-  .action(async (directoryName, options) => {
+  .action(async (name, options) => {
     try {
       // Enable debug mode if requested
       if (options.debug) {
@@ -50,78 +55,15 @@ program
 
       console.log(chalk.blue.bold('\n🚀 Welcome to RapidKit!\n'));
 
-      // Demo-only mode - generate project directly without workspace
-      if (options.demoOnly) {
-        const projectName = directoryName || 'my-fastapi-project';
-
-        // Validate project name
-        try {
-          validateProjectName(projectName);
-        } catch (error) {
-          if (error instanceof RapidKitError) {
-            logger.error(`\n❌ ${error.message}`);
-            if (error.details) {
-              logger.warn(`💡 ${error.details}\n`);
-            }
-            process.exit(1);
-          }
-          throw error;
-        }
-
-        const projectPath = path.resolve(process.cwd(), projectName);
-        currentProjectPath = projectPath;
-
-        // Dry-run mode
-        if (options.dryRun) {
-          console.log(chalk.cyan('\n🔍 Dry-run mode - showing what would be created:\n'));
-          console.log(chalk.white('📂 Project path:'), projectPath);
-          console.log(chalk.white('📦 Project type:'), 'FastAPI demo project');
-          console.log(chalk.white('📝 Files to create:'));
-          console.log(chalk.gray('  - src/main.py'));
-          console.log(chalk.gray('  - src/cli.py'));
-          console.log(chalk.gray('  - src/routing/'));
-          console.log(chalk.gray('  - tests/'));
-          console.log(chalk.gray('  - pyproject.toml'));
-          console.log(chalk.gray('  - README.md\n'));
-          return;
-        }
-
-        const answers = await inquirer.prompt([
-          {
-            type: 'input',
-            name: 'project_name',
-            message: 'Project name (snake_case):',
-            default: projectName.replace(/-/g, '_'),
-            validate: (input) => {
-              if (!/^[a-z][a-z0-9_]*$/.test(input)) {
-                return 'Please use snake_case (lowercase with underscores)';
-              }
-              return true;
-            },
-          },
-          {
-            type: 'input',
-            name: 'author',
-            message: 'Author name:',
-            default: process.env.USER || 'RapidKit User',
-          },
-          {
-            type: 'input',
-            name: 'description',
-            message: 'Project description:',
-            default: 'FastAPI service generated with RapidKit',
-          },
-        ]);
-
-        await generateDemoKit(projectPath, answers);
-        return;
+      // If no name provided, show help
+      if (!name) {
+        printHelp();
+        process.exit(0);
       }
 
-      const workspaceName = directoryName || 'rapidkit-workspace';
-
-      // Validate workspace name
+      // Validate name
       try {
-        validateProjectName(workspaceName);
+        validateProjectName(name);
       } catch (error) {
         if (error instanceof RapidKitError) {
           logger.error(`\n❌ ${error.message}`);
@@ -133,54 +75,124 @@ program
         throw error;
       }
 
-      currentProjectPath = path.resolve(process.cwd(), workspaceName);
+      const targetPath = path.resolve(process.cwd(), name);
+      currentProjectPath = targetPath;
 
-      if (options.demo) {
-        // Demo mode - create workspace with demo capabilities
-        console.log(
-          chalk.gray(
-            'This will create a workspace with demo kit templates.\nYou can generate demo projects inside without installing Python RapidKit.\n'
-          )
-        );
-
-        await createProject(workspaceName, {
-          skipGit: options.skipGit || userConfig.skipGit,
-          testMode: false,
-          demoMode: true,
-          dryRun: options.dryRun,
-          userConfig,
-        });
-        return;
-      }
-
-      // Normal mode - full RapidKit installation
-      console.log(chalk.yellow.bold('⚠️  BETA NOTICE\n'));
-      console.log(
-        chalk.yellow(
-          'RapidKit Python package is not yet available on PyPI.\n' +
-            'Full installation mode will be available soon.\n'
-        )
-      );
-      console.log(chalk.cyan('For now, please use one of these options:\n'));
-      console.log(chalk.white('  1. Demo mode (recommended):'));
-      console.log(chalk.gray('     npx rapidkit my-workspace --demo\n'));
-      console.log(chalk.white('  2. Test mode (if you have local RapidKit):'));
-      console.log(chalk.gray('     npx rapidkit my-workspace --test-mode\n'));
-
-      if (!options.testMode) {
-        console.log(chalk.red('❌ Cannot proceed without --demo or --test-mode flag.\n'));
+      // Check if directory already exists
+      if (await fsExtra.pathExists(targetPath)) {
+        logger.error(`\n❌ Directory "${name}" already exists`);
+        console.log(chalk.cyan('\n💡 Choose a different name or delete the existing directory.\n'));
         process.exit(1);
       }
 
-      console.log(chalk.yellow('⚠️  Running in TEST MODE - Installing from local path\n'));
+      // Determine mode: workspace or project
+      const isProjectMode = !!options.template;
 
-      await createProject(workspaceName, {
-        skipGit: options.skipGit || userConfig.skipGit,
-        testMode: options.testMode,
-        demoMode: false,
-        dryRun: options.dryRun,
-        userConfig,
-      });
+      // Validate template if provided
+      if (isProjectMode) {
+        const template = options.template.toLowerCase();
+        const validTemplates = ['fastapi', 'nestjs'];
+        if (!validTemplates.includes(template)) {
+          logger.error(`\n❌ Invalid template: ${options.template}`);
+          console.log(chalk.cyan(`\n📦 Available templates: ${validTemplates.join(', ')}\n`));
+          process.exit(1);
+        }
+      }
+
+      // Dry-run mode
+      if (options.dryRun) {
+        console.log(chalk.cyan('\n🔍 Dry-run mode - showing what would be created:\n'));
+        console.log(chalk.white('📂 Path:'), targetPath);
+        console.log(
+          chalk.white('📦 Type:'),
+          isProjectMode ? `Project (${options.template})` : 'Workspace'
+        );
+        console.log();
+        return;
+      }
+
+      // Get details
+      let answers;
+      if (options.yes) {
+        answers = {
+          author: process.env.USER || 'RapidKit User',
+          description: isProjectMode
+            ? `${options.template === 'nestjs' ? 'NestJS' : 'FastAPI'} application generated with RapidKit`
+            : undefined,
+          package_manager: 'npm',
+        };
+        console.log(chalk.gray('Using default values (--yes flag)\n'));
+      } else if (isProjectMode) {
+        // Project prompts
+        const template = options.template.toLowerCase();
+        if (template === 'fastapi') {
+          answers = await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'author',
+              message: 'Author name:',
+              default: process.env.USER || 'RapidKit User',
+            },
+            {
+              type: 'input',
+              name: 'description',
+              message: 'Project description:',
+              default: 'FastAPI service generated with RapidKit',
+            },
+          ]);
+        } else {
+          answers = await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'author',
+              message: 'Author name:',
+              default: process.env.USER || 'RapidKit User',
+            },
+            {
+              type: 'input',
+              name: 'description',
+              message: 'Project description:',
+              default: 'NestJS application generated with RapidKit',
+            },
+            {
+              type: 'list',
+              name: 'package_manager',
+              message: 'Package manager:',
+              choices: ['npm', 'yarn', 'pnpm'],
+              default: 'npm',
+            },
+          ]);
+        }
+      } else {
+        // Workspace prompts
+        answers = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'author',
+            message: 'Author name:',
+            default: process.env.USER || 'RapidKit User',
+          },
+        ]);
+      }
+
+      // Create workspace or project
+      if (isProjectMode) {
+        await createProject(targetPath, {
+          name,
+          template: options.template.toLowerCase(),
+          author: answers.author,
+          description: answers.description,
+          package_manager: answers.package_manager,
+          skipGit: options.skipGit,
+          skipInstall: options.skipInstall,
+        });
+      } else {
+        await createWorkspace(targetPath, {
+          name,
+          author: answers.author,
+          skipGit: options.skipGit,
+        });
+      }
     } catch (error) {
       if (error instanceof RapidKitError) {
         logger.error(`\n❌ ${error.message}`);
@@ -197,6 +209,35 @@ program
       currentProjectPath = null;
     }
   });
+
+function printHelp() {
+  console.log(chalk.white('Usage: npx rapidkit <name> [options]\n'));
+
+  console.log(chalk.bold('Create a workspace (recommended):'));
+  console.log(chalk.cyan('  npx rapidkit my-workspace'));
+  console.log(chalk.cyan('  cd my-workspace'));
+  console.log(chalk.cyan('  rapidkit create my-api --template fastapi'));
+  console.log(chalk.cyan('  cd my-api'));
+  console.log(chalk.cyan('  rapidkit dev\n'));
+
+  console.log(chalk.bold('Or create a project directly:'));
+  console.log(chalk.cyan('  npx rapidkit my-project --template fastapi'));
+  console.log(chalk.cyan('  npx rapidkit my-project --template nestjs\n'));
+
+  console.log(chalk.bold('Options:'));
+  console.log(
+    chalk.gray('  -t, --template <template>  Create project with template (fastapi, nestjs)')
+  );
+  console.log(chalk.gray('  -y, --yes                  Skip prompts and use defaults'));
+  console.log(chalk.gray('  --skip-git                 Skip git initialization'));
+  console.log(chalk.gray('  --skip-install             Skip installing dependencies'));
+  console.log(chalk.gray('  --debug                    Enable debug logging'));
+  console.log(chalk.gray('  --dry-run                  Show what would be created\n'));
+
+  console.log(chalk.bold('Templates:'));
+  console.log(chalk.gray('  fastapi    FastAPI + Python'));
+  console.log(chalk.gray('  nestjs     NestJS + TypeScript\n'));
+}
 
 // Handle process interruption (Ctrl+C)
 process.on('SIGINT', async () => {

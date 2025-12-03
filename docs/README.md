@@ -31,7 +31,7 @@
 ## 📖 Documentation Structure
 
 ```
-create-rapidkit/
+rapidkit-npm/
 ├── README.md                    # Main documentation
 ├── CHANGELOG.md                 # Version history
 └── docs/
@@ -40,4 +40,31 @@ create-rapidkit/
     ├── SETUP.md                # Setup and commands
     ├── OPTIMIZATION_GUIDE.md   # Optimization suggestions
     └── UTILITIES.md            # Cache and performance utilities
+```
+
+## 🚀 Quick Start
+
+### Create a Project
+
+```bash
+# FastAPI project
+npx rapidkit my-api --template fastapi
+
+# NestJS project
+npx rapidkit my-api --template nestjs
+
+# Workspace (for multiple projects)
+npx rapidkit my-workspace
+```
+
+### Use Project CLI
+
+```bash
+cd my-api
+source .rapidkit/activate   # Enable rapidkit commands
+
+rapidkit init      # Install dependencies
+rapidkit dev       # Start dev server (port 8000)
+rapidkit test      # Run tests
+rapidkit --help    # Show all commands
 ```

@@ -1,0 +1,97 @@
+# {{ project_name | replace('-', ' ') | title }}
+
+{{ description }}
+
+A production-ready NestJS 11 application generated with RapidKit.
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js >= 20 (check with `node --version`)
+- {{ package_manager }} package manager
+
+### Installation
+
+```bash
+# Install dependencies
+{{ package_manager }} install
+
+# Copy environment file
+cp .env.example .env
+
+# Start development server
+{{ package_manager }} run dev
+```
+
+Your API will be available at `http://localhost:8000`
+API docs available at `http://localhost:8000/docs`
+
+## 📚 Available Scripts
+
+| Command | Description |
+|---------|-------------|
+| `{{ package_manager }} run dev` | Start development server with hot reload |
+| `{{ package_manager }} run build` | Build for production |
+| `{{ package_manager }} start` | Start production server |
+| `{{ package_manager }} test` | Run unit tests |
+| `{{ package_manager }} run test:e2e` | Run e2e tests |
+| `{{ package_manager }} run test:cov` | Run tests with coverage |
+| `{{ package_manager }} run lint` | Lint and fix code |
+| `{{ package_manager }} run format` | Format code with Prettier |
+
+## 📁 Project Structure
+
+```
+{{ project_name }}/
+├── src/
+│   ├── main.ts              # Application entry point
+│   ├── app.module.ts        # Root module
+│   ├── app.controller.ts    # Root controller
+│   ├── app.service.ts       # Root service
+│   ├── config/              # Configuration module
+│   ├── examples/            # Example feature module
+│   └── modules/             # RapidKit modules
+├── test/                    # Test files
+├── package.json             # Dependencies
+├── tsconfig.json            # TypeScript config
+└── nest-cli.json            # NestJS CLI config
+```
+
+## 🔧 Configuration
+
+Environment variables are managed through `.env` file:
+
+- `APP_NAME` - Application name
+- `PORT` - Server port (default: 8000)
+- `HOST` - Server host (default: 0.0.0.0)
+- `NODE_ENV` - Environment (development/production/test)
+
+## 🧪 Example API
+
+The scaffold includes an example Notes API:
+
+```bash
+# Create a note
+curl -X POST http://localhost:8000/examples/notes \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Hello","body":"World"}'
+
+# List all notes
+curl http://localhost:8000/examples/notes
+
+# Get health status
+curl http://localhost:8000/health
+```
+
+## 📖 Learn More
+
+- [NestJS Documentation](https://docs.nestjs.com)
+- [RapidKit Documentation](https://rapidkit.top)
+
+## 📄 License
+
+This project is licensed under the {{ license }} License.
+
+---
+Generated with ❤️ by RapidKit

@@ -31,10 +31,53 @@ export RAPIDKIT_DEV_PATH=/path/to/local/rapidkit
 }
 
 # Then use --test-mode flag
-npx create-rapidkit my-workspace --test-mode
+npx rapidkit my-workspace --test-mode
 ```
 
 **Priority:** CLI options > Environment variables > Config file > Defaults
+
+## Two Modes of Operation
+
+### 1. Direct Project Creation (with `--template`)
+
+When you specify `--template`, it creates a standalone project:
+
+```bash
+npx rapidkit my-api --template fastapi   # Create FastAPI project
+npx rapidkit my-api --template nestjs    # Create NestJS project
+```
+
+### 2. Workspace Mode (without `--template`)
+
+Without `--template`, it creates a workspace for multiple projects:
+
+```bash
+npx rapidkit my-workspace                 # Create workspace
+cd my-workspace
+rapidkit create my-api --kit fastapi      # Create project in workspace
+```
+
+## Project CLI (`.rapidkit/activate`)
+
+Each generated project includes a local CLI system:
+
+```bash
+cd my-api
+source .rapidkit/activate   # Enable rapidkit commands (once per terminal)
+
+# Now you can use:
+rapidkit init      # Install dependencies
+rapidkit dev       # Start dev server (port 8000)
+rapidkit test      # Run tests
+rapidkit --help    # Show all commands
+```
+
+### How It Works
+
+1. **`rapidkit`** (root) - Bash script that finds Python and runs `.rapidkit/cli.py`
+2. **`.rapidkit/activate`** - Adds project root to PATH for the current terminal
+3. **`.rapidkit/cli.py`** - Python CLI with all project commands
+4. **`.rapidkit/rapidkit`** - Bash wrapper for poetry/npm commands
 
 ## Testing
 
@@ -54,6 +97,28 @@ npm run test:coverage
 npx vitest --ui
 ```
 
+### Manual Testing
+
+```bash
+# Build the package
+npm run build
+
+# Test FastAPI project creation
+node dist/index.js test-fastapi --template fastapi
+
+# Test NestJS project creation
+node dist/index.js test-nest --template nestjs
+
+# Test workspace creation
+node dist/index.js test-workspace
+
+# Test the generated project
+cd test-fastapi
+source .rapidkit/activate
+rapidkit init
+rapidkit dev
+```
+
 ### Test Structure
 
 ```
@@ -68,7 +133,7 @@ src/__tests__/
 Enable debug mode for verbose logging:
 
 ```bash
-npx create-rapidkit my-workspace --debug
+npx rapidkit my-workspace --debug
 ```
 
 Debug logs include:
@@ -82,8 +147,8 @@ Debug logs include:
 See what would be created without actually creating it:
 
 ```bash
-npx create-rapidkit my-workspace --dry-run
-npx create-rapidkit my-workspace --demo --dry-run
+npx rapidkit my-workspace --dry-run
+npx rapidkit my-api --template fastapi --dry-run
 ```
 
 ## Building

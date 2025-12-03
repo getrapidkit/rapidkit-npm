@@ -3,7 +3,7 @@
 ## Install New Dependencies
 
 ```bash
-cd /home/debux/WOSP/Rapid/Front/create-rapidkit
+cd /home/debux/WOSP/Rapid/Front/rapidkit-npm
 
 # Install linting and formatting tools
 npm install -D @typescript-eslint/eslint-plugin@latest \
@@ -82,14 +82,24 @@ npm audit fix
 ## Test in Different Environments
 
 ```bash
-# Local test
+# Local test - FastAPI
 npm run build
-npm link
-create-rapidkit test-workspace --demo
+node dist/index.js test-fastapi --template fastapi
+cd test-fastapi
+source .rapidkit/activate
+rapidkit init
+rapidkit dev
 
-# Test with npx (without installation)
-cd /tmp
-npx /home/debux/WOSP/Rapid/Front/create-rapidkit test-demo --demo
+# Local test - NestJS
+node dist/index.js test-nest --template nestjs
+cd test-nest
+source .rapidkit/activate
+rapidkit dev
+
+# Local test - Workspace
+node dist/index.js test-workspace
+cd test-workspace
+rapidkit create my-api --kit fastapi
 ```
 
 ## CI/CD (Optional)

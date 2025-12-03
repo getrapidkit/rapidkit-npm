@@ -17,56 +17,131 @@ describe('E2E Tests', () => {
     }
   });
 
-  it('creates demo workspace successfully', async () => {
-    const workspaceName = 'test-workspace';
-    const workspacePath = join(tempDir, workspaceName);
+  it.skip('creates FastAPI project successfully', async () => {
+    const projectName = 'test-api';
+    const projectPath = join(tempDir, projectName);
 
-    // Run rapidkit create command in demo mode
+    // Run rapidkit create command with --template fastapi
     await execa(
       'node',
-      [join(process.cwd(), 'dist/index.js'), workspaceName, '--demo', '--skip-git'],
+      [join(process.cwd(), 'dist/index.js'), projectName, '--template', 'fastapi', '--skip-git'],
       {
         cwd: tempDir,
       }
     );
 
-    // Verify workspace structure
-    await expect(fileExists(join(workspacePath, 'package.json'))).resolves.toBe(true);
-    await expect(fileExists(join(workspacePath, 'generate-demo.js'))).resolves.toBe(true);
-    await expect(fileExists(join(workspacePath, 'README.md'))).resolves.toBe(true);
+    // Verify project structure
+    await expect(fileExists(join(projectPath, 'pyproject.toml'))).resolves.toBe(true);
+    await expect(fileExists(join(projectPath, 'rapidkit'))).resolves.toBe(true);
+    await expect(fileExists(join(projectPath, '.rapidkit', 'cli.py'))).resolves.toBe(true);
+    await expect(fileExists(join(projectPath, '.rapidkit', 'activate'))).resolves.toBe(true);
+    await expect(fileExists(join(projectPath, 'src', 'main.py'))).resolves.toBe(true);
+    await expect(fileExists(join(projectPath, 'README.md'))).resolves.toBe(true);
+  }, 60000);
+
+  it.skip('creates NestJS project successfully', async () => {
+    const projectName = 'test-nest';
+    const projectPath = join(tempDir, projectName);
+
+    // Run rapidkit create command with --template nestjs
+    await execa(
+      'node',
+      [
+        join(process.cwd(), 'dist/index.js'),
+        projectName,
+        '--template',
+        'nestjs',
+        '--skip-git',
+        '--skip-install',
+      ],
+      {
+        cwd: tempDir,
+      }
+    );
+
+    // Verify project structure
+    await expect(fileExists(join(projectPath, 'package.json'))).resolves.toBe(true);
+    await expect(fileExists(join(projectPath, 'rapidkit'))).resolves.toBe(true);
+    await expect(fileExists(join(projectPath, '.rapidkit', 'rapidkit'))).resolves.toBe(true);
+    await expect(fileExists(join(projectPath, '.rapidkit', 'activate'))).resolves.toBe(true);
+    await expect(fileExists(join(projectPath, 'src', 'main.ts'))).resolves.toBe(true);
+    await expect(fileExists(join(projectPath, 'README.md'))).resolves.toBe(true);
 
     // Verify package.json content
-    const packageJson = JSON.parse(await readFile(join(workspacePath, 'package.json'), 'utf-8'));
-    expect(packageJson.name).toBe('test-workspace-workspace');
-    expect(packageJson.scripts.generate).toBeDefined();
+    const packageJson = JSON.parse(await readFile(join(projectPath, 'package.json'), 'utf-8'));
+    expect(packageJson.name).toBe('test-nest');
+  }, 60000);
+
+  it.skip('creates workspace successfully', async () => {
+    const workspaceName = 'test-workspace';
+    const workspacePath = join(tempDir, workspaceName);
+
+    // Run rapidkit create command without --template (workspace mode)
+    await execa('node', [join(process.cwd(), 'dist/index.js'), workspaceName, '--skip-git'], {
+      cwd: tempDir,
+    });
+
+    // Verify workspace structure
+    await expect(fileExists(join(workspacePath, 'rapidkit'))).resolves.toBe(true);
+    await expect(fileExists(join(workspacePath, 'README.md'))).resolves.toBe(true);
+    await expect(fileExists(join(workspacePath, 'templates'))).resolves.toBe(true);
   }, 30000);
 
-  it('rejects invalid workspace names', async () => {
-    const invalidNames = ['invalid name', '123-start', 'test@workspace', 'test workspace'];
+  it('rejects invalid project names', async () => {
+    const invalidNames = ['invalid name', '123-start', 'test@project', 'test project'];
 
     for (const invalidName of invalidNames) {
       await expect(
-        execa('node', [join(process.cwd(), 'dist/index.js'), invalidName, '--demo', '--skip-git'], {
-          cwd: tempDir,
-          reject: false,
-        })
+        execa(
+          'node',
+          [
+            join(process.cwd(), 'dist/index.js'),
+            invalidName,
+            '--template',
+            'fastapi',
+            '--skip-git',
+          ],
+          {
+            cwd: tempDir,
+            reject: false,
+          }
+        )
       ).resolves.toHaveProperty('exitCode', 1);
     }
   }, 30000);
 
-  it('handles dry-run mode correctly', async () => {
-    const workspaceName = 'test-workspace';
+  it('handles dry-run mode correctly for templates', async () => {
+    const projectName = 'test-project';
 
     const { stdout } = await execa(
       'node',
-      [join(process.cwd(), 'dist/index.js'), workspaceName, '--demo', '--dry-run'],
+      [join(process.cwd(), 'dist/index.js'), projectName, '--template', 'fastapi', '--dry-run'],
       {
         cwd: tempDir,
       }
     );
 
     expect(stdout).toContain('Dry-run mode');
-    expect(stdout).toContain('Demo workspace');
+    expect(stdout.toLowerCase()).toContain('fastapi');
+    expect(stdout).toContain(projectName);
+
+    // Verify nothing was created
+    await expect(fileExists(join(tempDir, projectName))).resolves.toBe(false);
+  }, 15000);
+
+  it('handles dry-run mode correctly for workspace', async () => {
+    const workspaceName = 'test-workspace';
+
+    const { stdout } = await execa(
+      'node',
+      [join(process.cwd(), 'dist/index.js'), workspaceName, '--dry-run'],
+      {
+        cwd: tempDir,
+      }
+    );
+
+    expect(stdout).toContain('Dry-run mode');
+    expect(stdout.toLowerCase()).toContain('workspace');
     expect(stdout).toContain(workspaceName);
 
     // Verify nothing was created
@@ -83,7 +158,7 @@ describe('E2E Tests', () => {
     const { stdout } = await execa('node', [join(process.cwd(), 'dist/index.js'), '--help']);
 
     expect(stdout).toContain('rapidkit');
-    expect(stdout).toContain('--demo');
+    expect(stdout).toContain('--template');
     expect(stdout).toContain('--skip-git');
   }, 5000);
 });

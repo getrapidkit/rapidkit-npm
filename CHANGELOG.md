@@ -5,6 +5,39 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2025-12-03
+
+### Added
+- 🆕 **Two Modes of Operation**
+  - **Direct Project Mode** (`--template`) - Create standalone FastAPI/NestJS projects
+  - **Workspace Mode** (default) - Create workspace for multiple projects
+- 🆕 **NestJS Template** - Full NestJS project support with TypeScript
+  - Swagger/OpenAPI documentation at `/docs`
+  - Example CRUD module
+  - Testing setup with Jest
+  - ESLint + Prettier configuration
+- 🆕 **Unified CLI Activation** - `source .rapidkit/activate`
+  - Enable `rapidkit` commands without `./` prefix
+  - Works in any terminal session
+  - Smart Python detection (venv → poetry → system)
+- 🆕 **Makefile Support** - Alternative commands for FastAPI projects
+  - `make dev`, `make test`, `make lint`, etc.
+- 🆕 **Default Port 8000** - Both FastAPI and NestJS now use port 8000
+
+### Changed
+- 📝 **Updated CLI** - `npx rapidkit` now supports both modes
+  - `npx rapidkit my-api --template fastapi` → Direct project
+  - `npx rapidkit my-workspace` → Workspace mode
+- 🔧 **Improved Project CLI**
+  - Better error messages with actionable hints
+  - `--reload-dir src` for FastAPI dev server
+  - Port/host configuration via `--port` and `--host` flags
+- 📝 **Updated Documentation** - All docs reflect new workflow
+
+### Fixed
+- 🐛 **Python Detection** - Smart fallback chain for finding Python
+- 🐛 **NestJS Port** - Changed default from 3000 to 8000 for consistency
+
 ## [0.11.3] - 2025-12-03
 
 ### Added
@@ -347,7 +380,7 @@ None in this release.
 ### v1.0.0 (Stable Release) - Coming Soon
 - [ ] RapidKit Python package on PyPI
 - [ ] Full installation mode without --test-mode
-- [ ] More templates (NestJS, advanced kits)
+- [x] NestJS template support ✅
 - [ ] Interactive config wizard
 - [ ] Auto-update functionality
 

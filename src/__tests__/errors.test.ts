@@ -132,7 +132,7 @@ describe('Error classes', () => {
       const error = new RapidKitNotAvailableError();
       expect(error.message).toContain('not yet available');
       expect(error.code).toBe('RAPIDKIT_NOT_AVAILABLE');
-      expect(error.details).toContain('--demo');
+      expect(error.details).toContain('--template');
     });
 
     it('should suggest alternatives', () => {
