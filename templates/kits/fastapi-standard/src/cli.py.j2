@@ -95,7 +95,8 @@ def dev() -> None:
     """🚀 Start development server with hot reload
 
     Usage:
-        poetry run dev [options]
+        rapidkit dev [options]  # preferred (project-aware)
+        # or: poetry run dev [options]
 
     Options:
         --port, -p PORT     Server port (default: 8000)
@@ -103,9 +104,10 @@ def dev() -> None:
         --env, -e ENV       Environment (default: development)
 
     Examples:
-        poetry run dev
-        poetry run dev --port 3000
-        poetry run dev --host 127.0.0.1 --port 8080
+        rapidkit dev
+        rapidkit dev --port 3000
+        rapidkit dev --host 127.0.0.1 --port 8080
+        # or: poetry run dev --port 3000
     """
     _print_banner("🚀", "Starting development server with hot reload...")
     _print_banner("📁", f"Working directory: {Path.cwd()}")
@@ -175,7 +177,7 @@ def build() -> None:
         _print_error(f"Build failed: {e}")
         sys.exit(1)
     except FileNotFoundError:
-        _print_error("Build tools not found. Install with: poetry install --group dev")
+        _print_error("Build tools not found. Install with: rapidkit init (or: poetry install --group dev)")
         sys.exit(1)
 
 
@@ -214,7 +216,7 @@ def test() -> None:
             sys.exit(result.returncode)
 
     except FileNotFoundError:
-        _print_error("pytest not found. Install with: poetry install --group dev")
+        _print_error("pytest not found. Install with: rapidkit init (or: poetry install --group dev)")
         sys.exit(1)
 
 
@@ -247,7 +249,7 @@ def lint() -> None:
         _print_error("Linting failed! Run 'poetry run format' to fix issues.")
         sys.exit(1)
     except FileNotFoundError:
-        _print_error("Linting tools not found. Install with: poetry install --group dev")
+        _print_error("Linting tools not found. Install with: rapidkit init (or: poetry install --group dev)")
         sys.exit(1)
 
 
@@ -280,7 +282,7 @@ def format() -> None:
         _print_error(f"Formatting failed: {e}")
         sys.exit(1)
     except FileNotFoundError:
-        _print_error("Formatting tools not found. Install with: poetry install --group dev")
+        _print_error("Formatting tools not found. Install with: rapidkit init (or: poetry install --group dev)")
         sys.exit(1)
 
 

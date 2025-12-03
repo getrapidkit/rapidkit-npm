@@ -5,16 +5,17 @@ A minimal FastAPI service generated with the **FastAPI Standard Kit**. All domai
 ## Quick start
 
 ```bash
-poetry install
-poetry run dev
+rapidkit init  # bootstrap the project (preferred)
+rapidkit dev
 ```
 
 ## Available commands
 
 ```bash
-poetry run dev      # 🚀 Start development server with hot reload
-poetry run start    # ⚡ Start production server
-poetry run build    # 📦 Build project for production
+rapidkit init       # 🔧 Bootstrap the project (create local launcher & install deps)
+rapidkit dev        # 🚀 Start development server with hot reload
+poetry run start    # ⚡ Advanced: start production server via poetry
+poetry run build    # 📦 Advanced: build via poetry
 poetry run test     # 🧪 Run tests
 ```
 

@@ -161,24 +161,22 @@ export async function createProject(
 
       console.log(chalk.white(`   ${activateCmd}  # Or: poetry run rapidkit`));
       console.log(chalk.white('   rapidkit create  # Interactive mode'));
-      console.log(chalk.white('   cd <project-name> && poetry install && rapidkit run dev'));
+      console.log(chalk.white('   cd <project-name> && rapidkit init && rapidkit dev'));
     } else if (pythonAnswers.installMethod === 'venv') {
       console.log(
         chalk.white('   source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate')
       );
       console.log(chalk.white('   rapidkit create  # Interactive mode'));
-      console.log(
-        chalk.white('   cd <project-name> && pip install -r requirements.txt && rapidkit run dev')
-      );
+      console.log(chalk.white('   cd <project-name> && rapidkit init && rapidkit dev'));
     } else {
       console.log(chalk.white('   rapidkit create  # Interactive mode'));
-      console.log(chalk.white('   cd <project-name> && rapidkit run dev'));
+      console.log(chalk.white('   cd <project-name> && rapidkit init && rapidkit dev'));
     }
 
     console.log(chalk.white('\n💡 For more information, check the README.md file.'));
     console.log(chalk.cyan('\n📚 RapidKit commands:'));
     console.log(chalk.white('   rapidkit create          - Create a new project (interactive)'));
-    console.log(chalk.white('   rapidkit run dev         - Run development server'));
+    console.log(chalk.white('   rapidkit dev             - Run development server'));
     console.log(chalk.white('   rapidkit add module <name> - Add a module (e.g., settings)'));
     console.log(chalk.white('   rapidkit list            - List available kits'));
     console.log(chalk.white('   rapidkit modules         - List available modules'));
@@ -408,14 +406,14 @@ Interactive mode will guide you through selecting a kit and configuring your pro
 
 \`\`\`bash
 cd my-project
-# Install dependencies:
-poetry install
+# Install dependencies (preferred):
+rapidkit init
 
-# Run the server (simplest way):
-rapidkit run dev
+# Run the server (project-aware):
+rapidkit dev
 
-# Or with poetry run:
-poetry run rapidkit run dev
+# Or with poetry run (manual / advanced):
+poetry run rapidkit dev
 
 # Or manually:
 uvicorn src.main:app --reload
@@ -437,7 +435,7 @@ rapidkit modules list
 
 - \`rapidkit create\` - Create a new project (interactive)
 - \`rapidkit create project <kit> <name>\` - Create project with specific kit
-- \`rapidkit run dev\` - Run development server
+- \`rapidkit dev\` - Run development server
 - \`rapidkit add module <name>\` - Add a module (e.g., \`rapidkit add module settings\`)
 - \`rapidkit list\` - List available kits
 - \`rapidkit modules\` - List available modules
@@ -447,7 +445,7 @@ rapidkit modules list
 
 ## RapidKit Documentation
 
-For full documentation, visit: [RapidKit Docs](https://rapidkit.dev) *(or appropriate URL)*
+For full documentation, visit: [RapidKit Docs](https://rapidkit.top) *(or appropriate URL)*
 
 ## Workspace Structure
 
@@ -613,7 +611,7 @@ Each generated demo project contains:
 1. **Explore the Generated Code** - Check out \`src/main.py\` and \`src/routing/\`
 2. **Add Routes** - Create new endpoints in \`src/routing/\`
 3. **Install Full RapidKit** - For advanced features: \`pipx install rapidkit\`
-4. **Read the Documentation** - Visit [RapidKit Docs](https://rapidkit.dev)
+4. **Read the Documentation** - Visit [RapidKit Docs](https://rapidkit.top)
 
 ## ⚠️ Demo Mode Limitations
 

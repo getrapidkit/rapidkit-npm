@@ -124,7 +124,7 @@ npx rapidkit my-project --demo-only --debug
 
 - **NPM Package**: https://www.npmjs.com/package/rapidkit
 - **GitHub Repository**: https://github.com/getrapidkit/rapidkit-npm
-- **Documentation**: https://rapidkit.dev/docs
+- **Documentation**: https://rapidkit.top/docs
 - **Issue Tracker**: https://github.com/getrapidkit/rapidkit-npm/issues
 
 ## 🙏 Contributors

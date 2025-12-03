@@ -134,7 +134,7 @@ Thank you to everyone who contributed to this release!
 
 - **NPM**: https://www.npmjs.com/package/rapidkit
 - **GitHub**: https://github.com/getrapidkit/rapidkit-npm
-- **Docs**: https://rapidkit.dev (coming soon)
+- **Docs**: https://rapidkit.top (coming soon)
 - **Issues**: https://github.com/getrapidkit/rapidkit-npm/issues
 
 ---

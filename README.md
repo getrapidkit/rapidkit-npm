@@ -335,7 +335,7 @@ npx rapidkit my-workspace --test-mode
 4. **Navigate and run**:
    ```bash
    cd api-service
-   rapidkit run dev
+   rapidkit dev
    ```
 
 5. **Create more projects** (from workspace root):
@@ -421,7 +421,7 @@ After setting up your demo project:
 ## Related Projects
 
 - **RapidKit Python** - The core framework (coming soon to PyPI)
-- **RapidKit Marketplace** - Browse and share modules (https://rapidkit.dev)
+- **RapidKit Marketplace** - Browse and share modules (https://rapidkit.top)
 - **GitHub**: https://github.com/getrapidkit
 
 ## Contributing
@@ -481,7 +481,7 @@ MIT
 ## Support
 
 - 🐛 Report issues: [GitHub Issues](https://github.com/getrapidkit/rapidkit-npm/issues)
-- 📚 Docs: https://rapidkit.dev
+- 📚 Docs: https://rapidkit.top
 - 💬 Community: Coming soon
 
 ---

@@ -364,14 +364,14 @@ This workspace contains RapidKit projects.
 
 \`\`\`bash
 cd my-project
-poetry install
-poetry run dev
+rapidkit init
+rapidkit dev
 \`\`\`
 `;
 
       expect(content).toContain('RapidKit');
       expect(content).toContain('Getting Started');
-      expect(content).toContain('poetry');
+      expect(content).toContain('rapidkit');
     });
 
     it('should support different install methods', () => {

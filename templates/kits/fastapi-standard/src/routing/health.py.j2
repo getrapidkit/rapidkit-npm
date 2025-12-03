@@ -4,10 +4,29 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-router = APIRouter()
+try:
+    from src.health.registry import (
+        list_registered_health_routes as _list_registered_health_routes,
+    )
+except ImportError:  # pragma: no cover - registry not generated yet
+    def _list_registered_health_routes(
+        prefix: str = "/api/health",
+    ) -> list[dict[str, str]]:
+        return []
+
+
+router = APIRouter(prefix="/health", tags=["health"])
 
 
 @router.get("/", summary="Health check")
 async def heartbeat() -> dict[str, str]:
     """Return basic service heartbeat."""
+
     return {"status": "ok"}
+
+
+@router.get("/modules", summary="Registered module health endpoints")
+async def module_health_catalog() -> dict[str, list[dict[str, str]]]:
+    """Expose metadata for module-provided health routers."""
+
+    return {"routes": _list_registered_health_routes()}

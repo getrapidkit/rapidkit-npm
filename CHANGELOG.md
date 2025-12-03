@@ -5,6 +5,24 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2] - 2025-06-22
+
+### Changed
+- 📝 **CLI Command Documentation** - Updated command references throughout
+  - Changed `rapidkit run dev` → `rapidkit dev` (simplified)
+  - Changed `poetry install` → `rapidkit init` (preferred method)
+  - Updated README templates and success messages
+- 🌐 **Documentation URLs** - Changed `rapidkit.dev` → `rapidkit.top`
+- 🏥 **FastAPI Health Router** - Enhanced health.py template
+  - Added `/health/modules` endpoint to catalog module health routes
+  - Integrated with health registry for dynamic module discovery
+  - Router now includes prefix and tags directly
+
+### Fixed
+- 🐛 **FastAPI Templates** - Fixed router mount duplication
+  - Removed redundant prefix/tags from api_router.include_router()
+  - Router configuration now managed at router definition level
+
 ## [0.11.1] - 2025-11-14
 
 ### Added
