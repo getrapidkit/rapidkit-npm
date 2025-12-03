@@ -768,9 +768,9 @@ ${chalk.bold('📚 Available commands:')}
   rapidkit format    # Format code
 
 ${chalk.bold('🌐 API endpoints:')}
-  http://localhost:3000/health          # Health check
-  http://localhost:3000/docs            # Swagger docs
-  http://localhost:3000/examples/notes  # Example API
+  http://localhost:8000/health          # Health check
+  http://localhost:8000/docs            # Swagger docs
+  http://localhost:8000/examples/notes  # Example API
 `);
     }
   } catch (error) {
