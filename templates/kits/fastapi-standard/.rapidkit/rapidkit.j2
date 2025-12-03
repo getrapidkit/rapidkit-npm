@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Local RapidKit project launcher (npm demo template)
+# This script provides local project commands for demo projects.
+
+set -euo pipefail
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Detect project type
+if [ -f "$ROOT_DIR/pyproject.toml" ]; then
+  PKG_TYPE="python"
+elif [ -f "$ROOT_DIR/package.json" ]; then
+  PKG_TYPE="node"
+else
+  PKG_TYPE="unknown"
+fi
+
+VENV_PY="${ROOT_DIR}/.venv/bin/python"
+VENV_POETRY="${ROOT_DIR}/.venv/bin/poetry"
+
+case "$PKG_TYPE" in
+  python)
+    # prefer project-local poetry
+    if [ -x "$VENV_POETRY" ]; then
+      if [ "${1:-}" = "init" ]; then
+        exec "$VENV_POETRY" "install"
+      else
+        exec "$VENV_POETRY" "run" "$@"
+      fi
+    fi
+
+    # then prefer poetry on PATH
+    if command -v poetry >/dev/null 2>&1; then
+      if [ "${1:-}" = "init" ]; then
+        exec poetry "install"
+      else
+        exec poetry "run" "$@"
+      fi
+    fi
+
+    # If venv python exists, try installing poetry into it
+    if [ -x "$VENV_PY" ]; then
+      echo "⚠️  Poetry not found. Installing poetry into project .venv..."
+      "$VENV_PY" -m pip install --upgrade pip >/dev/null 2>&1 || true
+      "$VENV_PY" -m pip install poetry >/dev/null 2>&1 || true
+      if [ -x "$VENV_POETRY" ]; then
+        if [ "${1:-}" = "init" ]; then
+          exec "$VENV_POETRY" "install"
+        else
+          exec "$VENV_POETRY" "run" "$@"
+        fi
+      else
+        echo "❌ Failed to locate poetry after installation."
+        exit 1
+      fi
+    fi
+
+    echo "❌ Poetry is not available and no project .venv exists."
+    echo "💡 Run: 'poetry install' to bootstrap the project, or install poetry: 'pip install poetry'"
+    exit 127
+    ;;
+
+  *)
+    echo "❌ Could not detect project type (pyproject.toml missing)."
+    echo "💡 This appears to be a demo project. Run 'poetry install' to set up."
+    exit 127
+    ;;
+esac

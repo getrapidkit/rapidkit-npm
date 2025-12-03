@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,12 +12,24 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routing import api_router
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Application lifespan context manager for startup/shutdown events."""
+    # Startup
+    # <<<inject:startup>>>
+    yield
+    # Shutdown
+    # <<<inject:shutdown>>>
+
+
 app = FastAPI(
     title="{{ project_name }}",
     description="{{ description }}",
     version="{{ app_version }}",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -27,15 +42,3 @@ app.add_middleware(
 
 app.include_router(api_router, prefix="/api")
 # <<<inject:routes>>>
-
-
-@app.on_event("startup")
-async def _on_startup() -> None:
-    """Execute startup hooks provided by modules."""
-    # <<<inject:startup>>>
-
-
-@app.on_event("shutdown")
-async def _on_shutdown() -> None:
-    """Execute shutdown hooks provided by modules."""
-    # <<<inject:shutdown>>>

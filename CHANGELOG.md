@@ -5,6 +5,37 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.3] - 2025-12-03
+
+### Added
+- 🆕 **Local RapidKit Commands** - Demo projects now support `rapidkit` CLI commands
+  - Added `.rapidkit/` folder with local launcher and CLI handler
+  - `rapidkit init` - Install dependencies via poetry
+  - `rapidkit dev` - Start development server with hot reload
+  - `rapidkit start` - Start production server
+  - `rapidkit test` - Run tests
+  - `rapidkit help` - Show available commands
+- ✅ **New Tests** - 6 new tests for `.rapidkit/` folder generation (431 total)
+  - Test `.rapidkit/` folder structure generation
+  - Test executable permissions on Unix systems
+  - Test `project.json` content validation
+  - Test `cli.py` command handlers
+  - Test rapidkit launcher script content
+
+### Changed
+- 📝 **Updated Documentation** - All documentation uses `rapidkit` commands
+  - README.md updated to use `rapidkit init` and `rapidkit dev`
+  - Demo workspace structure shows `.rapidkit/` folder
+  - README.md.j2 template updated with rapidkit commands
+  - Success messages show rapidkit commands with emoji descriptions
+- 🎯 **Improved UX** - Better user experience for demo projects
+  - Commands aligned with full RapidKit CLI syntax
+  - Consistent command interface across demo and full modes
+
+### Fixed
+- 🐛 **Template String Escaping** - Fixed bash variable syntax in embedded scripts
+  - Properly escaped `${1:-}` in JavaScript template literals
+
 ## [0.11.2] - 2025-06-22
 
 ### Changed

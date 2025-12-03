@@ -52,6 +52,10 @@ export async function generateDemoKit(projectPath: string, variables: KitVariabl
       'tests/__init__.py.j2',
       'README.md.j2',
       'pyproject.toml.j2',
+      // .rapidkit folder for project detection and local commands
+      '.rapidkit/project.json.j2',
+      '.rapidkit/cli.py.j2',
+      '.rapidkit/rapidkit.j2',
     ];
 
     // Generate files
@@ -70,6 +74,11 @@ export async function generateDemoKit(projectPath: string, variables: KitVariabl
 
       // Write file
       await fs.writeFile(outputPath, rendered);
+
+      // Make .rapidkit/rapidkit and .rapidkit/cli.py executable
+      if (outputFile === '.rapidkit/rapidkit' || outputFile === '.rapidkit/cli.py') {
+        await fs.chmod(outputPath, 0o755);
+      }
     }
 
     // Create .gitignore separately
@@ -125,6 +134,10 @@ ${chalk.green('✨ Demo project created successfully!')}
 
 ${chalk.bold('📂 Project structure:')}
 ${projectPath}/
+  ├── .rapidkit/           # RapidKit project config
+  │   ├── project.json     # Project metadata
+  │   ├── cli.py           # Local CLI handler
+  │   └── rapidkit         # Local launcher
   ├── src/
   │   ├── main.py          # FastAPI application
   │   ├── cli.py           # CLI commands
@@ -137,12 +150,15 @@ ${projectPath}/
 ${chalk.bold('🚀 Get started:')}
   cd ${path.basename(projectPath)}
   poetry install
-  poetry run python -m src.main
+  rapidkit dev             # or: poetry run python -m src.main
 
-${chalk.bold('📚 Next steps:')}
-  • Add RapidKit modules: poetry add rapidkit
-  • Read the README.md for more information
-  • Start building your API!
+${chalk.bold('📚 Available commands:')}
+  rapidkit init            # Install dependencies
+  rapidkit dev             # Start dev server with hot reload
+  rapidkit start           # Start production server
+  rapidkit test            # Run tests
+  rapidkit lint            # Lint code
+  rapidkit format          # Format code
 
 ${chalk.yellow('Note:')} This is a standalone demo. For full RapidKit features and modules,
 install RapidKit Python package: ${chalk.cyan('pipx install rapidkit')}

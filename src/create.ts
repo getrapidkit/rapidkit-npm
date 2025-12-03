@@ -517,8 +517,9 @@ async function createDemoWorkspace(
  *   npm run generate my-api
  */
 
-const { execSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
+const readline = require('readline');
 
 const projectName = process.argv[2];
 
@@ -529,20 +530,374 @@ if (!projectName) {
   process.exit(1);
 }
 
-// Use npx to run rapidkit in demo mode, targeting the current directory
-const targetPath = path.join(process.cwd(), projectName);
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
 
-try {
-  console.log(\`\\nGenerating demo project: \${projectName}...\\n\`);
-  execSync(\`npx rapidkit "\${projectName}" --demo-only\`, {
-    stdio: 'inherit',
-    cwd: process.cwd(),
+function ask(question, defaultValue) {
+  return new Promise((resolve) => {
+    rl.question(\`\${question} (\${defaultValue}): \`, (answer) => {
+      resolve(answer || defaultValue);
+    });
   });
-  console.log(\`\\n✅ Demo project created at: \${targetPath}\\n\`);
-} catch (_error) {
-  console.error('\\n❌ Failed to generate demo project\\n');
-  process.exit(1);
 }
+
+async function main() {
+  const targetPath = path.join(process.cwd(), projectName);
+  
+  if (fs.existsSync(targetPath)) {
+    console.error(\`\\n❌ Directory "\${projectName}" already exists\\n\`);
+    process.exit(1);
+  }
+
+  console.log(\`\\n🚀 Creating FastAPI project: \${projectName}\\n\`);
+  
+  const snakeName = projectName.replace(/-/g, '_').toLowerCase();
+  const project_name = await ask('Project name (snake_case)', snakeName);
+  const author = await ask('Author name', process.env.USER || 'RapidKit User');
+  const description = await ask('Description', 'FastAPI service generated with RapidKit');
+  
+  rl.close();
+
+  // Create project structure
+  const dirs = [
+    '',
+    'src',
+    'src/routing',
+    'src/modules',
+    'tests',
+    '.rapidkit'
+  ];
+
+  for (const dir of dirs) {
+    fs.mkdirSync(path.join(targetPath, dir), { recursive: true });
+  }
+
+  // Template files with content
+  const files = {
+    'src/__init__.py': '"""' + project_name + ' package."""\\n',
+    'src/modules/__init__.py': '"""Modules package."""\\n',
+    'tests/__init__.py': '"""Tests package."""\\n',
+    'src/main.py': \`"""$\{project_name} application entrypoint."""
+
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from .routing import api_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Application lifespan context manager for startup/shutdown events."""
+    yield
+
+
+app = FastAPI(
+    title="$\{project_name}",
+    description="$\{description}",
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(api_router, prefix="/api")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("src.main:app", host="0.0.0.0", port=8001, reload=True)
+\`,
+    'src/routing/__init__.py': \`"""API routing configuration."""
+
+from fastapi import APIRouter
+
+from .health import router as health_router
+
+api_router = APIRouter()
+
+api_router.include_router(health_router)
+\`,
+    'src/routing/health.py': \`"""Health check endpoints."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter
+
+router = APIRouter(prefix="/health", tags=["health"])
+
+
+@router.get("/", summary="Health check")
+async def heartbeat() -> dict[str, str]:
+    """Return basic service heartbeat."""
+    return {"status": "ok"}
+\`,
+    'src/cli.py': \`"""CLI commands for $\{project_name}."""
+
+import subprocess
+import sys
+from pathlib import Path
+
+
+def dev():
+    """Start development server with hot reload."""
+    print("🚀 Starting development server...")
+    subprocess.run([
+        sys.executable, "-m", "uvicorn",
+        "src.main:app", "--reload",
+        "--host", "0.0.0.0", "--port", "8000"
+    ])
+
+
+def start():
+    """Start production server."""
+    print("⚡ Starting production server...")
+    subprocess.run([
+        sys.executable, "-m", "uvicorn",
+        "src.main:app",
+        "--host", "0.0.0.0", "--port", "8000"
+    ])
+
+
+def test():
+    """Run tests."""
+    print("🧪 Running tests...")
+    subprocess.run([sys.executable, "-m", "pytest", "-q"])
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python -m src.cli <command>")
+        print("Commands: dev, start, test")
+        sys.exit(1)
+    
+    cmd = sys.argv[1]
+    if cmd == "dev":
+        dev()
+    elif cmd == "start":
+        start()
+    elif cmd == "test":
+        test()
+    else:
+        print(f"Unknown command: {cmd}")
+        sys.exit(1)
+\`,
+    'pyproject.toml': \`[tool.poetry]
+name = "$\{project_name}"
+version = "0.1.0"
+description = "$\{description}"
+authors = ["$\{author}"]
+license = "MIT"
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+pydantic = "^2.0"
+pydantic-settings = "^2.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+pytest-asyncio = "^0.24.0"
+pytest-cov = "^6.0"
+httpx = "^0.27"
+black = "^24.0"
+ruff = "^0.8"
+mypy = "^1.0"
+
+[tool.poetry.scripts]
+dev = "src.cli:dev"
+start = "src.cli:start"
+test = "src.cli:test"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+\`,
+    'README.md': \`# $\{project_name}
+
+$\{description}
+
+## Quick start
+
+\\\`\\\`\\\`bash
+rapidkit init       # Install dependencies
+rapidkit dev        # Start dev server
+\\\`\\\`\\\`
+
+## Available commands
+
+\\\`\\\`\\\`bash
+rapidkit init       # 🔧 Install dependencies
+rapidkit dev        # 🚀 Start development server with hot reload
+rapidkit start      # ⚡ Start production server
+rapidkit test       # 🧪 Run tests
+rapidkit help       # 📚 Show available commands
+\\\`\\\`\\\`
+
+## Project layout
+
+\\\`\\\`\\\`
+$\{project_name}/
+├── src/
+│   ├── main.py           # FastAPI application
+│   ├── cli.py            # CLI commands
+│   ├── routing/          # API routes
+│   └── modules/          # Module system
+├── tests/                # Test suite
+├── pyproject.toml        # Poetry configuration
+└── README.md
+\\\`\\\`\\\`
+\`,
+    '.rapidkit/project.json': JSON.stringify({
+      kit_name: "fastapi.standard",
+      profile: "fastapi/standard",
+      created_at: new Date().toISOString(),
+      rapidkit_version: "npm-demo"
+    }, null, 2),
+    '.rapidkit/cli.py': \`#!/usr/bin/env python3
+"""RapidKit CLI wrapper for demo projects."""
+
+import subprocess
+import sys
+from pathlib import Path
+
+
+def dev(port=8000, host="0.0.0.0"):
+    """Start development server."""
+    print("🚀 Starting development server with hot reload...")
+    subprocess.run([
+        sys.executable, "-m", "uvicorn",
+        "src.main:app", "--reload",
+        "--host", host, "--port", str(port)
+    ])
+
+
+def start(port=8000, host="0.0.0.0"):
+    """Start production server."""
+    print("⚡ Starting production server...")
+    subprocess.run([
+        sys.executable, "-m", "uvicorn",
+        "src.main:app",
+        "--host", host, "--port", str(port)
+    ])
+
+
+def init():
+    """Install dependencies."""
+    print("📦 Installing dependencies...")
+    subprocess.run(["poetry", "install"])
+
+
+def test():
+    """Run tests."""
+    print("🧪 Running tests...")
+    subprocess.run([sys.executable, "-m", "pytest", "-q"])
+
+
+def help_cmd():
+    """Show help."""
+    print("📚 Available commands:")
+    print("  init   - Install dependencies")
+    print("  dev    - Start dev server")
+    print("  start  - Start production server")
+    print("  test   - Run tests")
+
+
+if __name__ == "__main__":
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
+    cmds = {"dev": dev, "start": start, "init": init, "test": test, "help": help_cmd}
+    cmds.get(cmd, help_cmd)()
+\`,
+    '.rapidkit/rapidkit': '#!/usr/bin/env bash\\n# Local RapidKit launcher for demo projects\\nset -euo pipefail\\nSCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"\\nROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"\\ncd "$ROOT_DIR"\\n\\nif [ -f "pyproject.toml" ]; then\\n  if command -v poetry >/dev/null 2>&1; then\\n    exec poetry run python "$SCRIPT_DIR/cli.py" "$@"\\n  fi\\nfi\\n\\necho "Poetry not found. Install with: pip install poetry"\\nexit 1\\n',
+    '.gitignore': \`# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Project
+.env
+.env.local
+\`
+  };
+
+  for (const [filePath, content] of Object.entries(files)) {
+    fs.writeFileSync(path.join(targetPath, filePath), content);
+  }
+
+  // Make scripts executable
+  try {
+    fs.chmodSync(path.join(targetPath, '.rapidkit/cli.py'), 0o755);
+    fs.chmodSync(path.join(targetPath, '.rapidkit/rapidkit'), 0o755);
+  } catch (e) {
+    // Ignore on Windows
+  }
+
+  console.log(\`
+✨ Demo project created successfully!
+
+📂 Project: \${targetPath}
+
+🚀 Get started:
+  cd \${projectName}
+  rapidkit init       # Install dependencies
+  rapidkit dev        # Start dev server
+
+📚 Available commands:
+  rapidkit init       # 🔧 Install dependencies
+  rapidkit dev        # 🚀 Start dev server with hot reload
+  rapidkit start      # ⚡ Start production server
+  rapidkit test       # 🧪 Run tests
+  rapidkit help       # 📚 Show help
+
+💡 For full RapidKit features: pipx install rapidkit
+\`);
+}
+
+main().catch(console.error);
 `;
 
     await fsPromises.writeFile(
@@ -575,10 +930,10 @@ node generate-demo.js my-api
 cd my-api
 
 # Install dependencies:
-poetry install
+rapidkit init
 
 # Run the development server:
-poetry run python -m src.main
+rapidkit dev
 \`\`\`
 
 Your API will be available at \`http://localhost:8000\`
@@ -678,8 +1033,8 @@ ${name}/
     console.log(chalk.white(`   cd ${name}`));
     console.log(chalk.white('   node generate-demo.js my-api'));
     console.log(chalk.white('   cd my-api'));
-    console.log(chalk.white('   poetry install'));
-    console.log(chalk.white('   poetry run python -m src.main'));
+    console.log(chalk.white('   rapidkit init'));
+    console.log(chalk.white('   rapidkit dev'));
     console.log();
     console.log(chalk.yellow('💡 Note:'), 'This is a demo workspace. For full RapidKit features:');
     console.log(chalk.cyan('   pipx install rapidkit'));

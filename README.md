@@ -30,8 +30,8 @@ cd my-workspace
 # Generate your first project
 node generate-demo.js api-project
 cd api-project
-poetry install
-poetry run dev
+rapidkit init       # Install dependencies
+rapidkit dev        # Start dev server
 
 # Go back and create more projects
 cd ..
@@ -74,14 +74,17 @@ my-workspace/              # Workspace (container)
 ├── package.json          # npm configuration
 ├── README.md             # Workspace instructions
 ├── api-project/          # Project 1
+│   ├── .rapidkit/        # Local CLI (rapidkit init/dev/test)
 │   ├── src/
 │   ├── tests/
 │   └── pyproject.toml
 ├── auth-service/         # Project 2
+│   ├── .rapidkit/
 │   ├── src/
 │   ├── tests/
 │   └── pyproject.toml
 └── data-service/         # Project 3
+    ├── .rapidkit/
     ├── src/
     ├── tests/
     └── pyproject.toml
@@ -299,8 +302,8 @@ npx rapidkit my-workspace --test-mode
 
 3. **Install dependencies and run**:
    ```bash
-   poetry install
-   poetry run dev
+   rapidkit init       # Install dependencies
+   rapidkit dev        # Start dev server
    ```
 
 4. **Create more projects** (go back to workspace):
