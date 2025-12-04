@@ -86,14 +86,13 @@ npm audit fix
 npm run build
 node dist/index.js test-fastapi --template fastapi
 cd test-fastapi
-source .rapidkit/activate
 rapidkit init
 rapidkit dev
 
 # Local test - NestJS
 node dist/index.js test-nest --template nestjs
 cd test-nest
-source .rapidkit/activate
+rapidkit init
 rapidkit dev
 
 # Local test - Workspace

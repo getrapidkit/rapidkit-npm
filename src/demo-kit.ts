@@ -283,7 +283,6 @@ ${projectPath}/
 
 ${chalk.bold('🚀 Get started:')}
   ${chalk.cyan(`cd ${projectName}`)}
-  ${chalk.cyan('source .rapidkit/activate')}   ${chalk.gray('# Enable rapidkit commands')}
   ${chalk.cyan('rapidkit init')}               ${chalk.gray('# Install dependencies')}
   ${chalk.cyan('rapidkit dev')}                ${chalk.gray('# Start dev server')}
 
@@ -317,7 +316,6 @@ ${projectPath}/
 
 ${chalk.bold('🚀 Get started:')}
   ${chalk.cyan(`cd ${projectName}`)}
-  ${chalk.cyan('source .rapidkit/activate')}   ${chalk.gray('# Enable rapidkit commands')}
   ${chalk.cyan('rapidkit init')}               ${chalk.gray('# Install dependencies')}
   ${chalk.cyan('cp .env.example .env')}
   ${chalk.cyan('rapidkit dev')}                ${chalk.gray('# Start dev server')}

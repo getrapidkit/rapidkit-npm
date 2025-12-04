@@ -346,6 +346,12 @@ cmd_project() {
             case "$cmd" in
                 init)
                     echo -e "\${BLUE}📦 Installing dependencies...\${NC}"
+                    
+                    # Source activate script first to ensure Poetry is available
+                    if [[ -f ".rapidkit/activate" ]]; then
+                        source .rapidkit/activate
+                    fi
+                    
                     poetry install
                     echo -e "\${GREEN}✅ Dependencies installed!\${NC}"
                     ;;
@@ -391,6 +397,12 @@ cmd_project() {
             case "$cmd" in
                 init)
                     echo -e "\${BLUE}📦 Installing dependencies...\${NC}"
+                    
+                    # Source activate script first to ensure environment is ready
+                    if [[ -f ".rapidkit/activate" ]]; then
+                        source .rapidkit/activate
+                    fi
+                    
                     $pm install
                     echo -e "\${GREEN}✅ Dependencies installed!\${NC}"
                     ;;
@@ -722,7 +734,6 @@ ${projectPath}/
 
 ${chalk.bold('🚀 Get started:')}
   ${chalk.cyan(`cd ${projectName}`)}
-  ${chalk.cyan('source .rapidkit/activate')}   ${chalk.gray('# Enable rapidkit commands')}
   ${chalk.cyan('rapidkit init')}               ${chalk.gray('# Install dependencies')}
   ${chalk.cyan('rapidkit dev')}                ${chalk.gray('# Start dev server')}
 
@@ -754,7 +765,6 @@ ${projectPath}/
 
 ${chalk.bold('🚀 Get started:')}
   ${chalk.cyan(`cd ${projectName}`)}
-  ${chalk.cyan('source .rapidkit/activate')}   ${chalk.gray('# Enable rapidkit commands')}
   ${options.skipInstall ? chalk.cyan('rapidkit init') + chalk.gray('               # npm install') + '\n  ' : ''}${chalk.cyan('cp .env.example .env')}
   ${chalk.cyan('rapidkit dev')}                ${chalk.gray('# Start dev server')}
 

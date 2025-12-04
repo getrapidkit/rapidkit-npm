@@ -57,15 +57,12 @@ cd my-workspace
 rapidkit create my-api --kit fastapi      # Create project in workspace
 ```
 
-## Project CLI (`.rapidkit/activate`)
+## Project CLI
 
 Each generated project includes a local CLI system:
 
 ```bash
 cd my-api
-source .rapidkit/activate   # Enable rapidkit commands (once per terminal)
-
-# Now you can use:
 rapidkit init      # Install dependencies
 rapidkit dev       # Start dev server (port 8000)
 rapidkit test      # Run tests
@@ -114,7 +111,6 @@ node dist/index.js test-workspace
 
 # Test the generated project
 cd test-fastapi
-source .rapidkit/activate
 rapidkit init
 rapidkit dev
 ```

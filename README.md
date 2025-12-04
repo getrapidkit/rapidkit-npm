@@ -19,7 +19,6 @@
 ```bash
 npx rapidkit my-api --template fastapi
 cd my-api
-source .rapidkit/activate   # Enable rapidkit commands
 rapidkit init               # Install dependencies
 rapidkit dev                # Start dev server at http://localhost:8000
 ```
@@ -29,7 +28,7 @@ rapidkit dev                # Start dev server at http://localhost:8000
 ```bash
 npx rapidkit my-api --template nestjs
 cd my-api
-source .rapidkit/activate   # Enable rapidkit commands
+rapidkit init               # Install dependencies
 rapidkit dev                # Start dev server at http://localhost:8000
 ```
 
@@ -85,13 +84,11 @@ npx rapidkit [project-name] [options]
 
 ## Project Commands
 
-After creating a project, activate the local CLI and use these commands:
+After creating a project, use these commands:
 
 ```bash
 cd my-api
-source .rapidkit/activate   # Enable rapidkit commands (run once per terminal)
-
-rapidkit init      # Install dependencies
+rapidkit init      # Install dependencies (auto-activates environment)
 rapidkit dev       # Start dev server with hot reload (port 8000)
 rapidkit start     # Start production server
 rapidkit build     # Build for production
@@ -196,4 +193,6 @@ MIT
 
 ---
 
-**v0.12.0** - Added NestJS template, workspace mode, and unified CLI with `source .rapidkit/activate`
+**v0.12.1** - Simplified CLI: `rapidkit init` now handles environment activation automatically
+
+**v0.12.0** - Added NestJS template, workspace mode, and unified CLI

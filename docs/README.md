@@ -61,8 +61,6 @@ npx rapidkit my-workspace
 
 ```bash
 cd my-api
-source .rapidkit/activate   # Enable rapidkit commands
-
 rapidkit init      # Install dependencies
 rapidkit dev       # Start dev server (port 8000)
 rapidkit test      # Run tests

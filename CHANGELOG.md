@@ -5,6 +5,22 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.2] - 2025-12-04
+
+### Changed
+- ⚡ **Simplified Workflow** - `rapidkit init` now auto-activates environment
+  - No longer need to run `source .rapidkit/activate` manually
+  - `rapidkit init` sources activate script internally before installing dependencies
+  - Streamlined developer experience: just `cd project && rapidkit init && rapidkit dev`
+- 📝 **Updated Documentation** - Removed `source .rapidkit/activate` from all docs
+  - README.md updated with simplified workflow
+  - All docs/ files updated
+  - Success messages show simplified 2-step workflow
+
+### Fixed
+- 🐛 **Environment Activation** - Fixed Poetry/npm not found errors when running `rapidkit init`
+  - `rapidkit init` now properly sets up PATH before running package manager
+
 ## [0.12.1] - 2025-12-03
 
 ### Fixed
@@ -21,10 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Example CRUD module
   - Testing setup with Jest
   - ESLint + Prettier configuration
-- 🆕 **Unified CLI Activation** - `source .rapidkit/activate`
-  - Enable `rapidkit` commands without `./` prefix
-  - Works in any terminal session
-  - Smart Python detection (venv → poetry → system)
 - 🆕 **Makefile Support** - Alternative commands for FastAPI projects
   - `make dev`, `make test`, `make lint`, etc.
 - 🆕 **Default Port 8000** - Both FastAPI and NestJS now use port 8000
