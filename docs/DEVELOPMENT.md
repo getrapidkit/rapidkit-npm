@@ -69,12 +69,21 @@ rapidkit test      # Run tests
 rapidkit --help    # Show all commands
 ```
 
-### How It Works
+### Smart CLI Delegation (v0.12.3+)
 
-1. **`rapidkit`** (root) - Bash script that finds Python and runs `.rapidkit/cli.py`
-2. **`.rapidkit/activate`** - Adds project root to PATH for the current terminal
+The global `rapidkit` command automatically detects when you're inside a RapidKit project:
+
+- **Outside project:** `rapidkit` = npm global command (creates new projects)
+- **Inside project:** `rapidkit` = delegates to local `./rapidkit` script
+
+This detection works by checking for `./rapidkit` file and `.rapidkit/` directory in current folder.
+
+### How Local CLI Works
+
+1. **`./rapidkit`** (root) - Bash script that finds Python and runs `.rapidkit/cli.py`
+2. **`.rapidkit/activate`** - Optional: adds project root to PATH for the current terminal
 3. **`.rapidkit/cli.py`** - Python CLI with all project commands
-4. **`.rapidkit/rapidkit`** - Bash wrapper for poetry/npm commands
+4. **`.rapidkit/project.json`** - Project metadata and configuration
 
 ## Testing
 

@@ -98,9 +98,11 @@ rapidkit format    # Format code
 rapidkit --help    # Show all commands
 ```
 
-### Alternative: Without Activation
+> **Note:** The global `rapidkit` command automatically detects when you're inside a RapidKit project and delegates to the local CLI. No need for `./rapidkit` prefix or `source .rapidkit/activate`.
 
-You can also run commands directly without activation:
+### Alternative: Direct Commands
+
+You can also run commands directly:
 
 ```bash
 ./rapidkit dev          # Using the wrapper script

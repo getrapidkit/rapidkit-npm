@@ -1,6 +1,6 @@
 {
   "name": "rapidkit",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "type": "module",
   "description": "Create RapidKit projects with a single command - The official CLI for RapidKit framework",
   "keywords": [

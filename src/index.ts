@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import path from 'path';
+import { spawn } from 'child_process';
 import { logger } from './logger.js';
 import { checkForUpdates, getVersion } from './update-checker.js';
 import { loadUserConfig } from './config.js';
@@ -11,6 +12,67 @@ import { validateProjectName } from './validation.js';
 import { RapidKitError } from './errors.js';
 import * as fsExtra from 'fs-extra';
 import { createWorkspace, createProject } from './workspace.js';
+
+// Local project commands that should be delegated to ./rapidkit
+const LOCAL_COMMANDS = [
+  'init',
+  'dev',
+  'start',
+  'build',
+  'test',
+  'lint',
+  'format',
+  'help',
+  '--help',
+  '-h',
+];
+
+/**
+ * Check if we're inside a RapidKit project and delegate to local CLI if needed
+ */
+async function delegateToLocalCLI(): Promise<boolean> {
+  const cwd = process.cwd();
+  const localScript = path.join(cwd, 'rapidkit');
+  const rapidkitDir = path.join(cwd, '.rapidkit');
+
+  // Check if local rapidkit script and .rapidkit directory exist
+  const [hasLocalScript, hasRapidkitDir] = await Promise.all([
+    fsExtra.pathExists(localScript),
+    fsExtra.pathExists(rapidkitDir),
+  ]);
+
+  if (!hasLocalScript || !hasRapidkitDir) {
+    return false;
+  }
+
+  // Get the command (first argument without dashes)
+  const args = process.argv.slice(2);
+  const firstArg = args[0];
+
+  // Check if this is a local command
+  if (!firstArg || !LOCAL_COMMANDS.includes(firstArg)) {
+    return false;
+  }
+
+  // Delegate to local ./rapidkit script
+  logger.debug(`Delegating to local CLI: ./rapidkit ${args.join(' ')}`);
+
+  const child = spawn(localScript, args, {
+    stdio: 'inherit',
+    cwd,
+  });
+
+  child.on('close', (code) => {
+    process.exit(code ?? 0);
+  });
+
+  child.on('error', (err) => {
+    logger.error(`Failed to run local rapidkit: ${err.message}`);
+    process.exit(1);
+  });
+
+  return true;
+}
 
 // Track current project path for cleanup on interrupt
 let currentProjectPath: string | null = null;
@@ -277,4 +339,9 @@ process.on('SIGTERM', async () => {
   process.exit(143);
 });
 
-program.parse();
+// Delegate to local CLI if inside a RapidKit project
+delegateToLocalCLI().then((delegated) => {
+  if (!delegated) {
+    program.parse();
+  }
+});

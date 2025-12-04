@@ -5,6 +5,15 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.3] - 2025-12-04
+
+### Changed
+- 🎯 **Smart CLI Delegation** - Global `rapidkit` command now auto-detects project context
+  - Running `rapidkit init/dev/test/...` inside a project automatically delegates to local `./rapidkit`
+  - No more confusion between global npm command and local project commands
+  - Users can now run `rapidkit init` anywhere without `./` prefix or `source .rapidkit/activate`
+  - Workflow is now truly: `npx rapidkit my-api --template fastapi && cd my-api && rapidkit init && rapidkit dev`
+
 ## [0.12.2] - 2025-12-04
 
 ### Changed
