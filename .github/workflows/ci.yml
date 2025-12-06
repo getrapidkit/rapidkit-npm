@@ -26,6 +26,7 @@ jobs:
           cache: ${{ runner.os == 'macOS' && '' || 'npm' }}
 
       - name: Install dependencies
+        shell: bash
         run: |
           if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
             npm install --prefer-offline --no-audit
