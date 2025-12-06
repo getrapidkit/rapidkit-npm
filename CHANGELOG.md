@@ -5,6 +5,15 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.5] - 2025-12-06
+
+### Fixed
+- 🛠️ **CI/CD cross-platform compatibility** — Fixed GitHub Actions workflow for all platforms
+  - Added platform-specific rollup binary installation (darwin-arm64, win32-x64-msvc)
+  - Works around npm optional dependency bug on macOS and Windows
+  - Explicit bash shell for cross-platform script compatibility
+- 🛠️ **Node.js 20 only** — Removed Node.js 18 from test matrix (vitest 4.0.15+ requires Node 19+)
+
 ## [0.12.4] - 2025-12-06
 
 ### Added
