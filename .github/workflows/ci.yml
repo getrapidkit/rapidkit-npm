@@ -29,6 +29,8 @@ jobs:
         run: |
           if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
             npm install --prefer-offline --no-audit
+            # Workaround for npm optional dependency bug on macOS
+            npm install @rollup/rollup-darwin-arm64 --save-dev || true
           else
             npm ci
           fi
