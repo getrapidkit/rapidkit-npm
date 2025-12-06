@@ -23,17 +23,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: ${{ runner.os == 'macOS' && '' || 'npm' }}
+          cache: 'npm'
 
       - name: Install dependencies
         shell: bash
         run: |
-          if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-            npm install --prefer-offline --no-audit
-            # Workaround for npm optional dependency bug on macOS
-            npm install @rollup/rollup-darwin-arm64 --save-dev || true
-          else
-            npm ci
+          npm ci
+          # Workaround for npm optional dependency bug - install platform-specific rollup binary
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            npm install @rollup/rollup-darwin-arm64 --save-dev --no-audit || true
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            npm install @rollup/rollup-win32-x64-msvc --save-dev --no-audit || true
           fi
 
       - name: Build package
