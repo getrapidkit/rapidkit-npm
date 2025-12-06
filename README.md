@@ -195,6 +195,8 @@ MIT
 
 ---
 
-**v0.12.1** - Simplified CLI: `rapidkit init` now handles environment activation automatically
+**v0.12.4** - Friendly shell activation UX with green headers and robust fallback logic
+
+**v0.12.2** - Simplified CLI: `rapidkit init` now handles environment activation automatically
 
 **v0.12.0** - Added NestJS template, workspace mode, and unified CLI

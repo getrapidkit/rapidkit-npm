@@ -5,6 +5,20 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.4] - 2025-12-06
+
+### Added
+- ✅ **Friendly activation UX** — `rapidkit shell activate` now prints a prominent green header with a clear one-line instruction followed by the eval-able activation snippet
+- ✅ **Unit tests for shell activation** — Added comprehensive tests validating output formatting and behavior
+
+### Fixed
+- 🛠️ **Shell-activate robustness** — Now gracefully handles missing or unparseable `context.json` by falling back to `.venv` or `.rapidkit/activate`
+- 🛠️ **ESLint violations** — Fixed no-inner-declarations, no-constant-condition, no-useless-escape, unused variable warnings
+- 🛠️ **Code quality** — All 431 tests passing, 0 lint errors, 61 warnings only
+
+### Changed
+- 📝 **Improved documentation** — Updated README and release notes with v0.12.4 details
+
 ## [0.12.3] - 2025-12-04
 
 ### Changed
@@ -12,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Running `rapidkit init/dev/test/...` inside a project automatically delegates to local `./rapidkit`
   - No more confusion between global npm command and local project commands
   - Users can now run `rapidkit init` anywhere without `./` prefix or `source .rapidkit/activate`
-  - Workflow is now truly: `npx rapidkit my-api --template fastapi && cd my-api && rapidkit init && rapidkit dev`
+  - Workflow: `npx rapidkit my-api --template fastapi && cd my-api && rapidkit init && rapidkit dev`
 
 ## [0.12.2] - 2025-12-04
 
