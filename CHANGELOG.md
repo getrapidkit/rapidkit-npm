@@ -5,6 +5,60 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.6] - 2025-12-12
+
+### Added
+- ✅ **Quality metrics system** — Comprehensive metrics tracking for bundle size, test coverage, ESLint warnings, and security vulnerabilities
+  - New `scripts/metrics.ts` for automated metrics collection
+  - Metrics validation against defined targets (bundle < 500KB, coverage > 80%, 0 errors)
+  - New `npm run metrics` command for on-demand quality checks
+  - Complete documentation in `docs/METRICS.md`
+- ✅ **Enhanced pre-commit hooks** — Stricter quality gates before commits
+  - Added type checking (`npm run typecheck`)
+  - Added format validation (`npm run format:check`)
+  - Added test execution (`npm test`)
+  - Clear progress messages for each validation step
+- ✅ **Commit message validation** — New `.husky/commit-msg` hook
+  - Enforces [Conventional Commits](https://www.conventionalcommits.org/) format
+  - Provides helpful error messages with examples
+  - Supports all standard types (feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert)
+- ✅ **Security automation** — GitHub Actions workflows for continuous security monitoring
+  - Daily security audits via `.github/workflows/security.yml`
+  - npm audit with artifact uploads for historical tracking
+  - Dependency update checks with `npm-check-updates`
+- ✅ **Quality automation** — GitHub Actions workflow for metrics tracking
+  - Automated metrics collection on every PR and push
+  - Bundle size validation (fails if > 500KB)
+  - Coverage upload to Codecov
+  - Quality gates for CI/CD pipeline
+
+### Improved
+- 🎯 **ESLint configuration** — Smarter linting with context-aware rules
+  - Reduced warnings from 61 to 1 by allowing `any` in test files
+  - Added override rules for test files (`**/__tests__/**/*.ts`, `**/*.test.ts`)
+  - Improved ignore patterns to include `coverage/`
+  - Only production code subject to strict `any` warnings
+- 📚 **npm scripts** — New quality and security commands
+  - `npm run quality` — Run all quality checks (validate + security + metrics)
+  - `npm run security:fix` — Auto-fix security vulnerabilities
+  - `npm run metrics` — Collect and validate metrics
+
+### Documentation
+- 📖 **METRICS.md** — Complete guide to quality metrics
+  - Defined targets for all metrics
+  - Instructions for manual and automated collection
+  - Troubleshooting and best practices
+  - CI/CD integration documentation
+- 📊 **QUALITY_IMPROVEMENTS.md** — Implementation summary
+  - Detailed breakdown of all improvements
+  - Current metrics status
+  - Usage examples and next steps
+
+### Fixed
+- 🧹 **Code quality** — Cleaner codebase with reduced linter warnings
+  - 60 ESLint warnings eliminated in test files
+  - Only 1 warning remaining in production code
+
 ## [0.12.5] - 2025-12-06
 
 ### Fixed

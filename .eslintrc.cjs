@@ -14,7 +14,11 @@ module.exports = {
     es2022: true,
   },
   rules: {
-    '@typescript-eslint/no-explicit-any': 'warn',
+    // Relax 'any' to warn only in tests
+    '@typescript-eslint/no-explicit-any': ['warn', { 
+      ignoreRestArgs: true,
+      fixToUnknown: false,
+    }],
     '@typescript-eslint/no-unused-vars': ['error', { 
       argsIgnorePattern: '^_',
       varsIgnorePattern: '^_',
@@ -26,11 +30,21 @@ module.exports = {
     'prefer-const': 'error',
     'no-var': 'error',
   },
+  overrides: [
+    {
+      // Allow 'any' in test files for mocking
+      files: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'off',
+      },
+    },
+  ],
   ignorePatterns: [
     'dist/',
     'node_modules/',
     '*.js',
     'templates/',
     'test-workspace/',
+    'coverage/',
   ],
 };
