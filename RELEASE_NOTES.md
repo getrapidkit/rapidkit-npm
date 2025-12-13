@@ -1,47 +1,60 @@
 # Release Notes
 
-## Latest Release: v0.12.7 (December 13, 2025)
+## Latest Release: v0.12.8 (December 13, 2025)
 
-### 🪟 Windows Support
+### 🐛 Windows Spawn Fix
 
-This release adds full Windows compatibility for `rapidkit` CLI commands.
+This release fixes the `spawn EINVAL` error on Windows and improves Python detection messages.
 
 ### What Changed
 
-**Windows Batch Wrappers:**
-- Added `rapidkit.cmd` for FastAPI projects (Python detection with venv/poetry/system fallback)
-- Added `rapidkit.cmd` for NestJS projects (Node.js detection with npm/pnpm support)
-- Windows users can now run `rapidkit init` without `.\` prefix
+**Bug Fix:**
+- Fixed `spawn EINVAL` error when running `rapidkit init` on Windows
+- Added `shell: true` option for spawning `.cmd` files (required by Windows)
 
-**Global CLI Delegation:**
-- `findLocalLauncherUpSync()` now checks `.cmd` files first on Windows
-- `delegateToLocalCLI()` now checks `.cmd` files first on Windows
-- Early pip engine detection updated for Windows compatibility
-
-**Fixed:**
-- "rapidkit is not recognized" error on Windows PowerShell
-- Delegation to local project CLI on Windows
+**Improved Python Detection:**
+- Better error message when Python is not installed on Windows
+- Shows multiple installation options:
+  - Microsoft Store (recommended)
+  - Official python.org installer
+  - winget: `winget install Python.Python.3.12`
+  - chocolatey: `choco install python`
 
 ### Upgrade
 
 ```bash
-npx rapidkit@latest --version  # Should show 0.12.7
+npx rapidkit@latest --version  # Should show 0.12.8
 ```
 
 ### Windows Users
 
-After creating a project, you can now use:
-```powershell
-cd my-project
-rapidkit init    # ✅ Works! (no .\ prefix needed)
-rapidkit dev     # ✅ Works!
-rapidkit test    # ✅ Works!
+If Python is not installed, you'll see a helpful message with installation options:
+```
+============================================================
+  Python not found!
+============================================================
+
+  Install Python using one of these methods:
+
+  1. Microsoft Store (recommended):
+     https://apps.microsoft.com/detail/9NRWMJP3717K
+
+  2. Official installer:
+     https://www.python.org/downloads/
+
+  3. Using winget:
+     winget install Python.Python.3.12
+
+  4. Using chocolatey:
+     choco install python
+============================================================
 ```
 
 ## Previous Releases
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| [v0.12.7](releases/RELEASE_NOTES_v0.12.7.md) | Dec 13, 2025 | Windows support |
 | [v0.12.6](releases/RELEASE_NOTES_v0.12.6.md) | Dec 12, 2025 | Quality & security infrastructure |
 | [v0.12.5](releases/RELEASE_NOTES_v0.12.5.md) | Dec 6, 2025 | CI/CD cross-platform fixes |
 | [v0.12.4](releases/RELEASE_NOTES_v0.12.4.md) | Dec 6, 2025 | Shell activation UX |

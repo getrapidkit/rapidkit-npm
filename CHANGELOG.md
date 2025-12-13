@@ -5,6 +5,18 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.8] - 2025-12-13
+
+### Fixed
+- 🐛 **Windows spawn EINVAL error** - Fixed `spawn EINVAL` error when running `rapidkit init` on Windows
+  - Added `shell: true` option for spawning `.cmd` files on Windows
+  - Windows requires command interpreter to execute batch files
+
+### Improved
+- 📝 **Python not found message** - Better error message when Python is not installed
+  - Shows multiple installation options (Microsoft Store, python.org, winget, chocolatey)
+  - Clear instructions to restart terminal after installation
+
 ## [0.12.7] - 2025-12-13
 
 ### Added

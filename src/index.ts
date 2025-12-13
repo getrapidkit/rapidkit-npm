@@ -327,6 +327,7 @@ async function delegateToLocalCLI(): Promise<boolean> {
   const child = spawn(localScript, args, {
     stdio: 'inherit',
     cwd,
+    shell: isWindows, // Required on Windows to run .cmd files
   });
 
   child.on('close', (code) => {

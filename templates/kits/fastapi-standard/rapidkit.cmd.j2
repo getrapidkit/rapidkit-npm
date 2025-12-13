@@ -41,8 +41,31 @@ if %ERRORLEVEL% EQU 0 (
     goto :run
 )
 
-echo ❌ No Python interpreter found.
-echo 💡 Install Python 3.11+ and try again.
+echo.
+echo ============================================================
+echo   Python not found!
+echo ============================================================
+echo.
+echo   RapidKit FastAPI projects require Python 3.11 or newer.
+echo.
+echo   Install Python using one of these methods:
+echo.
+echo   1. Microsoft Store (recommended):
+echo      https://apps.microsoft.com/detail/9NRWMJP3717K
+echo.
+echo   2. Official installer:
+echo      https://www.python.org/downloads/
+echo      (Check "Add Python to PATH" during installation)
+echo.
+echo   3. Using winget:
+echo      winget install Python.Python.3.12
+echo.
+echo   4. Using chocolatey:
+echo      choco install python
+echo.
+echo   After installing, restart your terminal and try again.
+echo ============================================================
+echo.
 exit /b 127
 
 :run
