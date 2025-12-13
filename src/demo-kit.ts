@@ -79,6 +79,7 @@ export async function generateDemoKit(projectPath: string, variables: KitVariabl
         '.rapidkit/rapidkit.j2',
         '.rapidkit/activate.j2',
         'rapidkit.j2',
+        'rapidkit.cmd.j2',
       ];
     } else {
       // NestJS files
@@ -112,8 +113,10 @@ export async function generateDemoKit(projectPath: string, variables: KitVariabl
         'README.md.j2',
         '.rapidkit/project.json.j2',
         '.rapidkit/rapidkit.j2',
+        '.rapidkit/rapidkit.cmd.j2',
         '.rapidkit/activate.j2',
         'rapidkit.j2',
+        'rapidkit.cmd.j2',
       ];
     }
 

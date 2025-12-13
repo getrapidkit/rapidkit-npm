@@ -1,69 +1,48 @@
 # Release Notes
 
-## Latest Release: v0.12.6 (December 12, 2025)
+## Latest Release: v0.12.7 (December 13, 2025)
 
-### 🎯 Quality & Security Infrastructure
+### 🪟 Windows Support
 
-This release introduces comprehensive quality metrics, enhanced pre-commit hooks, and automated security workflows.
+This release adds full Windows compatibility for `rapidkit` CLI commands.
 
 ### What Changed
 
-**Quality Metrics System:**
-- New `scripts/metrics.ts` for automated metrics collection and validation
-- Track bundle size, test coverage, ESLint warnings, and security vulnerabilities
-- Metrics validation against targets: bundle < 500KB, coverage > 80%, 0 errors
-- New command: `npm run metrics` for on-demand quality checks
-- Complete documentation in `docs/METRICS.md`
+**Windows Batch Wrappers:**
+- Added `rapidkit.cmd` for FastAPI projects (Python detection with venv/poetry/system fallback)
+- Added `rapidkit.cmd` for NestJS projects (Node.js detection with npm/pnpm support)
+- Windows users can now run `rapidkit init` without `.\` prefix
 
-**Enhanced Pre-commit Hooks:**
-- Added type checking before every commit
-- Added format validation (Prettier)
-- Added test execution to catch regressions
-- Clear progress messages for each step
-- New commit message validation enforcing Conventional Commits format
+**Global CLI Delegation:**
+- `findLocalLauncherUpSync()` now checks `.cmd` files first on Windows
+- `delegateToLocalCLI()` now checks `.cmd` files first on Windows
+- Early pip engine detection updated for Windows compatibility
 
-**Security & Quality Automation:**
-- Daily security audits via GitHub Actions (`.github/workflows/security.yml`)
-- Automated metrics collection on every PR/push (`.github/workflows/metrics.yml`)
-- Bundle size validation in CI (fails if > 500KB)
-- Coverage upload to Codecov
-
-**Code Quality Improvements:**
-- ESLint warnings reduced from 61 to 1
-- Context-aware linting: strict in production, relaxed in tests
-- Only 1 warning remaining in production code
-
-**New npm Scripts:**
-- `npm run quality` — Run all quality checks at once
-- `npm run security:fix` — Auto-fix vulnerabilities
-- `npm run metrics` — Collect and validate metrics
+**Fixed:**
+- "rapidkit is not recognized" error on Windows PowerShell
+- Delegation to local project CLI on Windows
 
 ### Upgrade
 
 ```bash
-npx rapidkit@latest --version  # Should show 0.12.6
-
-# Run quality checks
-npm run quality
-
-# Check metrics
-npm run metrics
+npx rapidkit@latest --version  # Should show 0.12.7
 ```
 
-### Developer Experience
+### Windows Users
 
-The new quality infrastructure provides:
-- ✅ 431 tests passing (100% success rate)
-- ✅ 0 TypeScript errors
-- ✅ Only 1 ESLint warning (in production code)
-- ✅ Comprehensive pre-commit validation
-- ✅ Automated security monitoring
-- ✅ Metrics tracking and reporting
+After creating a project, you can now use:
+```powershell
+cd my-project
+rapidkit init    # ✅ Works! (no .\ prefix needed)
+rapidkit dev     # ✅ Works!
+rapidkit test    # ✅ Works!
+```
 
 ## Previous Releases
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| [v0.12.6](releases/RELEASE_NOTES_v0.12.6.md) | Dec 12, 2025 | Quality & security infrastructure |
 | [v0.12.5](releases/RELEASE_NOTES_v0.12.5.md) | Dec 6, 2025 | CI/CD cross-platform fixes |
 | [v0.12.4](releases/RELEASE_NOTES_v0.12.4.md) | Dec 6, 2025 | Shell activation UX |
 | [v0.12.3](releases/RELEASE_NOTES_v0.12.3.md) | Dec 4, 2025 | Smart CLI delegation |  

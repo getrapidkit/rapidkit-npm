@@ -46,9 +46,17 @@ function findContextFileUpSync(start: string): string | null {
 // exists, allow delegation so the later async check can spawn it. This is
 // fast/sync and intentionally mirrors the async delegateToLocalCLI logic.
 function findLocalLauncherUpSync(start: string): string | null {
+  const isWin = process.platform === 'win32';
   let p = start;
   // eslint-disable-next-line no-constant-condition
   while (true) {
+    // On Windows, prefer .cmd files
+    if (isWin) {
+      const topCmd = path.join(p, 'rapidkit.cmd');
+      const dotCmd = path.join(p, '.rapidkit', 'rapidkit.cmd');
+      if (fs.existsSync(topCmd)) return topCmd;
+      if (fs.existsSync(dotCmd)) return dotCmd;
+    }
     const top = path.join(p, 'rapidkit');
     const dot = path.join(p, '.rapidkit', 'rapidkit');
     if (fs.existsSync(top)) return top;
@@ -134,10 +142,16 @@ async function delegateToLocalCLI(): Promise<boolean> {
         const firstArg = args[0];
 
         // If a local project script exists, delegate there first (prefer local CLI)
-        const localScriptCandidatesEarly = [
-          path.join(cwd, 'rapidkit'),
-          path.join(cwd, '.rapidkit', 'rapidkit'),
-        ];
+        // On Windows, prefer .cmd files
+        const isWin = process.platform === 'win32';
+        const localScriptCandidatesEarly = isWin
+          ? [
+              path.join(cwd, 'rapidkit.cmd'),
+              path.join(cwd, 'rapidkit'),
+              path.join(cwd, '.rapidkit', 'rapidkit.cmd'),
+              path.join(cwd, '.rapidkit', 'rapidkit'),
+            ]
+          : [path.join(cwd, 'rapidkit'), path.join(cwd, '.rapidkit', 'rapidkit')];
         let localScriptEarly: string | null = null;
         for (const c of localScriptCandidatesEarly) {
           if (await fsExtra.pathExists(c)) {
@@ -275,11 +289,17 @@ async function delegateToLocalCLI(): Promise<boolean> {
 
   // ...existing code...
   // Prefer top-level local rapidkit script, but also accept .rapidkit/rapidkit
-  const localScriptCandidates = [
-    path.join(cwd, 'rapidkit'),
-    path.join(cwd, '.rapidkit', 'rapidkit'),
-  ];
-  let localScript = path.join(cwd, 'rapidkit');
+  // On Windows, also check for .cmd files
+  const isWindows = process.platform === 'win32';
+  const localScriptCandidates = isWindows
+    ? [
+        path.join(cwd, 'rapidkit.cmd'),
+        path.join(cwd, 'rapidkit'),
+        path.join(cwd, '.rapidkit', 'rapidkit.cmd'),
+        path.join(cwd, '.rapidkit', 'rapidkit'),
+      ]
+    : [path.join(cwd, 'rapidkit'), path.join(cwd, '.rapidkit', 'rapidkit')];
+  let localScript = isWindows ? path.join(cwd, 'rapidkit.cmd') : path.join(cwd, 'rapidkit');
   for (const candidate of localScriptCandidates) {
     if (await fsExtra.pathExists(candidate)) {
       localScript = candidate;
