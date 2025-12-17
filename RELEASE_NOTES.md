@@ -1,29 +1,30 @@
 # Release Notes
 
-## Latest Release: v0.12.8 (December 13, 2025)
+## Latest Release: v0.12.9 (December 17, 2025)
 
-### 🐛 Windows Spawn Fix
+### 📝 CLI UX Improvements
 
-This release fixes the `spawn EINVAL` error on Windows and improves Python detection messages.
+This release improves the CLI user experience with consistent `npx rapidkit` commands and helpful tips.
 
 ### What Changed
 
-**Bug Fix:**
-- Fixed `spawn EINVAL` error when running `rapidkit init` on Windows
-- Added `shell: true` option for spawning `.cmd` files (required by Windows)
+**Unified Command Syntax:**
+- All documentation and success messages now use `npx rapidkit` consistently
+- Same command works everywhere: `npx rapidkit <name> --template <type>`
+- No more confusion between `rapidkit create` and `npx rapidkit`
 
-**Improved Python Detection:**
-- Better error message when Python is not installed on Windows
-- Shows multiple installation options:
-  - Microsoft Store (recommended)
-  - Official python.org installer
-  - winget: `winget install Python.Python.3.12`
-  - chocolatey: `choco install python`
+**New Helpful Tip:**
+- Added tip after project creation: "Install globally (npm i -g rapidkit) to use without npx"
+- Helps first-time users understand their options
+
+**Documentation Updates:**
+- Simplified README with clearer command examples
+- Updated all template READMEs to use `npx rapidkit` commands
 
 ### Upgrade
 
 ```bash
-npx rapidkit@latest --version  # Should show 0.12.8
+npx rapidkit@latest --version  # Should show 0.12.9
 ```
 
 ### Windows Users

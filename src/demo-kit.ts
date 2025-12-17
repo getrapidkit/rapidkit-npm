@@ -286,20 +286,19 @@ ${projectPath}/
 
 ${chalk.bold('🚀 Get started:')}
   ${chalk.cyan(`cd ${projectName}`)}
-  ${chalk.cyan('rapidkit init')}               ${chalk.gray('# Install dependencies')}
-  ${chalk.cyan('rapidkit dev')}                ${chalk.gray('# Start dev server')}
+  ${chalk.cyan('npx rapidkit init')}          ${chalk.gray('# Install dependencies')}
+  ${chalk.cyan('npx rapidkit dev')}           ${chalk.gray('# Start dev server')}
 
-${chalk.bold('📚 Available rapidkit commands:')}
-  rapidkit init      # Install dependencies (poetry install)
-  rapidkit dev       # Start dev server with hot reload
-  rapidkit start     # Start production server
-  rapidkit test      # Run tests
-  rapidkit lint      # Lint code
-  rapidkit format    # Format code
+${chalk.bold('📚 Available commands:')}
+  npx rapidkit init    # Install dependencies (poetry install)
+  npx rapidkit dev     # Start dev server with hot reload
+  npx rapidkit start   # Start production server
+  npx rapidkit test    # Run tests
+  npx rapidkit lint    # Lint code
+  npx rapidkit format  # Format code
 
-${chalk.gray('Alternative: use make commands (make dev, make test, ...)')}
-${chalk.gray('For full RapidKit CLI features, install the Python package:')}
-  ${chalk.cyan('pipx install rapidkit')}
+${chalk.gray('Alternative: make dev, ./rapidkit dev, poetry run dev')}
+${chalk.gray('💡 Tip: Install globally (npm i -g rapidkit) to use without npx')}
 `);
     } else {
       console.log(`
@@ -319,26 +318,26 @@ ${projectPath}/
 
 ${chalk.bold('🚀 Get started:')}
   ${chalk.cyan(`cd ${projectName}`)}
-  ${chalk.cyan('rapidkit init')}               ${chalk.gray('# Install dependencies')}
+  ${chalk.cyan('npx rapidkit init')}          ${chalk.gray('# Install dependencies')}
   ${chalk.cyan('cp .env.example .env')}
-  ${chalk.cyan('rapidkit dev')}                ${chalk.gray('# Start dev server')}
+  ${chalk.cyan('npx rapidkit dev')}           ${chalk.gray('# Start dev server')}
 
-${chalk.bold('📚 Available rapidkit commands:')}
-  rapidkit init      # Install dependencies
-  rapidkit dev       # Start dev server with hot reload
-  rapidkit start     # Start production server
-  rapidkit build     # Build for production
-  rapidkit test      # Run tests
-  rapidkit lint      # Lint code
-  rapidkit format    # Format code
+${chalk.bold('📚 Available commands:')}
+  npx rapidkit init    # Install dependencies
+  npx rapidkit dev     # Start dev server with hot reload
+  npx rapidkit start   # Start production server
+  npx rapidkit build   # Build for production
+  npx rapidkit test    # Run tests
+  npx rapidkit lint    # Lint code
+  npx rapidkit format  # Format code
 
 ${chalk.bold('🌐 API endpoints:')}
   http://localhost:8000/health          # Health check
   http://localhost:8000/docs            # Swagger docs
   http://localhost:8000/examples/notes  # Example API
 
-${chalk.gray('For full RapidKit CLI features, install the Python package:')}
-  ${chalk.cyan('pipx install rapidkit')}
+${chalk.gray('Alternative: npm run start:dev, ./rapidkit dev')}
+${chalk.gray('💡 Tip: Install globally (npm i -g rapidkit) to use without npx')}
 `);
     }
   } catch (error) {

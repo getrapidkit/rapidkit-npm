@@ -749,18 +749,18 @@ $\{description}
 ## Quick start
 
 \\\`\\\`\\\`bash
-rapidkit init       # Install dependencies
-rapidkit dev        # Start dev server
+npx rapidkit init       # Install dependencies
+npx rapidkit dev        # Start dev server
 \\\`\\\`\\\`
 
 ## Available commands
 
 \\\`\\\`\\\`bash
-rapidkit init       # 🔧 Install dependencies
-rapidkit dev        # 🚀 Start development server with hot reload
-rapidkit start      # ⚡ Start production server
-rapidkit test       # 🧪 Run tests
-rapidkit help       # 📚 Show available commands
+npx rapidkit init       # 🔧 Install dependencies
+npx rapidkit dev        # 🚀 Start development server with hot reload
+npx rapidkit start      # ⚡ Start production server
+npx rapidkit test       # 🧪 Run tests
+npx rapidkit help       # 📚 Show available commands
 \\\`\\\`\\\`
 
 ## Project layout
@@ -883,15 +883,15 @@ venv/
 
 🚀 Get started:
   cd \${projectName}
-  rapidkit init       # Install dependencies
-  rapidkit dev        # Start dev server
+  npx rapidkit init   # Install dependencies
+  npx rapidkit dev    # Start dev server
 
 📚 Available commands:
-  rapidkit init       # 🔧 Install dependencies
-  rapidkit dev        # 🚀 Start dev server with hot reload
-  rapidkit start      # ⚡ Start production server
-  rapidkit test       # 🧪 Run tests
-  rapidkit help       # 📚 Show help
+  npx rapidkit init   # 🔧 Install dependencies
+  npx rapidkit dev    # 🚀 Start dev server with hot reload
+  npx rapidkit start  # ⚡ Start production server
+  npx rapidkit test   # 🧪 Run tests
+  npx rapidkit help   # 📚 Show help
 
 💡 For full RapidKit features: pipx install rapidkit
 \`);

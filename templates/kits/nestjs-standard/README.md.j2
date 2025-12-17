@@ -15,19 +15,32 @@ A production-ready NestJS 11 application generated with RapidKit.
 
 ```bash
 # Install dependencies
-{{ package_manager }} install
+npx rapidkit init
 
 # Copy environment file
 cp .env.example .env
 
 # Start development server
-{{ package_manager }} run dev
+npx rapidkit dev
 ```
 
 Your API will be available at `http://localhost:8000`
 API docs available at `http://localhost:8000/docs`
 
-## 📚 Available Scripts
+## 📚 Available Commands
+
+**RapidKit CLI (recommended):**
+```bash
+npx rapidkit init    # Install dependencies
+npx rapidkit dev     # Start dev server with hot reload
+npx rapidkit build   # Build for production
+npx rapidkit start   # Start production server
+npx rapidkit test    # Run tests
+npx rapidkit lint    # Lint code
+npx rapidkit format  # Format code
+```
+
+**Alternative ({{ package_manager }}):**
 
 | Command | Description |
 |---------|-------------|

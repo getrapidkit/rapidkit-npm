@@ -19,8 +19,8 @@
 ```bash
 npx rapidkit my-api --template fastapi
 cd my-api
-rapidkit init               # Install dependencies
-rapidkit dev                # Start dev server at http://localhost:8000
+npx rapidkit init           # Install dependencies
+npx rapidkit dev            # Start dev server at http://localhost:8000
 ```
 
 ### Create a NestJS Project
@@ -28,8 +28,8 @@ rapidkit dev                # Start dev server at http://localhost:8000
 ```bash
 npx rapidkit my-api --template nestjs
 cd my-api
-rapidkit init               # Install dependencies
-rapidkit dev                # Start dev server at http://localhost:8000
+npx rapidkit init           # Install dependencies
+npx rapidkit dev            # Start dev server at http://localhost:8000
 ```
 
 Your API will be available at `http://localhost:8000` with Swagger docs at `/docs`
@@ -47,14 +47,16 @@ npx rapidkit my-api --template nestjs    # Create NestJS project
 
 ### 2. Workspace Mode (without `--template`)
 
-Create a workspace that can contain multiple projects:
+Create a workspace to organize multiple projects:
 
 ```bash
 npx rapidkit my-workspace                     # Create workspace
 cd my-workspace
-rapidkit create my-api --template fastapi     # Create FastAPI project in workspace
-rapidkit create admin-api --template nestjs   # Create NestJS project in workspace
+npx rapidkit my-api --template fastapi        # Create FastAPI project
+npx rapidkit admin-api --template nestjs      # Create NestJS project
 ```
+
+> **Note:** The same `npx rapidkit <name> --template <type>` command works everywhere - in any directory or inside a workspace!
 
 ## Templates
 
@@ -88,17 +90,19 @@ After creating a project, use these commands:
 
 ```bash
 cd my-api
-rapidkit init      # Install dependencies (auto-activates environment)
-rapidkit dev       # Start dev server with hot reload (port 8000)
-rapidkit start     # Start production server
-rapidkit build     # Build for production
-rapidkit test      # Run tests
-rapidkit lint      # Lint code
-rapidkit format    # Format code
-rapidkit --help    # Show all commands
+npx rapidkit init      # Install dependencies (auto-activates environment)
+npx rapidkit dev       # Start dev server with hot reload (port 8000)
+npx rapidkit start     # Start production server
+npx rapidkit build     # Build for production
+npx rapidkit test      # Run tests
+npx rapidkit lint      # Lint code
+npx rapidkit format    # Format code
+npx rapidkit --help    # Show all commands
 ```
 
-> **Note:** The global `rapidkit` command automatically detects when you're inside a RapidKit project and delegates to the local CLI. No need for `./rapidkit` prefix or `source .rapidkit/activate`.
+> **Note:** `npx rapidkit` automatically detects when you're inside a RapidKit project and delegates to the local CLI. Works everywhere without any setup!
+
+> **💡 Tip:** Install globally with `npm i -g rapidkit` to use `rapidkit` directly without `npx`.
 
 ### Alternative: Direct Commands
 

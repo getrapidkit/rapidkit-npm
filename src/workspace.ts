@@ -91,7 +91,7 @@ ${chalk.green('✨ RapidKit workspace created successfully!')}
 
 ${chalk.bold('📂 Workspace structure:')}
 ${workspacePath}/
-  ├── rapidkit            # Local CLI (add to PATH or use ./rapidkit)
+  ├── rapidkit            # Local CLI wrapper
   ├── .rapidkit/          # Workspace configuration
   │   ├── config.json     # Workspace settings
   │   └── templates/      # Project templates
@@ -99,23 +99,23 @@ ${workspacePath}/
 
 ${chalk.bold('🚀 Get started:')}
   ${chalk.cyan(`cd ${options.name}`)}
-  ${chalk.cyan('export PATH="$PWD:$PATH"')}  ${chalk.gray('# Add rapidkit to PATH')}
-  ${chalk.cyan('rapidkit create my-api --template fastapi')}
+  ${chalk.cyan('npx rapidkit my-api --template fastapi')}
   ${chalk.cyan('cd my-api')}
-  ${chalk.cyan('rapidkit dev')}
+  ${chalk.cyan('npx rapidkit init')}
+  ${chalk.cyan('npx rapidkit dev')}
 
 ${chalk.bold('📦 Available templates:')}
   fastapi   - FastAPI + Python (default)
   nestjs    - NestJS + TypeScript
 
 ${chalk.bold('📚 Commands:')}
-  rapidkit create <name>       Create a new project
-  rapidkit create --help       Show create options
-  rapidkit help                Show all commands
+  npx rapidkit <name> --template <type>   Create a new project
+  npx rapidkit init                       Install dependencies
+  npx rapidkit dev                        Start dev server
+  npx rapidkit help                       Show all commands
 
-${chalk.gray('Tip: Add workspace to PATH for easier access:')}
-  ${chalk.cyan(`echo 'export PATH="${workspacePath}:$PATH"' >> ~/.bashrc`)}
-`);
+${chalk.gray('Alternative: ./rapidkit dev, make dev')}
+${chalk.gray('💡 Tip: Install globally (npm i -g rapidkit) to use without npx')}\n`);
   } catch (error) {
     spinner.fail('Failed to create workspace');
     throw error;
@@ -486,15 +486,15 @@ RapidKit workspace for building API projects.
 export PATH="$PWD:$PATH"
 
 # Create a FastAPI project
-rapidkit create my-api --template fastapi
+npx rapidkit my-api --template fastapi
 
 # Or create a NestJS project
-rapidkit create my-app --template nestjs
+npx rapidkit my-app --template nestjs
 
 # Enter project and start development
 cd my-api
-rapidkit init    # Install dependencies
-rapidkit dev     # Start dev server
+npx rapidkit init    # Install dependencies
+npx rapidkit dev     # Start dev server
 \`\`\`
 
 ## Available Templates
@@ -506,25 +506,18 @@ rapidkit dev     # Start dev server
 
 ## Commands
 
-### Workspace Commands
+### Commands
 
 | Command | Description |
 |---------|-------------|
-| \`rapidkit create <name>\` | Create a new project |
-| \`rapidkit create --help\` | Show create options |
-| \`rapidkit help\` | Show all commands |
-
-### Project Commands (run inside a project)
-
-| Command | Description |
-|---------|-------------|
-| \`rapidkit init\` | Install dependencies |
-| \`rapidkit dev\` | Start development server |
-| \`rapidkit start\` | Start production server |
-| \`rapidkit build\` | Build for production |
-| \`rapidkit test\` | Run tests |
-| \`rapidkit lint\` | Run linting |
-| \`rapidkit format\` | Format code |
+| \`npx rapidkit <name> --template <type>\` | Create a new project |
+| \`npx rapidkit init\` | Install dependencies |
+| \`npx rapidkit dev\` | Start development server |
+| \`npx rapidkit start\` | Start production server |
+| \`npx rapidkit build\` | Build for production |
+| \`npx rapidkit test\` | Run tests |
+| \`npx rapidkit lint\` | Run linting |
+| \`npx rapidkit format\` | Format code |
 
 ## Learn More
 
@@ -734,18 +727,19 @@ ${projectPath}/
 
 ${chalk.bold('🚀 Get started:')}
   ${chalk.cyan(`cd ${projectName}`)}
-  ${chalk.cyan('rapidkit init')}               ${chalk.gray('# Install dependencies')}
-  ${chalk.cyan('rapidkit dev')}                ${chalk.gray('# Start dev server')}
+  ${chalk.cyan('npx rapidkit init')}          ${chalk.gray('# Install dependencies')}
+  ${chalk.cyan('npx rapidkit dev')}           ${chalk.gray('# Start dev server')}
 
 ${chalk.bold('📚 Available commands:')}
-  rapidkit init      # Install dependencies (poetry install)
-  rapidkit dev       # Start dev server with hot reload
-  rapidkit start     # Start production server
-  rapidkit test      # Run tests
-  rapidkit lint      # Lint code
-  rapidkit format    # Format code
+  npx rapidkit init    # Install dependencies (poetry install)
+  npx rapidkit dev     # Start dev server with hot reload
+  npx rapidkit start   # Start production server
+  npx rapidkit test    # Run tests
+  npx rapidkit lint    # Lint code
+  npx rapidkit format  # Format code
 
-${chalk.gray('Alternative: use make commands (make dev, make test, ...)')}
+${chalk.gray('Alternative: make dev, ./rapidkit dev, poetry run dev')}
+${chalk.gray('💡 Tip: Install globally (npm i -g rapidkit) to use without npx')}
 `);
     } else {
       console.log(`
@@ -765,22 +759,24 @@ ${projectPath}/
 
 ${chalk.bold('🚀 Get started:')}
   ${chalk.cyan(`cd ${projectName}`)}
-  ${options.skipInstall ? chalk.cyan('rapidkit init') + chalk.gray('               # npm install') + '\n  ' : ''}${chalk.cyan('cp .env.example .env')}
-  ${chalk.cyan('rapidkit dev')}                ${chalk.gray('# Start dev server')}
+  ${options.skipInstall ? chalk.cyan('npx rapidkit init') + chalk.gray('         # npm install') + '\n  ' : ''}${chalk.cyan('cp .env.example .env')}
+  ${chalk.cyan('npx rapidkit dev')}           ${chalk.gray('# Start dev server')}
 
 ${chalk.bold('📚 Available commands:')}
-  rapidkit init      # Install dependencies
-  rapidkit dev       # Start dev server with hot reload
-  rapidkit start     # Start production server
-  rapidkit build     # Build for production
-  rapidkit test      # Run tests
-  rapidkit lint      # Lint code
-  rapidkit format    # Format code
+  npx rapidkit init    # Install dependencies
+  npx rapidkit dev     # Start dev server with hot reload
+  npx rapidkit start   # Start production server
+  npx rapidkit build   # Build for production
+  npx rapidkit test    # Run tests
+  npx rapidkit lint    # Lint code
+  npx rapidkit format  # Format code
 
 ${chalk.bold('🌐 API endpoints:')}
   http://localhost:8000/health          # Health check
   http://localhost:8000/docs            # Swagger docs
   http://localhost:8000/examples/notes  # Example API
+
+${chalk.gray('💡 Tip: Install globally (npm i -g rapidkit) to use without npx')}
 `);
     }
   } catch (error) {

@@ -5,18 +5,25 @@ A minimal FastAPI service generated with the **FastAPI Standard Kit**. All domai
 ## Quick start
 
 ```bash
-rapidkit init  # bootstrap the project (preferred)
-rapidkit dev
+npx rapidkit init    # Install dependencies
+npx rapidkit dev     # Start dev server at http://localhost:8000
 ```
 
 ## Available commands
 
 ```bash
-rapidkit init       # 🔧 Install dependencies
-rapidkit dev        # 🚀 Start development server with hot reload
-rapidkit start      # ⚡ Start production server
-rapidkit test       # 🧪 Run tests
-rapidkit help       # 📚 Show available commands
+npx rapidkit init    # 🔧 Install dependencies (poetry install)
+npx rapidkit dev     # 🚀 Start development server with hot reload
+npx rapidkit start   # ⚡ Start production server
+npx rapidkit test    # 🧪 Run tests
+npx rapidkit help    # 📚 Show available commands
+```
+
+**Alternative commands:**
+```bash
+./rapidkit dev       # Using the local wrapper script
+make dev             # Using Makefile
+poetry run dev       # Using Poetry directly
 ```
 
 ## Project layout

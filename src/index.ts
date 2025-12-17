@@ -23,6 +23,7 @@ const LOCAL_COMMANDS = [
   'test',
   'lint',
   'format',
+  'create', // workspace command
   'help',
   '--help',
   '-h',
@@ -129,10 +130,56 @@ function findContextFileUp(start: string): string | null {
 async function delegateToLocalCLI(): Promise<boolean> {
   const cwd = process.cwd();
 
-  // Walk upwards looking for .rapidkit/context.json (project may be in parent dir)
+  // Walk upwards looking for .rapidkit directory (project may be in parent dir)
   const contextFile = findContextFileUp(cwd);
-  const rapidkitDir = contextFile ? path.dirname(contextFile) : path.join(cwd, '.rapidkit');
 
+  // FIRST: Check if we have a local rapidkit script and should delegate
+  // This works for BOTH npm and pip engine projects
+  const isWindows = process.platform === 'win32';
+  const localScriptCandidates = isWindows
+    ? [
+        path.join(cwd, 'rapidkit.cmd'),
+        path.join(cwd, 'rapidkit'),
+        path.join(cwd, '.rapidkit', 'rapidkit.cmd'),
+        path.join(cwd, '.rapidkit', 'rapidkit'),
+      ]
+    : [path.join(cwd, 'rapidkit'), path.join(cwd, '.rapidkit', 'rapidkit')];
+
+  let localScript: string | null = null;
+  for (const candidate of localScriptCandidates) {
+    if (await fsExtra.pathExists(candidate)) {
+      localScript = candidate;
+      break;
+    }
+  }
+
+  const args = process.argv.slice(2);
+  const firstArg = args[0];
+
+  // If we have a local script AND the command is a local command, delegate immediately
+  // This works for projects created with --template (npm engine) and workspace projects
+  if (localScript && firstArg && LOCAL_COMMANDS.includes(firstArg)) {
+    logger.debug(`Delegating to local CLI: ${localScript} ${args.join(' ')}`);
+
+    const child = spawn(localScript, args, {
+      stdio: 'inherit',
+      cwd,
+      shell: isWindows,
+    });
+
+    child.on('close', (code) => {
+      process.exit(code ?? 0);
+    });
+
+    child.on('error', (err) => {
+      logger.error(`Failed to run local rapidkit: ${err.message}`);
+      process.exit(1);
+    });
+
+    return true;
+  }
+
+  // Special handling for pip-engine projects (Python RapidKit)
   // Block npm CLI if context.json exists and engine is pip
   if (contextFile && (await fsExtra.pathExists(contextFile))) {
     try {
@@ -287,59 +334,8 @@ async function delegateToLocalCLI(): Promise<boolean> {
     }
   }
 
-  // ...existing code...
-  // Prefer top-level local rapidkit script, but also accept .rapidkit/rapidkit
-  // On Windows, also check for .cmd files
-  const isWindows = process.platform === 'win32';
-  const localScriptCandidates = isWindows
-    ? [
-        path.join(cwd, 'rapidkit.cmd'),
-        path.join(cwd, 'rapidkit'),
-        path.join(cwd, '.rapidkit', 'rapidkit.cmd'),
-        path.join(cwd, '.rapidkit', 'rapidkit'),
-      ]
-    : [path.join(cwd, 'rapidkit'), path.join(cwd, '.rapidkit', 'rapidkit')];
-  let localScript = isWindows ? path.join(cwd, 'rapidkit.cmd') : path.join(cwd, 'rapidkit');
-  for (const candidate of localScriptCandidates) {
-    if (await fsExtra.pathExists(candidate)) {
-      localScript = candidate;
-      break;
-    }
-  }
-  const hasLocalScript = await fsExtra.pathExists(localScript);
-  const hasRapidkitDir = await fsExtra.pathExists(rapidkitDir);
-
-  if (!hasLocalScript || !hasRapidkitDir) {
-    return false;
-  }
-
-  // ...existing code...
-  const args = process.argv.slice(2);
-  const firstArg = args[0];
-
-  if (!firstArg || !LOCAL_COMMANDS.includes(firstArg)) {
-    return false;
-  }
-
-  // Delegate to local ./rapidkit script
-  logger.debug(`Delegating to local CLI: ./rapidkit ${args.join(' ')}`);
-
-  const child = spawn(localScript, args, {
-    stdio: 'inherit',
-    cwd,
-    shell: isWindows, // Required on Windows to run .cmd files
-  });
-
-  child.on('close', (code) => {
-    process.exit(code ?? 0);
-  });
-
-  child.on('error', (err) => {
-    logger.error(`Failed to run local rapidkit: ${err.message}`);
-    process.exit(1);
-  });
-
-  return true;
+  // No delegation needed - let the main CLI handle it
+  return false;
 }
 
 // Track current project path for cleanup on interrupt
