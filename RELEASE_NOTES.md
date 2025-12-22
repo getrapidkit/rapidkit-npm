@@ -1,30 +1,30 @@
 # Release Notes
 
-## Latest Release: v0.12.9 (December 22, 2025)
+## Latest Release: v0.13.0 (December 22, 2025)
 
-### 📝 CLI UX Improvements
+### 🧪 Test Coverage & Quality
 
-This release improves the CLI user experience with consistent `npx rapidkit` commands and helpful tips.
+This release focuses on **test quality and coverage**, adding comprehensive NestJS tests and boosting overall test coverage.
 
 ### What Changed
 
-**Unified Command Syntax:**
-- All documentation and success messages now use `npx rapidkit` consistently
-- Same command works everywhere: `npx rapidkit <name> --template <type>`
-- No more confusion between `rapidkit create` and `npx rapidkit`
+**NestJS Test Suite:**
+- 13 new tests for NestJS project generation
+- Tests for project structure, config, tsconfig, .env.example
+- Tests for package manager variants (npm, yarn, pnpm)
+- Mocked execa for fast, reliable tests
 
-**New Helpful Tip:**
-- Added tip after project creation: "Install globally (npm i -g rapidkit) to use without npx"
-- Helps first-time users understand their options
-
-**Documentation Updates:**
-- Simplified README with clearer command examples
-- Updated all template READMEs to use `npx rapidkit` commands
+**Coverage Improvements:**
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| demo-kit.ts | 75% | 90%+ | **+15%** |
+| Overall | 93.5% | 95.35% | +1.85% |
+| Tests | 431 | 444 | +13 |
 
 ### Upgrade
 
 ```bash
-npx rapidkit@latest --version  # Should show 0.12.9
+npx rapidkit@latest --version  # Should show 0.13.0
 ```
 
 ### Windows Users
@@ -55,6 +55,8 @@ If Python is not installed, you'll see a helpful message with installation optio
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| [v0.12.9](releases/RELEASE_NOTES_v0.12.9.md) | Dec 22, 2025 | Unified npx commands |
+| [v0.12.8](releases/RELEASE_NOTES_v0.12.8.md) | Dec 13, 2025 | Windows spawn fix |
 | [v0.12.7](releases/RELEASE_NOTES_v0.12.7.md) | Dec 13, 2025 | Windows support |
 | [v0.12.6](releases/RELEASE_NOTES_v0.12.6.md) | Dec 12, 2025 | Quality & security infrastructure |
 | [v0.12.5](releases/RELEASE_NOTES_v0.12.5.md) | Dec 6, 2025 | CI/CD cross-platform fixes |

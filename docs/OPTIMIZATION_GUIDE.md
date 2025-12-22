@@ -435,7 +435,7 @@ export async function sendTelemetry(data: TelemetryData) {
   if (!config.telemetry) return;
   
   try {
-    await fetch('https://telemetry.rapidkit.top/api/events', {
+    await fetch('https://telemetry.getrapidkit.com/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

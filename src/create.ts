@@ -445,7 +445,7 @@ rapidkit modules list
 
 ## RapidKit Documentation
 
-For full documentation, visit: [RapidKit Docs](https://rapidkit.top) *(or appropriate URL)*
+For full documentation, visit: [RapidKit Docs](https://getrapidkit.com) *(or appropriate URL)*
 
 ## Workspace Structure
 
@@ -966,7 +966,7 @@ Each generated demo project contains:
 1. **Explore the Generated Code** - Check out \`src/main.py\` and \`src/routing/\`
 2. **Add Routes** - Create new endpoints in \`src/routing/\`
 3. **Install Full RapidKit** - For advanced features: \`pipx install rapidkit\`
-4. **Read the Documentation** - Visit [RapidKit Docs](https://rapidkit.top)
+4. **Read the Documentation** - Visit [RapidKit Docs](https://getrapidkit.com)
 
 ## ⚠️ Demo Mode Limitations
 

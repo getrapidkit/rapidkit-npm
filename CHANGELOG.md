@@ -5,6 +5,20 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2025-12-22
+
+### Added
+- 🧪 **NestJS test suite** — 13 new tests for NestJS project generation
+  - Tests for project structure, config, tsconfig, .env.example
+  - Tests for package manager variants (npm, yarn, pnpm)
+  - Mocked execa for fast, reliable package manager tests
+
+### Improved
+- 📈 **Test coverage boost** — demo-kit.ts coverage: 75% → 90%+
+  - Total tests: 431 → 444
+  - Overall coverage: 93.5% → 95.35%
+- 📝 **Documentation fixes** — Updated dates and minor corrections
+
 ## [0.12.9] - 2025-12-22
 
 ### Improved

@@ -185,7 +185,7 @@ npm run dev
 ## Related Projects
 
 - **RapidKit Python** - The core framework (coming soon to PyPI)
-- **RapidKit Docs** - https://rapidkit.top
+- **RapidKit Docs** - https://getrapidkit.com
 - **GitHub**: https://github.com/getrapidkit
 
 ## License
@@ -195,7 +195,7 @@ MIT
 ## Support
 
 - 🐛 Report issues: [GitHub Issues](https://github.com/getrapidkit/rapidkit-npm/issues)
-- 📚 Docs: https://rapidkit.top
+- 📚 Docs: https://getrapidkit.com
 
 ---
 
