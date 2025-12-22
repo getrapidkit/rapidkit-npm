@@ -1,4 +1,4 @@
-# v0.12.9 (December 17, 2025)
+# v0.12.9 (December 22, 2025)
 
 ### 📝 CLI UX Improvements
 

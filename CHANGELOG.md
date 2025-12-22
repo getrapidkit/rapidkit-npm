@@ -5,6 +5,17 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.9] - 2025-12-22
+
+### Improved
+- 📝 **Unified CLI commands** - All documentation and success messages now use `npx rapidkit` consistently
+  - Same command works everywhere: `npx rapidkit <name> --template <type>`
+  - No more confusion between `rapidkit create` and `npx rapidkit`
+- 💡 **Helpful tip after project creation** - Added tip: "Install globally (npm i -g rapidkit) to use without npx"
+  - Helps first-time users understand their options
+- 📚 **Documentation updates** - Simplified README with clearer command examples
+  - Updated all template READMEs to use `npx rapidkit` commands
+
 ## [0.12.8] - 2025-12-13
 
 ### Fixed
@@ -206,7 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Changed `rapidkit run dev` → `rapidkit dev` (simplified)
   - Changed `poetry install` → `rapidkit init` (preferred method)
   - Updated README templates and success messages
-- 🌐 **Documentation URLs** - Changed `rapidkit.dev` → `rapidkit.top`
+- 🌐 **Documentation URLs** - Changed `rapidkit.dev` → `getrapidkit.com`
 - 🏥 **FastAPI Health Router** - Enhanced health.py template
   - Added `/health/modules` endpoint to catalog module health routes
   - Integrated with health registry for dynamic module discovery
