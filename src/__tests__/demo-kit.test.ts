@@ -1,8 +1,27 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { generateDemoKit } from '../demo-kit.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
+
+// Mock execa to avoid actual npm install
+vi.mock('execa', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('execa')>();
+  return {
+    ...actual,
+    execa: vi.fn().mockImplementation((cmd, args, options) => {
+      // Allow git commands to work normally for git init tests
+      if (cmd === 'git') {
+        return actual.execa(cmd, args, options);
+      }
+      // Mock npm/yarn/pnpm install to succeed immediately
+      if (cmd === 'npm' || cmd === 'yarn' || cmd === 'pnpm') {
+        return Promise.resolve({ stdout: '', stderr: '' });
+      }
+      return actual.execa(cmd, args, options);
+    }),
+  };
+});
 
 describe('Demo Kit Generator', () => {
   let testDir: string;
@@ -289,6 +308,277 @@ describe('Demo Kit Generator', () => {
       expect(content).toContain('poetry');
       expect(content).toContain('pyproject.toml');
       expect(content).toContain('init');
+    });
+
+    // ==================== NestJS Tests ====================
+
+    it('should generate NestJS project with template: nestjs', async () => {
+      const projectPath = path.join(testDir, 'nestjs-project');
+      const variables = {
+        project_name: 'nestjs_project',
+        template: 'nestjs',
+        author: 'NestJS Dev',
+        description: 'NestJS API project',
+        skipInstall: true, // Skip npm install in tests
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      // Verify project directory exists
+      const stat = await fs.stat(projectPath);
+      expect(stat.isDirectory()).toBe(true);
+
+      // Check for NestJS-specific files
+      const packageJsonPath = path.join(projectPath, 'package.json');
+      const packageJsonExists = await fs
+        .stat(packageJsonPath)
+        .then(() => true)
+        .catch(() => false);
+      expect(packageJsonExists).toBe(true);
+
+      // Verify it's a NestJS project
+      const content = await fs.readFile(packageJsonPath, 'utf-8');
+      const packageJson = JSON.parse(content);
+      expect(packageJson.dependencies).toHaveProperty('@nestjs/core');
+    });
+
+    it('should generate NestJS project structure with src folder', async () => {
+      const projectPath = path.join(testDir, 'nestjs-structure');
+      const variables = {
+        project_name: 'nestjs_structure',
+        template: 'nestjs',
+        skipInstall: true,
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      // Check NestJS src structure
+      const srcPath = path.join(projectPath, 'src');
+      const mainTsPath = path.join(srcPath, 'main.ts');
+      const appModulePath = path.join(srcPath, 'app.module.ts');
+
+      const srcExists = await fs
+        .stat(srcPath)
+        .then(() => true)
+        .catch(() => false);
+      const mainTsExists = await fs
+        .stat(mainTsPath)
+        .then(() => true)
+        .catch(() => false);
+      const appModuleExists = await fs
+        .stat(appModulePath)
+        .then(() => true)
+        .catch(() => false);
+
+      expect(srcExists).toBe(true);
+      expect(mainTsExists).toBe(true);
+      expect(appModuleExists).toBe(true);
+    });
+
+    it('should generate NestJS .rapidkit folder', async () => {
+      const projectPath = path.join(testDir, 'nestjs-rapidkit-folder');
+      const variables = {
+        project_name: 'nestjs_rapidkit_folder',
+        template: 'nestjs',
+        skipInstall: true,
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      // Check .rapidkit folder for NestJS
+      const rapidkitPath = path.join(projectPath, '.rapidkit');
+      const projectJsonPath = path.join(rapidkitPath, 'project.json');
+
+      const rapidkitExists = await fs
+        .stat(rapidkitPath)
+        .then(() => true)
+        .catch(() => false);
+      const projectJsonExists = await fs
+        .stat(projectJsonPath)
+        .then(() => true)
+        .catch(() => false);
+
+      expect(rapidkitExists).toBe(true);
+      expect(projectJsonExists).toBe(true);
+
+      // Verify it's marked as NestJS
+      const content = await fs.readFile(projectJsonPath, 'utf-8');
+      const projectJson = JSON.parse(content);
+      expect(projectJson.kit_name).toBe('nestjs.standard');
+    });
+
+    it('should generate NestJS project with custom package manager (yarn)', async () => {
+      const projectPath = path.join(testDir, 'nestjs-yarn');
+      const variables = {
+        project_name: 'nestjs_yarn',
+        template: 'nestjs',
+        package_manager: 'yarn',
+        skipInstall: true,
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      const stat = await fs.stat(projectPath);
+      expect(stat.isDirectory()).toBe(true);
+    });
+
+    it('should generate NestJS project with custom package manager (pnpm)', async () => {
+      const projectPath = path.join(testDir, 'nestjs-pnpm');
+      const variables = {
+        project_name: 'nestjs_pnpm',
+        template: 'nestjs',
+        package_manager: 'pnpm',
+        skipInstall: true,
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      const stat = await fs.stat(projectPath);
+      expect(stat.isDirectory()).toBe(true);
+    });
+
+    it('should generate NestJS config folder', async () => {
+      const projectPath = path.join(testDir, 'nestjs-config');
+      const variables = {
+        project_name: 'nestjs_config',
+        template: 'nestjs',
+        skipInstall: true,
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      // Check config folder
+      const configPath = path.join(projectPath, 'src', 'config');
+      const configExists = await fs
+        .stat(configPath)
+        .then(() => true)
+        .catch(() => false);
+      expect(configExists).toBe(true);
+    });
+
+    it('should generate NestJS test folder', async () => {
+      const projectPath = path.join(testDir, 'nestjs-test-folder');
+      const variables = {
+        project_name: 'nestjs_test_folder',
+        template: 'nestjs',
+        skipInstall: true,
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      // Check test folder
+      const testPath = path.join(projectPath, 'test');
+      const testExists = await fs
+        .stat(testPath)
+        .then(() => true)
+        .catch(() => false);
+      expect(testExists).toBe(true);
+    });
+
+    it('should generate NestJS .env.example file', async () => {
+      const projectPath = path.join(testDir, 'nestjs-env');
+      const variables = {
+        project_name: 'nestjs_env',
+        template: 'nestjs',
+        skipInstall: true,
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      const envExamplePath = path.join(projectPath, '.env.example');
+      const envExists = await fs
+        .stat(envExamplePath)
+        .then(() => true)
+        .catch(() => false);
+      expect(envExists).toBe(true);
+    });
+
+    it('should generate NestJS tsconfig.json', async () => {
+      const projectPath = path.join(testDir, 'nestjs-tsconfig');
+      const variables = {
+        project_name: 'nestjs_tsconfig',
+        template: 'nestjs',
+        skipInstall: true,
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      const tsconfigPath = path.join(projectPath, 'tsconfig.json');
+      const tsconfigExists = await fs
+        .stat(tsconfigPath)
+        .then(() => true)
+        .catch(() => false);
+      expect(tsconfigExists).toBe(true);
+
+      const content = await fs.readFile(tsconfigPath, 'utf-8');
+      const tsconfig = JSON.parse(content);
+      expect(tsconfig.compilerOptions).toBeDefined();
+    });
+
+    it('should skip git init when skipGit is true', async () => {
+      const projectPath = path.join(testDir, 'no-git-project');
+      const variables = {
+        project_name: 'no_git_project',
+        skipGit: true,
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      // Check that .git folder does NOT exist
+      const gitPath = path.join(projectPath, '.git');
+      const gitExists = await fs
+        .stat(gitPath)
+        .then(() => true)
+        .catch(() => false);
+      expect(gitExists).toBe(false);
+    });
+
+    // Test npm install code path with mocked execa
+    it('should attempt npm install for NestJS when skipInstall is false', async () => {
+      const projectPath = path.join(testDir, 'nestjs-install-test');
+      const variables = {
+        project_name: 'nestjs_install_test',
+        template: 'nestjs',
+        skipInstall: false,
+        skipGit: true,
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      const stat = await fs.stat(projectPath);
+      expect(stat.isDirectory()).toBe(true);
+    });
+
+    it('should handle yarn package manager for NestJS (with skipInstall)', async () => {
+      const projectPath = path.join(testDir, 'nestjs-yarn-install');
+      const variables = {
+        project_name: 'nestjs_yarn_install',
+        template: 'nestjs',
+        package_manager: 'yarn',
+        skipInstall: true, // Skip actual install to avoid timeout
+        skipGit: true,
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      const stat = await fs.stat(projectPath);
+      expect(stat.isDirectory()).toBe(true);
+    });
+
+    it('should handle pnpm package manager for NestJS (with skipInstall)', async () => {
+      const projectPath = path.join(testDir, 'nestjs-pnpm-install');
+      const variables = {
+        project_name: 'nestjs_pnpm_install',
+        template: 'nestjs',
+        package_manager: 'pnpm',
+        skipInstall: true, // Skip actual install to avoid timeout
+        skipGit: true,
+      };
+
+      await generateDemoKit(projectPath, variables);
+
+      const stat = await fs.stat(projectPath);
+      expect(stat.isDirectory()).toBe(true);
     });
   });
 });
