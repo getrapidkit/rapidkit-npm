@@ -83,6 +83,22 @@ describe('validateProjectName', () => {
       expect((error as InvalidProjectNameError).message).toContain('Invalid project name');
     }
   });
+
+  it('should handle npm package validation errors with explicit true return', () => {
+    // Ensure the return true at the end is covered
+    const result1 = validateProjectName('my-app');
+    expect(result1).toBe(true);
+    const result2 = validateProjectName('app123');
+    expect(result2).toBe(true);
+  });
+
+  it('should reject names with dots (npm validation)', () => {
+    expect(() => validateProjectName('my.app')).toThrow(InvalidProjectNameError);
+  });
+
+  it('should reject names with slashes (npm validation)', () => {
+    expect(() => validateProjectName('my/app')).toThrow(InvalidProjectNameError);
+  });
 });
 
 describe('toSnakeCase', () => {

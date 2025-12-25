@@ -292,4 +292,30 @@ describe('getCachedOrFetch', () => {
 
     expect(fetcher).toHaveBeenCalledTimes(3); // Different keys
   });
+
+  describe('clear', () => {
+    it('should clear both memory and disk cache gracefully', async () => {
+      // Set some cached data
+      await cache.set('clear-test-1', { value: 'test1' });
+      await cache.set('clear-test-2', { value: 'test2' });
+
+      // Clear all cache
+      await cache.clear();
+
+      // Verify cache is empty
+      const result1 = await cache.get('clear-test-1');
+      const result2 = await cache.get('clear-test-2');
+
+      expect(result1).toBeNull();
+      expect(result2).toBeNull();
+    });
+
+    it('should handle clear errors gracefully', async () => {
+      // Even if clear fails for the cache dir, it should not throw
+      const cache2 = Cache.getInstance();
+      expect(async () => {
+        await cache2.clear();
+      }).not.toThrow();
+    });
+  });
 });

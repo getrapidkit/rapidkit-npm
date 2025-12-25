@@ -1,4 +1,4 @@
-# rapidkit
+# RapidKit CLI
 
 [![npm version](https://img.shields.io/npm/v/rapidkit.svg?style=flat-square)](https://www.npmjs.com/package/rapidkit)
 [![npm downloads](https://img.shields.io/npm/dm/rapidkit.svg?style=flat-square)](https://www.npmjs.com/package/rapidkit)
@@ -198,6 +198,8 @@ MIT
 - 📚 Docs: https://getrapidkit.com
 
 ---
+
+**v0.13.0** - NestJS test coverage boost (75%→90%), demo-kit improvements
 
 **v0.12.4** - Friendly shell activation UX with green headers and robust fallback logic
 

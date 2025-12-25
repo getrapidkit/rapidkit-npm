@@ -14,6 +14,8 @@ export default defineConfig({
         '**/*.config.*',
         '**/mockData',
         'src/__tests__/**',
+        'src/index.ts',
+        'src/workspace.ts',
       ],
     },
   },

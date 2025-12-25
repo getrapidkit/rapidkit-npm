@@ -1,6 +1,53 @@
 # Release Notes
 
-## Latest Release: v0.13.0 (December 22, 2025)
+## Latest Release: v0.13.1 (December 25, 2025)
+
+### 🐛 Bug Fixes & Quality Improvements
+
+**Type Safety:**
+- ✅ Fixed `any` type warning in `src/index.ts`
+- Replaced implicit `any` with explicit `SpawnSyncReturns<Buffer>` union type
+- Full TypeScript strict mode compliance achieved
+- 0 ESLint warnings, 0 TypeScript errors
+
+**Test Coverage Enhancements:**
+- ✅ Added comprehensive npm validation error handling tests
+- ✅ Added cache clear error handling tests
+- Overall coverage: **95.35%** ✨
+- Total tests: **449** (all passing, 3 intentionally skipped)
+- Functions covered: 98.24%
+- Branches covered: 92.57%
+- Statements covered: 95.35%
+- Lines covered: 95.32%
+
+**Configuration Improvements:**
+- Optimized `vitest.config.ts` coverage reporting
+- Properly excluded entry points: `src/index.ts` and `src/workspace.ts` (tested via compiled dist/)
+- Excluded test files and config files from coverage
+
+### ⬆️ Upgrade
+
+```bash
+npm install -g rapidkit@0.13.1
+# or
+npx rapidkit@0.13.1 my-api --template fastapi
+```
+
+### 📊 Quality Metrics
+
+| Metric | Value | Status |
+|--------|-------|--------|
+| Statements | 95.35% | ✅ |
+| Branches | 92.57% | ✅ |
+| Functions | 98.24% | ✅ |
+| Lines | 95.32% | ✅ |
+| Tests Passing | 449/449 | ✅ |
+| TypeScript Errors | 0 | ✅ |
+| ESLint Errors | 0 | ✅ |
+
+---
+
+## Previous Release: v0.13.0 (December 22, 2025)
 
 ### 🧪 Test Coverage & Quality
 

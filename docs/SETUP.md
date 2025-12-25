@@ -3,7 +3,8 @@
 ## Install New Dependencies
 
 ```bash
-cd /home/debux/WOSP/Rapid/Front/rapidkit-npm
+# Navigate to the rapidkit-npm directory
+cd path/to/rapidkit-npm
 
 # Install linting and formatting tools
 npm install -D @typescript-eslint/eslint-plugin@latest \

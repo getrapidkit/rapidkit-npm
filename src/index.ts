@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import path from 'path';
-import { spawn } from 'child_process';
+import { spawn, SpawnSyncReturns } from 'child_process';
 import { logger } from './logger.js';
 import { checkForUpdates, getVersion } from './update-checker.js';
 import { loadUserConfig } from './config.js';
@@ -298,7 +298,11 @@ async function delegateToLocalCLI(): Promise<boolean> {
           process.exit(0);
         }
 
-        let result: any = { status: 1 };
+        let result: SpawnSyncReturns<Buffer> | { status: number; stderr: null; stdout: null } = {
+          status: 1,
+          stderr: null,
+          stdout: null,
+        };
         if (userConfirmed) {
           for (const [cmd, args] of installers) {
             try {
