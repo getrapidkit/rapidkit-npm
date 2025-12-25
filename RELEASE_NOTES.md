@@ -47,61 +47,11 @@ npx rapidkit@0.13.1 my-api --template fastapi
 
 ---
 
-## Previous Release: v0.13.0 (December 22, 2025)
-
-### 🧪 Test Coverage & Quality
-
-This release focuses on **test quality and coverage**, adding comprehensive NestJS tests and boosting overall test coverage.
-
-### What Changed
-
-**NestJS Test Suite:**
-- 13 new tests for NestJS project generation
-- Tests for project structure, config, tsconfig, .env.example
-- Tests for package manager variants (npm, yarn, pnpm)
-- Mocked execa for fast, reliable tests
-
-**Coverage Improvements:**
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| demo-kit.ts | 75% | 90%+ | **+15%** |
-| Overall | 93.5% | 95.35% | +1.85% |
-| Tests | 431 | 444 | +13 |
-
-### Upgrade
-
-```bash
-npx rapidkit@latest --version  # Should show 0.13.0
-```
-
-### Windows Users
-
-If Python is not installed, you'll see a helpful message with installation options:
-```
-============================================================
-  Python not found!
-============================================================
-
-  Install Python using one of these methods:
-
-  1. Microsoft Store (recommended):
-     https://apps.microsoft.com/detail/9NRWMJP3717K
-
-  2. Official installer:
-     https://www.python.org/downloads/
-
-  3. Using winget:
-     winget install Python.Python.3.12
-
-  4. Using chocolatey:
-     choco install python
-============================================================
-```
-
 ## Previous Releases
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| [v0.13.0](releases/RELEASE_NOTES_v0.13.0.md) | Dec 22, 2025 | NestJS test coverage boost |
 | [v0.12.9](releases/RELEASE_NOTES_v0.12.9.md) | Dec 22, 2025 | Unified npx commands |
 | [v0.12.8](releases/RELEASE_NOTES_v0.12.8.md) | Dec 13, 2025 | Windows spawn fix |
 | [v0.12.7](releases/RELEASE_NOTES_v0.12.7.md) | Dec 13, 2025 | Windows support |
