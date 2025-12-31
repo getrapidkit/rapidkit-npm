@@ -5,6 +5,17 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1] - 2025-12-31
+
+### Fixed
+- 🐛 **Poetry virtualenv detection** - Support Poetry virtualenvs outside project directory
+  - rapidkit now detects Poetry virtualenv via `poetry env info --path`
+  - No longer requires `.venv` in project directory
+  - Works with Poetry's default cache location (`~/.cache/pypoetry/virtualenvs/`)
+  - Eliminates need for `poetry config virtualenvs.in-project true`
+- 🔧 **Shell script improvements** - Updated `.rapidkit/rapidkit.j2` to auto-detect Poetry venv
+- 💬 **Better feedback** - Shows virtualenv location when using Poetry cache
+
 ## [0.14.0] - 2025-12-31
 
 ### Changed

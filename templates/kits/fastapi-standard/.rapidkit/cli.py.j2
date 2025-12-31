@@ -56,6 +56,24 @@ def _python_code_targets(root: Path) -> list[str]:
     return targets or ["src"]
 
 
+def _get_poetry_venv() -> Path | None:
+    """Get Poetry virtualenv path if it exists"""
+    try:
+        result = subprocess.run(
+            ["poetry", "env", "info", "--path"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            venv_path = Path(result.stdout.strip())
+            if venv_path.exists():
+                return venv_path
+    except Exception:
+        pass
+    return None
+
+
 def _venv_has_uvicorn(venv_path: Path) -> bool:
     if (venv_path / "bin" / "uvicorn").exists():
         return True
@@ -77,9 +95,16 @@ def dev(port: int = 8000, host: str = "0.0.0.0", allow_global_runtime: bool = Fa
         _print_banner("📁", f"Working directory: {root}")
         _print_banner("🌐", f"Server will be available at: http://{host}:{port}")
 
+        # Check for .venv or Poetry virtualenv
+        if not venv_dir.exists():
+            poetry_venv = _get_poetry_venv()
+            if poetry_venv:
+                venv_dir = poetry_venv
+                _print_banner("🐍", f"Using Poetry virtualenv: {venv_dir}")
+
         if venv_dir.exists():
             if not _venv_has_uvicorn(venv_dir):
-                print("❌ Project .venv was found but uvicorn/fastapi doesn't appear installed.")
+                print("❌ Project virtualenv was found but uvicorn/fastapi doesn't appear installed.")
                 print("💡 Run 'rapidkit init' to install dependencies.")
                 sys.exit(1)
         else:
@@ -141,9 +166,16 @@ def start(port: int = 8000, host: str = "0.0.0.0", allow_global_runtime: bool = 
     
     if ptype == "python":
         venv_dir = root / ".venv"
+        
+        # Check for .venv or Poetry virtualenv
+        if not venv_dir.exists():
+            poetry_venv = _get_poetry_venv()
+            if poetry_venv:
+                venv_dir = poetry_venv
+
         if venv_dir.exists():
             if not _venv_has_uvicorn(venv_dir):
-                print("❌ Project .venv was found but uvicorn/fastapi doesn't appear installed.")
+                print("❌ Project virtualenv was found but uvicorn/fastapi doesn't appear installed.")
                 print("💡 Run 'poetry install' to install dependencies.")
                 sys.exit(1)
         else:

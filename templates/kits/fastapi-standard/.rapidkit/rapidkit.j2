@@ -48,6 +48,15 @@ fi
 VENV_PY="${ROOT_DIR}/.venv/bin/python"
 VENV_POETRY="${ROOT_DIR}/.venv/bin/poetry"
 
+# Try to detect Poetry virtualenv path
+if [ ! -d "${ROOT_DIR}/.venv" ] && command -v poetry >/dev/null 2>&1; then
+  POETRY_VENV_PATH=$(cd "$ROOT_DIR" && poetry env info --path 2>/dev/null || true)
+  if [ -n "$POETRY_VENV_PATH" ] && [ -d "$POETRY_VENV_PATH" ]; then
+    VENV_PY="${POETRY_VENV_PATH}/bin/python"
+    VENV_POETRY="${POETRY_VENV_PATH}/bin/poetry"
+  fi
+fi
+
 case "$PKG_TYPE" in
   python)
     # prefer project-local poetry
