@@ -706,20 +706,20 @@ readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.11"
-fastapi = "^0.115.0"
-uvicorn = {extras = ["standard"], version = "^0.32.0"}
-pydantic = "^2.0"
-pydantic-settings = "^2.0"
+python = "^3.10.14"
+fastapi = "^0.128.0"
+uvicorn = {extras = ["standard"], version = "^0.40.0"}
+pydantic = "^2.12.5"
+pydantic-settings = "^2.12.0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.0"
-pytest-asyncio = "^0.24.0"
-pytest-cov = "^6.0"
-httpx = "^0.27"
-black = "^24.0"
-ruff = "^0.8"
-mypy = "^1.0"
+pytest = "^9.0.2"
+pytest-asyncio = "^1.3.0"
+pytest-cov = "^7.0.0"
+httpx = "^0.28.1"
+black = "^25.12.0"
+ruff = "^0.14.10"
+mypy = "^1.19.1"
 
 [tool.poetry.scripts]
 dev = "src.cli:dev"

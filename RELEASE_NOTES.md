@@ -1,49 +1,55 @@
 # Release Notes
 
-## Latest Release: v0.13.1 (December 25, 2025)
+## Latest Release: v0.14.0 (December 31, 2025)
 
-### 🐛 Bug Fixes & Quality Improvements
+### ⬆️ Major Dependency Updates
 
-**Type Safety:**
-- ✅ Fixed `any` type warning in `src/index.ts`
-- Replaced implicit `any` with explicit `SpawnSyncReturns<Buffer>` union type
-- Full TypeScript strict mode compliance achieved
-- 0 ESLint warnings, 0 TypeScript errors
+**Node.js & Runtime:**
+- ✅ Updated Node.js requirement to **>=20.19.6** (LTS Iron)
+- Better performance, security, and modern JavaScript features
+- Aligns with current LTS recommendations
 
-**Test Coverage Enhancements:**
-- ✅ Added comprehensive npm validation error handling tests
-- ✅ Added cache clear error handling tests
-- Overall coverage: **95.35%** ✨
-- Total tests: **449** (all passing, 3 intentionally skipped)
-- Functions covered: 98.24%
-- Branches covered: 92.57%
-- Statements covered: 95.35%
-- Lines covered: 95.32%
+**Python Stack (FastAPI Projects):**
+- ✅ Python: **^3.10.14** (broader compatibility)
+- ✅ FastAPI: **0.128.0** (latest stable)
+- ✅ Uvicorn: **0.40.0** (latest server)
+- ✅ Pydantic: **2.12.5** (latest validation)
+- ✅ pydantic-settings: **2.12.0**
 
-**Configuration Improvements:**
-- Optimized `vitest.config.ts` coverage reporting
-- Properly excluded entry points: `src/index.ts` and `src/workspace.ts` (tested via compiled dist/)
-- Excluded test files and config files from coverage
+**Python Dev Tools:**
+- ✅ pytest: **9.0.2**
+- ✅ black: **25.12.0**
+- ✅ ruff: **0.14.10**
+- ✅ mypy: **1.19.1**
+- ✅ isort: **7.0.0**
+- ✅ httpx: **0.28.1**
+
+**NestJS Stack:**
+- ✅ @nestjs/*: **11.1.10** (all core packages)
+- ✅ Jest: **30.2.0**
+- ✅ TypeScript: **5.9.3**
+- ✅ All dev dependencies updated to latest stable
+
+### 🐛 Bug Fixes
+
+- Fixed httpx version inconsistency across templates
+- All templates now use synchronized dependency versions
 
 ### ⬆️ Upgrade
 
 ```bash
-npm install -g rapidkit@0.13.1
+npm install -g rapidkit@0.14.0
 # or
-npx rapidkit@0.13.1 my-api --template fastapi
+npx rapidkit@0.14.0 my-api --template fastapi
 ```
 
-### 📊 Quality Metrics
+### ✅ Quality Assurance
 
-| Metric | Value | Status |
-|--------|-------|--------|
-| Statements | 95.35% | ✅ |
-| Branches | 92.57% | ✅ |
-| Functions | 98.24% | ✅ |
-| Lines | 95.32% | ✅ |
-| Tests Passing | 449/449 | ✅ |
-| TypeScript Errors | 0 | ✅ |
-| ESLint Errors | 0 | ✅ |
+- ✅ All **449 tests passing**
+- ✅ Build successful
+- ✅ TypeScript type check passed
+- ✅ ESLint passed with no warnings
+- ✅ Code coverage: **95.35%**
 
 ---
 
@@ -51,6 +57,8 @@ npx rapidkit@0.13.1 my-api --template fastapi
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| [v0.14.0](releases/RELEASE_NOTES_v0.14.0.md) | Dec 31, 2025 | Major dependency updates |
+| [v0.13.1](releases/RELEASE_NOTES_v0.13.1.md) | Dec 25, 2025 | Type safety & test coverage |
 | [v0.13.0](releases/RELEASE_NOTES_v0.13.0.md) | Dec 22, 2025 | NestJS test coverage boost |
 | [v0.12.9](releases/RELEASE_NOTES_v0.12.9.md) | Dec 22, 2025 | Unified npx commands |
 | [v0.12.8](releases/RELEASE_NOTES_v0.12.8.md) | Dec 13, 2025 | Windows spawn fix |

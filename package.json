@@ -1,6 +1,6 @@
 {
   "name": "rapidkit",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "type": "module",
   "description": "Create RapidKit projects with a single command - The official CLI for RapidKit framework",
   "keywords": [
@@ -77,7 +77,7 @@
     "vitest": "^4.0.15"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.19.6"
   },
   "lint-staged": {
     "*.ts": [

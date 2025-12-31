@@ -5,6 +5,35 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2025-12-31
+
+### Changed
+- ⬆️ **Node.js requirement** - Updated to >=20.19.6 (LTS Iron)
+  - Better compatibility with latest Node.js LTS
+  - Improved performance and security
+- ⬆️ **Python dependencies** - Updated to latest stable versions
+  - Python: ^3.10.14 for broader compatibility
+  - FastAPI: 0.128.0
+  - Uvicorn: 0.40.0
+  - Pydantic: 2.12.5
+  - pydantic-settings: 2.12.0
+- ⬆️ **Python dev tools** - Updated to latest versions
+  - pytest: 9.0.2
+  - black: 25.12.0
+  - ruff: 0.14.10
+  - mypy: 1.19.1
+  - isort: 7.0.0
+  - httpx: 0.28.1 (synced across all templates)
+- ⬆️ **NestJS dependencies** - Updated to latest stable versions
+  - @nestjs/common, @nestjs/core, @nestjs/platform-express: 11.1.10
+  - Jest: 30.2.0
+  - TypeScript: 5.9.3
+  - All related dev dependencies updated
+
+### Fixed
+- 🐛 **Consistency** - Synced httpx version to 0.28.1 across all templates
+  - Fixed version mismatch between create.ts and template files
+
 ## [0.13.0] - 2025-12-22
 
 ### Added
