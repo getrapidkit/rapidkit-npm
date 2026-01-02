@@ -1136,6 +1136,7 @@ This npm package is a **bridge/wrapper** that:
 - Forwards global/core commands (e.g. `list`, `info`, `create`, `add`, `doctor`, `--tui`, `--json`) to `python -m rapidkit ...`.
 - If `rapidkit-core` is not available in your system Python, it can bootstrap a cached virtualenv and install Core there.
 
+**🤖 NEW:** [AI-powered module recommendations](#-ai-features) to help you build faster!  
 **💡 Tip:** Use the [RapidKit VS Code Extension](https://marketplace.visualstudio.com/items?itemName=rapidkit.rapidkit-vscode) for a visual interface!
 
 ## Quick Start
@@ -1401,6 +1402,128 @@ Projects are automatically registered when created via:
 - `rapidkit create project ...` (inside a workspace)
 - VS Code Extension "Create Project" command
 
+## 🤖 AI Features
+
+RapidKit now includes AI-powered module recommendations using OpenAI embeddings!
+
+### Quick Start with AI
+
+**First time setup** (automatic):
+```bash
+# Just use AI recommendations - it will guide you through setup!
+npx rapidkit ai recommend "user authentication with social login"
+
+# If embeddings don't exist, you'll see:
+# ⚠️  Module embeddings not found
+# ? What would you like to do?
+#   🚀 Generate embeddings now (requires OpenAI API key)
+#   📝 Show me how to generate them manually
+#   ❌ Cancel
+```
+
+**Example Usage:**
+```bash
+# Get intelligent module recommendations
+npx rapidkit ai recommend "I need user authentication with email"
+
+# Output:
+# 📦 Recommended Modules:
+# 1. Authentication Core
+#    Complete authentication with JWT, OAuth 2.0, secure sessions
+#    Match: 92.5% - Matches: auth, login, email
+#    Category: auth
+#
+# 2. Users Core
+#    User management with profiles, roles, permissions
+#    Match: 88.3% - Matches: user
+#    Category: auth
+#    Requires: authentication-core
+```
+
+### AI Commands
+
+```bash
+# Get recommendations
+npx rapidkit ai recommend "payment processing with Stripe"
+npx rapidkit ai recommend "real-time notifications" --number 3
+
+# Setup and management
+npx rapidkit config set-api-key              # Configure OpenAI API key
+npx rapidkit ai generate-embeddings          # Manual embedding generation
+npx rapidkit ai generate-embeddings --force  # Force regeneration
+npx rapidkit ai update-embeddings            # Update with latest modules
+npx rapidkit ai info                         # Show features & pricing
+```
+
+### Features
+
+- 🧠 **Semantic Search**: AI understands intent, not just keywords
+- 🤖 **Auto-Setup**: Embeddings generate automatically on first use
+- 📦 **27+ Modules**: Production-ready modules from RapidKit Python Core
+- 💰 **Ultra-Cheap**: ~$0.0002 per query (practically free)
+- 🎯 **Dependency Detection**: Automatically shows required modules
+- ✅ **Mock Mode**: Test without API key using deterministic embeddings
+- 🔄 **Dynamic Catalog**: Fetches latest modules from Python Core
+
+### Pricing
+
+**One-time Setup:**
+- Generate embeddings: ~$0.50 (one time only)
+
+**Per Query:**
+- Single query: ~$0.0002
+- 100 queries: ~$0.02 (2 cents)
+- 1,000 queries: ~$0.20 (20 cents)
+
+💡 **Tip:** Setup cost is paid once, then queries are essentially free!
+
+### Available Module Categories
+
+- 🔐 **Auth**: authentication-core, users-core, session-management, 2fa
+- 💾 **Database**: db-postgres, db-mongodb, db-mysql
+- 💳 **Payment**: stripe-payment, payment-core
+- 📧 **Communication**: email, sms, notifications
+- 🚀 **Infrastructure**: redis-cache, celery, storage, rate-limiter
+- 📊 **Monitoring**: logging, analytics, error-tracking
+- 🔌 **Integrations**: webhooks, api-gateway, graphql
+
+### Troubleshooting
+
+**No OpenAI API Key?**
+```bash
+# AI works in mock mode without API key (for testing)
+npx rapidkit ai recommend "auth"  # Works without key!
+
+# For production, get a key:
+# 1. Visit: https://platform.openai.com/api-keys
+# 2. Create new key
+# 3. Configure: npx rapidkit config set-api-key
+```
+
+**Embeddings Not Found?**
+```bash
+# Just run any AI command - it will prompt you to generate them
+npx rapidkit ai recommend "database"
+
+# Or generate manually:
+npx rapidkit ai generate-embeddings
+```
+
+**Update Embeddings After RapidKit Python Update?**
+```bash
+npx rapidkit ai update-embeddings
+```
+
+**See Current Config:**
+```bash
+npx rapidkit config show
+```
+
+### Learn More
+
+- 📚 **Full Guide**: [docs/AI_FEATURES.md](docs/AI_FEATURES.md)
+- 🔧 **Technical Details**: [docs/AI_DYNAMIC_INTEGRATION.md](docs/AI_DYNAMIC_INTEGRATION.md)
+
 ## CLI Options
 
 ```bash
@@ -1440,6 +1563,16 @@ npx rapidkit build     # Build for production
 npx rapidkit test      # Run tests
 npx rapidkit lint      # Lint code
 npx rapidkit format    # Format code
+
+# AI Commands (new!)
+npx rapidkit ai recommend "query"           # Get module recommendations
+npx rapidkit ai recommend "auth" --number 3 # Get top 3 results
+npx rapidkit ai generate-embeddings         # Generate embeddings (one-time)
+npx rapidkit ai update-embeddings           # Update embeddings
+npx rapidkit ai info                        # Show AI features info
+npx rapidkit config set-api-key             # Configure OpenAI API key
+npx rapidkit config show                    # View current config
+
 npx rapidkit --help    # Show all commands
 ```
 

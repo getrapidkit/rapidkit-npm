@@ -22,6 +22,8 @@ import { BOOTSTRAP_CORE_COMMANDS_SET } from './core-bridge/bootstrapCoreCommands
 import { createProject as createPythonEnvironment, registerWorkspaceAtPath } from './create.js';
 import { generateDemoKit } from './demo-kit.js';
 import { runDoctor } from './doctor.js';
+import { registerConfigCommands } from './commands/config.js';
+import { registerAICommands } from './commands/ai.js';
 
 type BridgeFailureCode = 'PYTHON_NOT_FOUND' | 'BRIDGE_VENV_BOOTSTRAP_FAILED';
 
@@ -56,7 +58,7 @@ async function runCreateFallback(args: string[], reasonCode: BridgeFailureCode):
   if (hasJson) {
     process.stderr.write(
       'RapidKit (npm) offline fallback does not support --json for `create` commands.\n' +
-        'Install Python 3.10+ and retry the same command.\n'
+      'Install Python 3.10+ and retry the same command.\n'
     );
     return 1;
   }
@@ -67,8 +69,8 @@ async function runCreateFallback(args: string[], reasonCode: BridgeFailureCode):
   if (sub !== 'project') {
     process.stderr.write(
       'RapidKit (npm) could not run the Python core engine for `create`.\n' +
-        `Reason: ${reasonCode}.\n` +
-        'Install Python 3.10+ to use the interactive wizard and full kit catalog.\n'
+      `Reason: ${reasonCode}.\n` +
+      'Install Python 3.10+ to use the interactive wizard and full kit catalog.\n'
     );
     return 1;
   }
@@ -78,7 +80,7 @@ async function runCreateFallback(args: string[], reasonCode: BridgeFailureCode):
   if (!kit || !name) {
     process.stderr.write(
       'Usage: rapidkit create project <kit> <name> [--output <dir>]\n' +
-        'Tip: offline fallback supports only fastapi* and nestjs* kits.\n'
+      'Tip: offline fallback supports only fastapi* and nestjs* kits.\n'
     );
     return 1;
   }
@@ -87,10 +89,10 @@ async function runCreateFallback(args: string[], reasonCode: BridgeFailureCode):
   if (!template) {
     process.stderr.write(
       'RapidKit (npm) could not run the Python core engine to create this kit.\n' +
-        `Reason: ${reasonCode}.\n` +
-        `Requested kit: ${kit}\n` +
-        'Offline fallback only supports: fastapi.standard, nestjs.standard (and their shorthands).\n' +
-        'Install Python 3.10+ to access all kits.\n'
+      `Reason: ${reasonCode}.\n` +
+      `Requested kit: ${kit}\n` +
+      'Offline fallback only supports: fastapi.standard, nestjs.standard (and their shorthands).\n' +
+      'Install Python 3.10+ to access all kits.\n'
     );
     return 1;
   }
@@ -431,11 +433,11 @@ async function delegateToLocalCLI(): Promise<boolean> {
   const isWindows = process.platform === 'win32';
   const localScriptCandidates = isWindows
     ? [
-        path.join(cwd, 'rapidkit.cmd'),
-        path.join(cwd, 'rapidkit'),
-        path.join(cwd, '.rapidkit', 'rapidkit.cmd'),
-        path.join(cwd, '.rapidkit', 'rapidkit'),
-      ]
+      path.join(cwd, 'rapidkit.cmd'),
+      path.join(cwd, 'rapidkit'),
+      path.join(cwd, '.rapidkit', 'rapidkit.cmd'),
+      path.join(cwd, '.rapidkit', 'rapidkit'),
+    ]
     : [path.join(cwd, 'rapidkit'), path.join(cwd, '.rapidkit', 'rapidkit')];
 
   let localScript: string | null = null;
@@ -487,11 +489,11 @@ async function delegateToLocalCLI(): Promise<boolean> {
         const isWin = process.platform === 'win32';
         const localScriptCandidatesEarly = isWin
           ? [
-              path.join(cwd, 'rapidkit.cmd'),
-              path.join(cwd, 'rapidkit'),
-              path.join(cwd, '.rapidkit', 'rapidkit.cmd'),
-              path.join(cwd, '.rapidkit', 'rapidkit'),
-            ]
+            path.join(cwd, 'rapidkit.cmd'),
+            path.join(cwd, 'rapidkit'),
+            path.join(cwd, '.rapidkit', 'rapidkit.cmd'),
+            path.join(cwd, '.rapidkit', 'rapidkit'),
+          ]
           : [path.join(cwd, 'rapidkit'), path.join(cwd, '.rapidkit', 'rapidkit')];
         let localScriptEarly: string | null = null;
         for (const c of localScriptCandidatesEarly) {
@@ -913,6 +915,12 @@ program
       currentProjectPath = null;
     }
   });
+
+// Register AI commands
+registerAICommands(program);
+
+// Register config commands
+registerConfigCommands(program);
 
 // Shell helpers - e.g. `rapidkit shell activate` prints an eval-able activation snippet
 program
