@@ -13,6 +13,8 @@ import { RapidKitError } from './errors.js';
 import * as fsExtra from 'fs-extra';
 import fs from 'fs';
 import { createWorkspace, createProject } from './workspace.js';
+import { registerConfigCommands } from './commands/config.js';
+import { registerAICommands } from './commands/ai.js';
 
 // Local project commands that should be delegated to ./rapidkit
 const LOCAL_COMMANDS = [
@@ -539,6 +541,12 @@ program
       currentProjectPath = null;
     }
   });
+
+// Register AI commands
+registerAICommands(program);
+
+// Register config commands
+registerConfigCommands(program);
 
 // Shell helpers - e.g. `rapidkit shell activate` prints an eval-able activation snippet
 program

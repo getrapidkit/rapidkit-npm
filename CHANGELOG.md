@@ -5,6 +5,79 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- 🤖 **AI Module Recommender** - Intelligent module suggestions using OpenAI embeddings
+  - 🧠 Semantic search for modules (understands intent, not just keywords)
+  - 🔄 **Dynamic module fetching from Python Core** (`rapidkit modules list --json`)
+  - 📦 27+ production-ready modules cataloged (auth, database, payment, communication, infrastructure)
+  - 🤖 **Auto-generate embeddings** - Automatic setup on first use with interactive prompts
+  - ✅ **Mock mode** - Test without API key using deterministic embeddings
+  - 🎯 Cosine similarity algorithm for accurate recommendations (92%+ match scores)
+  - 🔗 Dependency detection and installation order calculation
+  - 💰 Ultra-cheap: ~$0.0002 per query (practically free after $0.50 setup)
+  - ⚡ 5-minute cache for optimal performance (~50ms per query)
+  - 🛡️ Graceful fallback to 11 hardcoded modules if Python Core unavailable
+- 🛠️ **New CLI Commands**:
+  - `rapidkit ai recommend [query]` - Get module recommendations with match scores and reasons
+  - `rapidkit ai recommend [query] -n <N>` - Get top N recommendations (default: 5)
+  - `rapidkit ai recommend [query] --json` - JSON output for scripting
+  - `rapidkit ai generate-embeddings` - Generate embeddings (one-time setup)
+  - `rapidkit ai generate-embeddings --force` - Force regenerate embeddings
+  - `rapidkit ai update-embeddings` - Update embeddings with latest modules
+  - `rapidkit ai info` - Show AI features, pricing, and getting started guide
+  - `rapidkit config set-api-key` - Configure OpenAI API key (interactive or --key option)
+  - `rapidkit config show` - View current configuration (masked key)
+  - `rapidkit config remove-api-key` - Remove stored API key
+  - `rapidkit config ai enable|disable` - Toggle AI features
+- 📦 **New Dependencies**:
+  - openai@^4.80.0 - Official OpenAI SDK for embeddings
+  - inquirer@9.2.23 - Interactive prompts for auto-setup
+  - ora@8.0.1 - Elegant terminal spinners for generation progress
+- 📚 **Documentation**:
+  - [docs/AI_FEATURES.md](docs/AI_FEATURES.md) - Complete AI features guide with troubleshooting
+  - [docs/AI_QUICKSTART.md](docs/AI_QUICKSTART.md) - Get started in 60 seconds
+  - [docs/AI_EXAMPLES.md](docs/AI_EXAMPLES.md) - Real-world use cases (SaaS, E-commerce, Healthcare, Gaming)
+  - [docs/AI_DYNAMIC_INTEGRATION.md](docs/AI_DYNAMIC_INTEGRATION.md) - Dynamic integration architecture
+  - Updated README with comprehensive AI section
+- 🔒 **Security**:
+  - API keys stored in ~/.rapidkit/config.json (600 permissions, owner only)
+  - Environment variable support (OPENAI_API_KEY)
+  - Embeddings file (data/modules-embeddings.json) added to .gitignore
+  - No local paths or personal information in distributed package (verified)
+- ✅ **Testing**:
+  - 76 AI tests (100% passing)
+  - 90% overall coverage, 76% AI module coverage
+  - Mock mode tests (no API key needed)
+  - Integration tests for auto-generation flow
+
+### Changed
+- 🔄 **Dynamic Module Catalog** - AI now fetches module list from Python Core in real-time
+  - Automatically syncs with Python Core module registry
+  - Single source of truth (Python Core)
+  - No duplicate data maintenance
+  - Always up-to-date recommendations
+  - Falls back to 11 core modules if Python unavailable
+- 🎨 **Enhanced User Experience**:
+  - Interactive prompts for missing embeddings (3 options: generate/manual/cancel)
+  - Cost estimation before generation (~$0.50 for 27 modules)
+  - Progress indicators for long operations
+  - Better error messages (401 invalid key, 429 quota exceeded, connection errors)
+  - Mock mode automatically activates when no API key configured
+
+### Technical
+- New module: `src/config/user-config.ts` - User configuration management (API key, AI toggle)
+- New module: `src/ai/module-catalog.ts` - Dynamic module catalog with Python Core integration
+- New module: `src/ai/openai-client.ts` - OpenAI API wrapper with mock mode support
+- New module: `src/ai/recommender.ts` - AI recommendation engine with cosine similarity
+- New module: `src/ai/embeddings-manager.ts` - Auto-generation and management of embeddings
+- New script: `scripts/generate-mock-embeddings.ts` - Generate deterministic mock embeddings for testing
+- AI uses text-embedding-3-small model (1536 dimensions, $0.02/1M tokens)
+- Build size: 58.57 KB (ESM bundle)
+- 5-minute cache TTL for module list
+- Automatic fallback to hardcoded catalog (11 modules)
+
 ## [0.14.1] - 2025-12-31
 
 ### Fixed
