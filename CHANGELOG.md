@@ -5,9 +5,62 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - v0.15.0 (Stabilization Release)
+
+### Focus: Polish & Core Integration Preparation
+
+This release focuses on stabilizing the existing codebase and preparing for seamless integration with RapidKit Python Core when released.
+
+### Documentation
+
+- 📚 **Enhanced README** - Clearer messaging about preview status and upcoming features
+- 📚 **Roadmap updates** - Added detailed stabilization plan and Core integration architecture
+- 📚 **Coming Soon messaging** - AI features clearly marked as post-Core release
+- 📚 **Requirements clarity** - Specific version requirements (Node 20.19.6+, Python 3.10.14+, Poetry 2.2.1+)
+
+### Code Quality
+
+- 🧹 **Bundle optimization** - Target: reduce from 72KB to <60KB
+- 🧹 **Dependency audit** - Remove unused packages
+- 🧹 **Error handling** - Consistent error messages and recovery strategies
+- 🧹 **JSDoc comments** - Better API documentation for public functions
+
+### Testing
+
+- ✅ **Maintained coverage** - 449 tests, 100% passing
+- ✅ **Cross-platform testing** - Validated on Linux, macOS, Windows
+- ✅ **Performance benchmarks** - Project creation time tracking
+- ✅ **Integration tests** - Edge case coverage
+
+### Core Integration Preparation
+
+- 🔧 **Core bridge design** - Architecture for Python Core communication
+- 🔧 **Version compatibility** - Checker for Core version requirements
+- 🔧 **Fallback mechanisms** - Graceful degradation when Core unavailable
+- 🔧 **Mock Core CLI** - For testing integration paths
+
+### Developer Experience
+
+- 💡 **VS Code sync** - Ensure CLI matches extension expectations
+- 💡 **Error messages** - More helpful diagnostics and suggestions
+- 💡 **Progress indicators** - Better feedback during long operations
+
+### AI Feature
+
+- 🔮 **On hold** - AI Recommender feature complete in `feature/ai-recommender` branch
+- 🔮 **Waiting for Core** - Will merge after Python Core modules are available
+- 🔮 **76 AI tests ready** - 100% passing, ready to activate
+
+### Notes
+
+- This is a **stabilization release** - no major new features
+- Preparing foundation for powerful Core-backed version
+- Focus on quality, documentation, and integration readiness
+
 ## [0.14.1] - 2025-12-31
 
 ### Fixed
+
 - 🐛 **Poetry virtualenv detection** - Support Poetry virtualenvs outside project directory
   - rapidkit now detects Poetry virtualenv via `poetry env info --path`
   - No longer requires `.venv` in project directory
@@ -19,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.14.0] - 2025-12-31
 
 ### Changed
+
 - ⬆️ **Node.js requirement** - Updated to >=20.19.6 (LTS Iron)
   - Better compatibility with latest Node.js LTS
   - Improved performance and security
@@ -42,18 +96,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All related dev dependencies updated
 
 ### Fixed
+
 - 🐛 **Consistency** - Synced httpx version to 0.28.1 across all templates
   - Fixed version mismatch between create.ts and template files
 
 ## [0.13.0] - 2025-12-22
 
 ### Added
+
 - 🧪 **NestJS test suite** — 13 new tests for NestJS project generation
   - Tests for project structure, config, tsconfig, .env.example
   - Tests for package manager variants (npm, yarn, pnpm)
   - Mocked execa for fast, reliable package manager tests
 
 ### Improved
+
 - 📈 **Test coverage boost** — demo-kit.ts coverage: 75% → 90%+
   - Total tests: 431 → 444
   - Overall coverage: 93.5% → 95.35%
@@ -62,6 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.12.9] - 2025-12-22
 
 ### Improved
+
 - 📝 **Unified CLI commands** - All documentation and success messages now use `npx rapidkit` consistently
   - Same command works everywhere: `npx rapidkit <name> --template <type>`
   - No more confusion between `rapidkit create` and `npx rapidkit`
@@ -73,11 +131,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.12.8] - 2025-12-13
 
 ### Fixed
+
 - 🐛 **Windows spawn EINVAL error** - Fixed `spawn EINVAL` error when running `rapidkit init` on Windows
   - Added `shell: true` option for spawning `.cmd` files on Windows
   - Windows requires command interpreter to execute batch files
 
 ### Improved
+
 - 📝 **Python not found message** - Better error message when Python is not installed
   - Shows multiple installation options (Microsoft Store, python.org, winget, chocolatey)
   - Clear instructions to restart terminal after installation
@@ -85,6 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.12.7] - 2025-12-13
 
 ### Added
+
 - 🪟 **Windows Support** - Full Windows compatibility for `rapidkit` commands
   - Added `rapidkit.cmd` Windows batch wrapper for FastAPI projects
   - Added `rapidkit.cmd` Windows batch wrapper for NestJS projects
@@ -92,6 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `rapidkit init/dev/test/...` now works natively on Windows (no `.\` prefix needed)
 
 ### Fixed
+
 - 🐛 **Windows CLI Delegation** - Fixed "rapidkit is not recognized" error on Windows
   - `findLocalLauncherUpSync()` now checks `.cmd` files first on Windows
   - `delegateToLocalCLI()` now checks `.cmd` files first on Windows
@@ -100,6 +162,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.12.6] - 2025-12-12
 
 ### Added
+
 - ✅ **Quality metrics system** — Comprehensive metrics tracking for bundle size, test coverage, ESLint warnings, and security vulnerabilities
   - New `scripts/metrics.ts` for automated metrics collection
   - Metrics validation against defined targets (bundle < 500KB, coverage > 80%, 0 errors)
@@ -125,6 +188,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Quality gates for CI/CD pipeline
 
 ### Improved
+
 - 🎯 **ESLint configuration** — Smarter linting with context-aware rules
   - Reduced warnings from 61 to 1 by allowing `any` in test files
   - Added override rules for test files (`**/__tests__/**/*.ts`, `**/*.test.ts`)
@@ -136,6 +200,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `npm run metrics` — Collect and validate metrics
 
 ### Documentation
+
 - 📖 **METRICS.md** — Complete guide to quality metrics
   - Defined targets for all metrics
   - Instructions for manual and automated collection
@@ -147,6 +212,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Usage examples and next steps
 
 ### Fixed
+
 - 🧹 **Code quality** — Cleaner codebase with reduced linter warnings
   - 60 ESLint warnings eliminated in test files
   - Only 1 warning remaining in production code
@@ -154,6 +220,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.12.5] - 2025-12-06
 
 ### Fixed
+
 - 🛠️ **CI/CD cross-platform compatibility** — Fixed GitHub Actions workflow for all platforms
   - Added platform-specific rollup binary installation (darwin-arm64, win32-x64-msvc)
   - Works around npm optional dependency bug on macOS and Windows
@@ -163,20 +230,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.12.4] - 2025-12-06
 
 ### Added
+
 - ✅ **Friendly activation UX** — `rapidkit shell activate` now prints a prominent green header with a clear one-line instruction followed by the eval-able activation snippet
 - ✅ **Unit tests for shell activation** — Added comprehensive tests validating output formatting and behavior
 
 ### Fixed
+
 - 🛠️ **Shell-activate robustness** — Now gracefully handles missing or unparseable `context.json` by falling back to `.venv` or `.rapidkit/activate`
 - 🛠️ **ESLint violations** — Fixed no-inner-declarations, no-constant-condition, no-useless-escape, unused variable warnings
 - 🛠️ **Code quality** — All 431 tests passing, 0 lint errors, 61 warnings only
 
 ### Changed
+
 - 📝 **Improved documentation** — Updated README and release notes with v0.12.4 details
 
 ## [0.12.3] - 2025-12-04
 
 ### Changed
+
 - 🎯 **Smart CLI Delegation** - Global `rapidkit` command now auto-detects project context
   - Running `rapidkit init/dev/test/...` inside a project automatically delegates to local `./rapidkit`
   - No more confusion between global npm command and local project commands
@@ -186,6 +257,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.12.2] - 2025-12-04
 
 ### Changed
+
 - ⚡ **Simplified Workflow** - `rapidkit init` now auto-activates environment
   - No longer need to run `source .rapidkit/activate` manually
   - `rapidkit init` sources activate script internally before installing dependencies
@@ -196,17 +268,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Success messages show simplified 2-step workflow
 
 ### Fixed
+
 - 🐛 **Environment Activation** - Fixed Poetry/npm not found errors when running `rapidkit init`
   - `rapidkit init` now properly sets up PATH before running package manager
 
 ## [0.12.1] - 2025-12-03
 
 ### Fixed
+
 - 🐛 **NestJS Output Messages** - Fixed port display in CLI output (was showing 3000, now correctly shows 8000)
 
 ## [0.12.0] - 2025-12-03
 
 ### Added
+
 - 🆕 **Two Modes of Operation**
   - **Direct Project Mode** (`--template`) - Create standalone FastAPI/NestJS projects
   - **Workspace Mode** (default) - Create workspace for multiple projects
@@ -220,6 +295,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🆕 **Default Port 8000** - Both FastAPI and NestJS now use port 8000
 
 ### Changed
+
 - 📝 **Updated CLI** - `npx rapidkit` now supports both modes
   - `npx rapidkit my-api --template fastapi` → Direct project
   - `npx rapidkit my-workspace` → Workspace mode
@@ -230,12 +306,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 📝 **Updated Documentation** - All docs reflect new workflow
 
 ### Fixed
+
 - 🐛 **Python Detection** - Smart fallback chain for finding Python
 - 🐛 **NestJS Port** - Changed default from 3000 to 8000 for consistency
 
 ## [0.11.3] - 2025-12-03
 
 ### Added
+
 - 🆕 **Local RapidKit Commands** - Demo projects now support `rapidkit` CLI commands
   - Added `.rapidkit/` folder with local launcher and CLI handler
   - `rapidkit init` - Install dependencies via poetry
@@ -251,6 +329,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Test rapidkit launcher script content
 
 ### Changed
+
 - 📝 **Updated Documentation** - All documentation uses `rapidkit` commands
   - README.md updated to use `rapidkit init` and `rapidkit dev`
   - Demo workspace structure shows `.rapidkit/` folder
@@ -261,12 +340,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Consistent command interface across demo and full modes
 
 ### Fixed
+
 - 🐛 **Template String Escaping** - Fixed bash variable syntax in embedded scripts
   - Properly escaped `${1:-}` in JavaScript template literals
 
 ## [0.11.2] - 2025-06-22
 
 ### Changed
+
 - 📝 **CLI Command Documentation** - Updated command references throughout
   - Changed `rapidkit run dev` → `rapidkit dev` (simplified)
   - Changed `poetry install` → `rapidkit init` (preferred method)
@@ -278,6 +359,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Router now includes prefix and tags directly
 
 ### Fixed
+
 - 🐛 **FastAPI Templates** - Fixed router mount duplication
   - Removed redundant prefix/tags from api_router.include_router()
   - Router configuration now managed at router definition level
@@ -285,6 +367,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.11.1] - 2025-11-14
 
 ### Added
+
 - ✅ **Enhanced Test Coverage** - Increased from 72.69% to 74.63% (426 tests)
   - 37 new CLI integration tests for index.ts
   - 6 new decorator tests for performance monitoring
@@ -294,11 +377,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Git failure and error recovery testing
 
 ### Changed
+
 - 🔧 **TypeScript Configuration** - Enabled experimental decorators
   - Added `experimentalDecorators` for performance decorator support
   - Added `emitDecoratorMetadata` for enhanced decorator functionality
 
 ### Fixed
+
 - 🐛 **Test Suite** - Fixed async/await syntax error in create-helpers.test.ts
   - Path operation tests now properly handle async imports
 - 🐛 **Performance Utilities** - Achieved 100% test coverage
@@ -312,6 +397,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Ensured CI compliance for all code quality checks
 
 ### Testing
+
 - **Total Tests**: 426 (up from 393)
 - **Coverage**: 74.63% overall
   - config.ts: 100%
@@ -327,6 +413,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.11.0] - 2025-11-14
 
 ### Fixed
+
 - 🐛 **Version Display** - Fixed version command showing incorrect hardcoded version
   - Now reads version dynamically from package.json
   - Ensures --version always shows correct installed version
@@ -335,6 +422,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.0] - 2025-11-08
 
 ### Changed
+
 - ⚡ **Bundle Optimization** - Migrated from TypeScript compiler to tsup
   - 80% bundle size reduction (208KB → 40KB)
   - Production build now minified and tree-shaked
@@ -346,6 +434,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Will release 1.0.0 when RapidKit Python is published on PyPI
 
 ### Developer Experience
+
 - 🛠️ **Build System** - Added tsup configuration for optimized builds
 - 📦 **Bundle Size** - Automated bundle size monitoring in build process
 - 🚀 **Performance** - Faster CLI startup time with optimized bundle
@@ -353,6 +442,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0-beta.9] - 2025-11-07
 
 ### Added
+
 - ✅ **E2E Integration Tests** - Comprehensive end-to-end testing suite
   - Demo workspace creation tests
   - Invalid input validation tests
@@ -376,17 +466,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `npm run bundle-size` - Check compiled bundle size
 
 ### Changed
+
 - 🔧 **Improved Error Messages** - All errors now include detailed troubleshooting steps
 - 🔧 **Better Error Details** - Installation errors show common solutions
 - 🔧 **Enhanced UX** - Clearer error feedback for users
 
 ### Fixed
+
 - 🐛 **Error Stack Traces** - Proper stack trace capture in all custom error classes
 - 🐛 **Error Message Formatting** - Consistent formatting across all error types
 
 ## [1.0.0-beta.8] - 2025-11-01
 
 ### Changed
+
 - 🎯 **Simplified CLI command** - Changed bin name from `create-rapidkit` to `rapidkit`
   - Now use `npx rapidkit` instead of `npx create-rapidkit`
   - More intuitive and aligned with package name
@@ -396,17 +489,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🐛 **Fixed VS Code extension integration** - CLI wrapper now uses correct command name
 
 ### Fixed
+
 - Reserved package names validation updated to reflect new bin name
 
 ## [1.0.0-beta.7] - 2025-10-31
 
 ### Fixed
+
 - Fixed package name in demo workspace generator script (changed from `create-rapidkit` to `rapidkit`)
 - Fixed help text examples to use correct package name `rapidkit` instead of `create-rapidkit`
 
 ## [1.0.0-beta.6] - 2025-10-31
 
 ### Added
+
 - **Code Quality Tools**
   - ESLint with TypeScript support (latest @typescript-eslint v8.21.0)
   - Prettier for consistent code formatting
@@ -428,6 +524,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `npm run validate` - Complete validation pipeline
 
 ### Changed
+
 - **Documentation** - All documentation converted to English
   - Reorganized documentation into `docs/` folder
   - `docs/DEVELOPMENT.md` - Development guide
@@ -446,17 +543,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Better error handling with proper type guards
 
 ### Fixed
+
 - TypeScript 5.9.3 compatibility (updated @typescript-eslint packages)
 - Unused variable warnings fixed with proper naming conventions
 - Cache type inference issues resolved
 
 ### Security
+
 - Security audit of dependencies performed
 - 7 moderate vulnerabilities identified (in dev dependencies only)
 
 ## [1.0.0-beta.5] - 2025-10-23
 
 ### Added
+
 - **Custom error classes** with detailed error codes and messages
   - `RapidKitError` base class with `code` and `details` properties
   - Specific errors: `PythonNotFoundError`, `PoetryNotFoundError`, `PipxNotFoundError`, etc.
@@ -494,6 +594,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Version tracking and compatibility information
 
 ### Changed
+
 - **Removed hardcoded paths** - No personal data in source code
   - Test mode now uses `RAPIDKIT_DEV_PATH` environment variable
   - Falls back to config file `testRapidKitPath`
@@ -508,11 +609,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Comprehensive development guide
 
 ### Fixed
+
 - TypeScript strict mode compliance
 - Unused variable warnings
 - Missing type definitions
 
 ### Security
+
 - Removed hardcoded file paths that could leak developer information
 - Environment variable support for sensitive configuration
 - User config file excluded from git
@@ -520,17 +623,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0-beta.4] - 2025-10-05
 
 ### Added
+
 - Demo mode with bundled templates
 - Multiple install methods (Poetry, venv, pipx)
 - Test mode for local RapidKit installation
 
 ### Fixed
+
 - Poetry package-mode configuration
 - Cross-platform path handling
 
 ## [1.0.0-beta.3] - 2025-09-20
 
 ### Added
+
 - Initial beta release
 - Basic project creation
 - README generation
@@ -538,6 +644,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Configuration Examples
 
 ### User Configuration (~/.rapidkitrc.json)
+
 ```json
 {
   "defaultKit": "fastapi.standard",
@@ -550,6 +657,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ```
 
 ### Environment Variables
+
 ```bash
 export RAPIDKIT_DEV_PATH=/path/to/local/rapidkit
 ```
@@ -561,6 +669,7 @@ export RAPIDKIT_DEV_PATH=/path/to/local/rapidkit
 No breaking changes. All existing commands work the same way.
 
 New optional features:
+
 - Add `--debug` for verbose logging
 - Add `--dry-run` to preview changes
 - Create `~/.rapidkitrc.json` for custom defaults
@@ -573,6 +682,7 @@ None in this release.
 ## Roadmap
 
 ### v1.0.0 (Stable Release) - Coming Soon
+
 - [ ] RapidKit Python package on PyPI
 - [ ] Full installation mode without --test-mode
 - [x] NestJS template support ✅
@@ -580,12 +690,14 @@ None in this release.
 - [ ] Auto-update functionality
 
 ### v1.1.0
+
 - [ ] Plugin system for custom templates
 - [ ] Cloud deployment integrations
 - [ ] CI/CD template generation
 - [ ] Multi-language support
 
 ### v2.0.0
+
 - [ ] Complete rewrite with enhanced architecture
 - [ ] GraphQL support
 - [ ] Microservices orchestration

@@ -5,10 +5,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![GitHub Stars](https://img.shields.io/github/stars/getrapidkit/rapidkit-npm.svg?style=flat-square)](https://github.com/getrapidkit/rapidkit-npm/stargazers)
 
-> ⚠️ **PRE-RELEASE VERSION** - This is a companion tool for RapidKit framework.  
-> The stable production version of RapidKit Python will be released soon on PyPI.
+> ⚠️ **PREVIEW VERSION** - This package provides demo templates for testing RapidKit's workflow.  
+> Full module ecosystem and advanced features will be available after the Python Core release.
 
 🚀 The easiest way to create FastAPI and NestJS projects with RapidKit templates!
+
+> 🔮 **Coming Soon:** AI-powered module recommendations when Core modules are released!
 
 **💡 Tip:** Use the [RapidKit VS Code Extension](https://marketplace.visualstudio.com/items?itemName=rapidkit.rapidkit-vscode) for a visual interface!
 
@@ -60,10 +62,12 @@ npx rapidkit admin-api --template nestjs      # Create NestJS project
 
 ## Templates
 
-| Template | Framework | Description |
-|----------|-----------|-------------|
-| `fastapi` | FastAPI | Python async web framework with automatic API docs |
-| `nestjs` | NestJS | TypeScript Node.js framework with modular architecture |
+| Template  | Framework | Description                                            |
+| --------- | --------- | ------------------------------------------------------ |
+| `fastapi` | FastAPI   | Python async web framework with automatic API docs     |
+| `nestjs`  | NestJS    | TypeScript Node.js framework with modular architecture |
+
+> 📦 **Note:** These templates are designed for testing the RapidKit workflow. Full module ecosystem coming with Core release!
 
 ## CLI Options
 
@@ -72,11 +76,13 @@ npx rapidkit [project-name] [options]
 ```
 
 ### Arguments
+
 - `project-name` - Name of project/workspace directory to create
 
 ### Options
+
 - `-t, --template <template>` - Template to use: `fastapi` or `nestjs` (creates direct project)
-- `--skip-git` - Skip git initialization  
+- `--skip-git` - Skip git initialization
 - `--skip-install` - Skip installing dependencies (for NestJS)
 - `--debug` - Enable verbose debug logging
 - `--dry-run` - Preview what would be created without creating it
@@ -158,9 +164,34 @@ my-api/
 
 ## Requirements
 
-- **Node.js**: 18+ (for running npx)
-- **For FastAPI**: Python 3.11+ with Poetry
+- **Node.js**: 20.19.6+ (LTS recommended)
+- **For FastAPI**: Python 3.10.14+ with Poetry 2.2.1+
 - **For NestJS**: Node.js 20+ with npm/yarn/pnpm
+- **Git**: For version control
+
+> 💡 **Tip:** Use [RapidKit VS Code Extension](https://marketplace.visualstudio.com/items?itemName=rapidkit.rapidkit-vscode) - includes system checker to verify all requirements!
+
+## What's Next?
+
+This npm package is currently in **preview mode** with demo templates. Here's what's coming:
+
+### 🚀 After Core Release (v1.0.0)
+
+- **Full Module Ecosystem** - 50+ production-ready modules
+- **AI-Powered Recommendations** - Intelligent module suggestions
+- **Seamless Integration** - npm package becomes thin wrapper over Python Core
+- **Dynamic Modules** - Install any module from the registry
+- **Advanced Features** - All RapidKit power through npm
+
+### 📦 Current Focus (v0.15.0)
+
+- Polish existing features
+- Improve documentation
+- Optimize bundle size
+- Prepare Core integration bridge
+- Enhanced error messages
+
+**Stay tuned!** Follow our progress on [GitHub](https://github.com/getrapidkit/rapidkit-npm).
 
 ## Development
 
