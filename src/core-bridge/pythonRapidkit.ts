@@ -50,13 +50,14 @@ async function tryRun(
       stdout: result.stdout,
       stderr: result.stderr,
     };
-  } catch (e: any) {
+  } catch (e: unknown) {
     // execa throws on spawn errors; keep it best-effort.
+    const msg = e instanceof Error ? e.message : String(e);
     return {
       ok: false,
       exitCode: undefined,
       stdout: '',
-      stderr: e?.message ? String(e.message) : String(e),
+      stderr: msg,
     };
   }
 }

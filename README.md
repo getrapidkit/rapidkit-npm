@@ -206,6 +206,43 @@ npx rapidkit format    # Format code
 npx rapidkit --help    # Show all commands
 ```
 
+### Adding Modules to Your Project
+
+RapidKit's modular architecture lets you extend your project with pre-built modules. Install modules using:
+
+```bash
+npx rapidkit add module <module-slug>
+```
+
+**Examples:**
+
+```bash
+# Add authentication module
+npx rapidkit add module auth
+
+# Add caching module (Redis)
+npx rapidkit add module redis
+
+# Add database module (PostgreSQL)
+npx rapidkit add module db_postgres
+```
+
+**List available modules:**
+
+```bash
+npx rapidkit list modules
+npx rapidkit list modules --json
+```
+
+**View module details:**
+
+```bash
+npx rapidkit info module auth
+npx rapidkit info module db_postgres
+```
+
+> **💡 Tip:** Use the [RapidKit VS Code Extension](https://marketplace.visualstudio.com/items?itemName=rapidkit.rapidkit-vscode) for a visual interface to browse and install modules!
+
 > **Note:** `npx rapidkit` automatically detects when you're inside a RapidKit project and delegates to the local CLI. Works everywhere without any setup!
 
 > **💡 Tip:** Install globally with `npm i -g rapidkit` to use `rapidkit` directly without `npx`.

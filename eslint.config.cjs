@@ -34,4 +34,12 @@ module.exports = [
       '@typescript-eslint/no-non-null-assertion': 'warn',
     },
   },
+  // Test files: allow any and non-null assertion for mocks and brevity
+  {
+    files: ['src/__tests__/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
 ];

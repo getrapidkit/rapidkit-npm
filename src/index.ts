@@ -2,7 +2,7 @@
 
 import { Command, Option } from 'commander';
 import chalk from 'chalk';
-import inquirer from 'inquirer';
+import inquirer, { type Question } from 'inquirer';
 import path from 'path';
 import { spawn } from 'child_process';
 import { logger } from './logger.js';
@@ -177,7 +177,7 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
                 message:
                   'This project will be created outside a RapidKit workspace. Create and register a workspace here?',
                 default: true,
-              } as any,
+              } as Question<{ createWs: boolean }>,
             ])) as { createWs: boolean };
 
             if (createWs) {
@@ -664,7 +664,7 @@ program
                   message:
                     'This project will be created outside a RapidKit workspace. Create and register a workspace here?',
                   default: true,
-                } as any,
+                } as Question<{ createWs: boolean }>,
               ])) as { createWs: boolean };
 
               if (createWs) {

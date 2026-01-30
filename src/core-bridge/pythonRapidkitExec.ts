@@ -120,7 +120,7 @@ async function tryRapidkit(cmd: PythonCommand): Promise<boolean> {
                 !!parsed &&
                 typeof parsed === 'object' &&
                 parsed !== null &&
-                'version' in (parsed as any);
+                'version' in (parsed as Record<string, unknown>);
               debug(`script JSON parse ok=${ok}`);
               if (ok) return true;
             } catch (_err) {
@@ -203,7 +203,7 @@ async function tryRapidkit(cmd: PythonCommand): Promise<boolean> {
                 !!parsed &&
                 typeof parsed === 'object' &&
                 parsed !== null &&
-                'version' in (parsed as any)
+                'version' in (parsed as Record<string, unknown>)
               ) {
                 return true;
               }
@@ -237,7 +237,10 @@ async function isCoreJsonVersion(stdout: unknown): Promise<boolean> {
   try {
     const parsed = JSON.parse(out) as unknown;
     return (
-      !!parsed && typeof parsed === 'object' && parsed !== null && 'version' in (parsed as any)
+      !!parsed &&
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      'version' in (parsed as Record<string, unknown>)
     );
   } catch {
     return false;
@@ -616,7 +619,7 @@ export async function getCoreTopLevelCommands(): Promise<Set<string>> {
   const help = await runCoreRapidkitCapture(['--help'], { cwd: process.cwd() });
   if (help.exitCode !== 0) {
     // Fall back to the cached set if available.
-    if (cachedHasCommands) return new Set(cached!.commands);
+    if (cachedHasCommands && cached?.commands) return new Set(cached.commands);
     return new Set();
   }
 

@@ -33,23 +33,44 @@ describe('CLI Entry Point', () => {
 
     it('should display help with --help flag', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '--help']);
-      expect(stdout).toContain('Create RapidKit workspaces and projects');
+
+      // CLI identity
+      expect(stdout).toContain('RapidKit');
+      expect(stdout).toContain('Global CLI');
+
+      // Core sections
+      expect(stdout).toContain('Global Engine Commands');
+      expect(stdout).toContain('Project Commands');
+
+      // Known commands
+      expect(stdout).toContain('rapidkit create');
+      expect(stdout).toContain('rapidkit init');
+      expect(stdout).toContain('rapidkit dev');
+      expect(stdout).toContain('rapidkit help');
+
+      // Legacy flags should NOT appear
       expect(stdout).not.toContain('--template');
-      expect(stdout).toContain('--skip-git');
-      expect(stdout).toContain('--dry-run');
+      expect(stdout).not.toContain('--skip-install');
+      expect(stdout).not.toContain('--skip-git');
+      expect(stdout).not.toContain('--dry-run');
     });
 
-    it('should display legacy flags in help when enabled', async () => {
+    it('should not show legacy flags even when legacy env is enabled', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '--help'], {
         env: { ...process.env, RAPIDKIT_SHOW_LEGACY: '1' },
       });
-      expect(stdout).toContain('--template');
-      expect(stdout).toContain('--skip-install');
+
+      expect(stdout).not.toContain('--template');
+      expect(stdout).not.toContain('--skip-install');
     });
 
-    it('should display help with -h flag', async () => {
+    it('should display the same help output with -h flag', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '-h']);
-      expect(stdout).toContain('Usage:');
+
+      expect(stdout).toContain('RapidKit');
+      expect(stdout).toContain('Global Engine Commands');
+      expect(stdout).toContain('Project Commands');
+      expect(stdout).toContain('rapidkit help');
     });
   });
 
