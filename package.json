@@ -41,8 +41,8 @@
     "test:scenarios": "bash scripts/scenario-matrix-local.sh",
     "test:scenarios:full": "RAPIDKIT_SCENARIO_FULL_BOOTSTRAP=1 bash scripts/scenario-matrix-local.sh",
     "test:scenarios:docker": "bash scripts/scenario-matrix.sh",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix",
+    "lint": "eslint --config .eslintrc.cjs src --ext .ts",
+    "lint:fix": "eslint --config .eslintrc.cjs src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
@@ -64,6 +64,7 @@
     "validate-npm-package-name": "^5.0.1"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
     "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^9.0.7",
     "@types/node": "^20.14.0",

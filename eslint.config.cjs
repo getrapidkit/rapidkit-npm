@@ -13,6 +13,8 @@ module.exports = [
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: 'module',
+        project: './tsconfig.json',
+        extraFileExtensions: ['.ts'],
       },
     },
     plugins: {
@@ -26,7 +28,10 @@ module.exports = [
 
       // TypeScript rules (keep test-friendly defaults)
       '@typescript-eslint/no-explicit-any': ['warn', { ignoreRestArgs: true, fixToUnknown: false }],
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/no-non-null-assertion': 'warn',
     },
