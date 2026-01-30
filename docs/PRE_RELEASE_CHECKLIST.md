@@ -9,6 +9,7 @@
 ## ✅ Pre-Release Checks
 
 ### Code Quality
+
 - [x] All tests passing (449/449)
 - [x] Build successful
 - [x] No ESLint warnings
@@ -16,6 +17,7 @@
 - [x] Dependencies cleaned up (npm prune)
 
 ### Documentation
+
 - [x] README.md updated with preview messaging
 - [x] CHANGELOG.md updated with v0.15.0 roadmap
 - [x] RELEASE_NOTES.md updated with v0.14.2
@@ -24,12 +26,14 @@
 - [x] docs/POLISH_CHECKLIST.md added
 
 ### Version & Git
+
 - [ ] Version bumped in package.json (will be done by `npm version`)
 - [ ] Git working directory clean
 - [ ] All changes committed
 - [ ] Release script ready
 
 ### Security
+
 - [x] No sensitive information in docs
 - [x] .gitignore properly configured
 - [x] No API keys or tokens
@@ -40,6 +44,7 @@
 ## 🚀 Release Steps
 
 ### 1. Final Verification
+
 ```bash
 # Check status
 git status
@@ -52,6 +57,7 @@ npm run bundle-size
 ```
 
 ### 2. Commit Changes
+
 ```bash
 git add .
 git commit -m "chore(release): prepare v0.14.2
@@ -67,6 +73,7 @@ This is a documentation and cleanup release preparing for Core integration."
 ```
 
 ### 3. Automated Release (Recommended)
+
 ```bash
 # Run the release script
 ./scripts/release.sh
@@ -77,28 +84,33 @@ This is a documentation and cleanup release preparing for Core integration."
 ### 3. Manual Release Steps
 
 #### a. Version Bump
+
 ```bash
 npm version patch  # 0.14.1 → 0.14.2
 ```
 
 #### b. Final Build
+
 ```bash
 npm run build
 npm run test
 ```
 
 #### c. Publish to npm
+
 ```bash
 npm publish --dry-run  # Review first
 npm publish            # Actual publish
 ```
 
 #### d. Push to GitHub
+
 ```bash
 git push origin main --tags
 ```
 
 #### e. Create GitHub Release
+
 ```bash
 gh release create v0.14.2 \
   --title "v0.14.2 - Documentation & Cleanup" \
@@ -110,18 +122,21 @@ gh release create v0.14.2 \
 ## 📋 Post-Release Tasks
 
 ### Immediate
+
 - [ ] Verify package on npm: https://www.npmjs.com/package/rapidkit
 - [ ] Test installation: `npm install -g rapidkit@0.14.2`
-- [ ] Test project creation: `npx rapidkit@0.14.2 test-api --template fastapi`
+- [ ] Test project creation: `npx rapidkit@0.14.2 create project fastapi.standard test-api --output .`
 - [ ] Check GitHub release page
 
 ### Within 24 hours
+
 - [ ] Update VS Code extension to reference v0.14.2
 - [ ] Announce on social media
 - [ ] Update any documentation sites
 - [ ] Monitor npm downloads and issues
 
 ### Monitoring
+
 - [ ] Watch for npm download stats
 - [ ] Monitor GitHub issues for bug reports
 - [ ] Check for user feedback on Discord/community
@@ -148,6 +163,7 @@ git push origin :refs/tags/v0.14.2
 ## 📊 Success Metrics
 
 Track after 1 week:
+
 - npm downloads (expect similar to 0.14.1)
 - GitHub stars/issues
 - User feedback

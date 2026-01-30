@@ -158,7 +158,7 @@ describe('E2E Tests', () => {
     const { stdout } = await execa('node', [join(process.cwd(), 'dist/index.js'), '--help']);
 
     expect(stdout).toContain('rapidkit');
-    expect(stdout).toContain('--template');
+    expect(stdout).not.toContain('--template');
     expect(stdout).toContain('--skip-git');
   }, 5000);
 });

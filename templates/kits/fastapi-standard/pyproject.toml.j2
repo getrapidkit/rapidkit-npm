@@ -6,18 +6,9 @@ authors = ["{{ author }} <you@example.com>"]
 license = "{{ license }}"
 packages = [{ include = "src" }]
 
-[tool.poetry.scripts]
-rapidkit = ".rapidkit.cli:main"
-dev = "src.cli:dev"
-start = "src.cli:start"
-build = "src.cli:build"
-test = "src.cli:test"
-lint = "src.cli:lint"
-format = "src.cli:format"
-help = "src.cli:help_cmd"
-
 [tool.poetry.dependencies]
 python = "^3.10.14"
+rapidkit-core = "*"
 fastapi = "^0.128.0"
 uvicorn = { extras = ["standard"], version = "^0.40.0" }
 pydantic = "^2.12.5"

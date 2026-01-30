@@ -1,207 +1,151 @@
 # Development Guide
 
+This package is the RapidKit npm CLI (Node/TypeScript) that bootstraps and invokes the Python Core.
+
+## Prereqs
+
+- Node.js `>=20`
+- npm (or yarn/pnpm)
+
+## Install
+
+```bash
+npm install
+```
+
+## Quality checks
+
+```bash
+npm run validate
+npm run build
+```
+
 ## Configuration
 
-### User Configuration File
+### User configuration file
 
-Create `~/.rapidkitrc.json` in your home directory to set default values:
+Create `~/.rapidkitrc.json` to set defaults:
 
 ```json
 {
   "defaultKit": "fastapi.standard",
   "defaultInstallMethod": "poetry",
-  "pythonVersion": "3.11",
+  "pythonVersion": "3.10",
   "author": "Your Name",
   "license": "MIT",
   "skipGit": false
 }
 ```
 
-### Test Mode
+Priority: CLI options > Environment variables > Config file > Defaults.
 
-For development and testing with a local RapidKit installation:
+### Test mode (local Core)
+
+Use a local RapidKit Core checkout for development/testing:
 
 ```bash
-# Set environment variable
 export RAPIDKIT_DEV_PATH=/path/to/local/rapidkit
 
-# Or add to ~/.rapidkitrc.json
-{
-  "testRapidKitPath": "/path/to/local/rapidkit"
-}
+# Or add to ~/.rapidkitrc.json:
+# { "testRapidKitPath": "/path/to/local/rapidkit" }
 
-# Then use --test-mode flag
 npx rapidkit my-workspace --test-mode
 ```
 
-**Priority:** CLI options > Environment variables > Config file > Defaults
+## CLI workflows
 
-## Two Modes of Operation
-
-### 1. Direct Project Creation (with `--template`)
-
-When you specify `--template`, it creates a standalone project:
+### 1) Direct project creation (recommended)
 
 ```bash
-npx rapidkit my-api --template fastapi   # Create FastAPI project
-npx rapidkit my-api --template nestjs    # Create NestJS project
+npx rapidkit create project fastapi.standard my-api --output .
+npx rapidkit create project nestjs.standard my-api --output .
 ```
 
-### 2. Workspace Mode (without `--template`)
-
-Without `--template`, it creates a workspace for multiple projects:
+### 2) Workspace mode
 
 ```bash
-npx rapidkit my-workspace                 # Create workspace
+npx rapidkit my-workspace
 cd my-workspace
-rapidkit create my-api --kit fastapi      # Create project in workspace
+
+# Run without activation (recommended):
+./rapidkit --help
+
+# Or activate Poetry-managed env (usually in Poetry cache):
+source "$(poetry env info --path)/bin/activate"
+
+# Interactive mode:
+rapidkit create
+
+# Or non-interactive:
+rapidkit create project fastapi.standard my-api --output .
 ```
-
-## Project CLI
-
-Each generated project includes a local CLI system:
-
-```bash
-cd my-api
-rapidkit init      # Install dependencies
-rapidkit dev       # Start dev server (port 8000)
-rapidkit test      # Run tests
-rapidkit --help    # Show all commands
-```
-
-### Smart CLI Delegation (v0.12.3+)
-
-The global `rapidkit` command automatically detects when you're inside a RapidKit project:
-
-- **Outside project:** `rapidkit` = npm global command (creates new projects)
-- **Inside project:** `rapidkit` = delegates to local `./rapidkit` script
-
-This detection works by checking for `./rapidkit` file and `.rapidkit/` directory in current folder.
-
-### How Local CLI Works
-
-1. **`./rapidkit`** (root) - Bash script that finds Python and runs `.rapidkit/cli.py`
-2. **`.rapidkit/activate`** - Optional: adds project root to PATH for the current terminal
-3. **`.rapidkit/cli.py`** - Python CLI with all project commands
-4. **`.rapidkit/project.json`** - Project metadata and configuration
 
 ## Testing
 
-### Run Tests
-
 ```bash
-# Run all tests
 npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run tests with coverage
-npm run test:coverage
-
-# Run tests with UI
-npx vitest --ui
+npm run validate
 ```
 
-### Manual Testing
+Focused runs:
 
 ```bash
-# Build the package
+npm run test:e2e
+npm run test:drift
+```
+
+### Scenario matrix (end-to-end)
+
+```bash
+npm run test:scenarios
+npm run test:scenarios:full
+npm run test:scenarios:docker
+```
+
+## Manual smoke
+
+```bash
 npm run build
 
-# Test FastAPI project creation
-node dist/index.js test-fastapi --template fastapi
+node dist/index.js --help
+node dist/index.js --version
 
-# Test NestJS project creation
-node dist/index.js test-nest --template nestjs
+node dist/index.js create project fastapi.standard test-fastapi --output .
+node dist/index.js create project nestjs.standard test-nest --output .
 
-# Test workspace creation
-node dist/index.js test-workspace
-
-# Test the generated project
-cd test-fastapi
-rapidkit init
-rapidkit dev
-```
-
-### Test Structure
-
-```
-src/__tests__/
-├── validation.test.ts    # Project name validation
-├── errors.test.ts        # Custom error classes
-└── config.test.ts        # Configuration loading
+node dist/index.js my-workspace --yes --skip-git --no-update-check
 ```
 
 ## Debugging
-
-Enable debug mode for verbose logging:
 
 ```bash
 npx rapidkit my-workspace --debug
 ```
 
-Debug logs include:
-- Config loading details
-- Environment variable resolution
-- Installation paths
-- API call traces
-
-## Dry-Run Mode
-
-See what would be created without actually creating it:
-
-```bash
-npx rapidkit my-workspace --dry-run
-npx rapidkit my-api --template fastapi --dry-run
-```
-
 ## Building
 
 ```bash
-# Build TypeScript to JavaScript
 npm run build
-
-# Watch mode for development
 npm run dev
 ```
 
-## Environment Variables
+## Environment variables
 
-- `RAPIDKIT_DEV_PATH` - Path to local RapidKit for test mode
-- `DEBUG` - Enable debug logging (alternative to --debug flag)
+Bridge + Core integration:
+
+- `RAPIDKIT_DEV_PATH` - Path to a local RapidKit checkout for workspace bootstrap in dev/test
+- `RAPIDKIT_CORE_PYTHON_PACKAGE` - Override Core install target for the Python bridge (path or package spec)
+- `RAPIDKIT_BRIDGE_FORCE_VENV=1` - Force using the cached bridge venv even if system Python has Core
+- `RAPIDKIT_BRIDGE_UPGRADE_PIP=1` - Upgrade pip inside the bridge venv during bootstrap
+- `XDG_CACHE_HOME` - Cache root used by the bridge (defaults to `~/.cache` on Linux)
+
+Scenario script toggles:
+
+- `RAPIDKIT_SCENARIO_FULL_BOOTSTRAP=1` - Enable bootstrap scenarios
+- `RAPIDKIT_SCENARIO_WORKSPACE_CREATE=1` - Enable workspace creation scenario
+
+General:
+
+- `DEBUG` - Enable debug logging (alternative to `--debug`)
 - `NODE_ENV` - Node environment (development/production)
-
-## Error Handling
-
-All errors extend `RapidKitError` base class with:
-- `message` - Human-readable error message
-- `code` - Machine-readable error code
-- `details` - Additional help text (optional)
-
-Example error codes:
-- `PYTHON_NOT_FOUND` - Python not installed or wrong version
-- `POETRY_NOT_FOUND` - Poetry not installed
-- `DIRECTORY_EXISTS` - Target directory already exists
-- `INVALID_PROJECT_NAME` - Project name validation failed
-- `INSTALLATION_ERROR` - Installation step failed
-- `RAPIDKIT_NOT_AVAILABLE` - RapidKit not on PyPI yet
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Write tests for new features
-4. Ensure all tests pass
-5. Submit a pull request
-
-## Release Process
-
-1. Update version in `package.json`
-2. Update version in `src/update-checker.ts`
-3. Update CHANGELOG.md
-4. Build and test: `npm run build && npm test`
-5. Commit: `git commit -am "Release v1.0.0"`
-6. Tag: `git tag v1.0.0`
-7. Push: `git push && git push --tags`
-8. Publish: `npm publish`
+  npm run build

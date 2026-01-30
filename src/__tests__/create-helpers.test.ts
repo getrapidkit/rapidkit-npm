@@ -3,6 +3,7 @@ import * as fsExtra from 'fs-extra';
 import { execa } from 'execa';
 import inquirer from 'inquirer';
 import { promises as fsPromises } from 'fs';
+import { createProject } from '../create';
 
 // This file tests helper functions and internal logic from create.ts
 // by importing and mocking dependencies
@@ -86,6 +87,43 @@ describe('Create Module Helpers', () => {
 
       await execa('poetry', ['add', 'rapidkit'], { cwd: '/test/project' });
       expect(execa).toHaveBeenCalledWith('poetry', ['add', 'rapidkit'], { cwd: '/test/project' });
+    });
+
+    it('should configure poetry to create in-project virtualenv', async () => {
+      // Mock external commands and filesystem
+      vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
+      vi.mocked(fsExtra.ensureDir).mockResolvedValue(undefined);
+      vi.mocked(fsExtra.outputFile).mockResolvedValue(undefined);
+      vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]\nname = "test"\n');
+      vi.spyOn(fsPromises, 'writeFile').mockResolvedValue(undefined);
+      vi.mocked(fsExtra.pathExists).mockResolvedValue(false);
+
+      // Use the exported createProject helper for testing
+      await createProject('my-poetry-project', {
+        yes: true,
+        skipGit: true,
+        userConfig: { defaultInstallMethod: 'poetry', pythonVersion: '3.11' },
+      });
+
+      // Assert that poetry config was called before poetry add
+      const calls = vi.mocked(execa).mock.calls;
+      const configCallIndex = calls.findIndex(
+        (call) => call[0] === 'poetry' && Array.isArray(call[1]) && call[1][0] === 'config'
+      );
+      const addCallIndex = calls.findIndex(
+        (call) => call[0] === 'poetry' && Array.isArray(call[1]) && call[1][0] === 'add'
+      );
+
+      expect(configCallIndex).toBeGreaterThanOrEqual(0);
+      expect(addCallIndex).toBeGreaterThanOrEqual(0);
+      expect(configCallIndex).toBeLessThan(addCallIndex);
+
+      // Verify the exact config call arguments
+      expect(vi.mocked(execa)).toHaveBeenCalledWith(
+        'poetry',
+        ['config', 'virtualenvs.in-project', 'true'],
+        { cwd: expect.stringContaining('my-poetry-project') }
+      );
     });
 
     it('should handle poetry not found', async () => {

@@ -34,9 +34,17 @@ describe('CLI Entry Point', () => {
     it('should display help with --help flag', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '--help']);
       expect(stdout).toContain('Create RapidKit workspaces and projects');
-      expect(stdout).toContain('--template');
+      expect(stdout).not.toContain('--template');
       expect(stdout).toContain('--skip-git');
       expect(stdout).toContain('--dry-run');
+    });
+
+    it('should display legacy flags in help when enabled', async () => {
+      const { stdout } = await execa('node', [CLI_PATH, '--help'], {
+        env: { ...process.env, RAPIDKIT_SHOW_LEGACY: '1' },
+      });
+      expect(stdout).toContain('--template');
+      expect(stdout).toContain('--skip-install');
     });
 
     it('should display help with -h flag', async () => {

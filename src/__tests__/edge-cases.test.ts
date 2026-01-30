@@ -20,7 +20,7 @@ describe('Edge Cases and Error Scenarios', () => {
     });
 
     it('should handle unicode characters', () => {
-      const str = 'پروژه-تست';
+      const str = 'naïve-café';
       expect(str.length).toBeGreaterThan(0);
     });
 
@@ -167,7 +167,7 @@ describe('Edge Cases and Error Scenarios', () => {
       expect(0).toBe(0);
       // In JavaScript, -0 and 0 are different in Object.is but equal with ==
       const negZero = -0;
-      // eslint-disable-next-line eqeqeq
+
       expect(negZero == 0).toBe(true);
     });
 
@@ -356,11 +356,11 @@ describe('Edge Cases and Error Scenarios', () => {
     it('should use loose equality', () => {
       const zero: any = 0;
       const empty: any = '';
-      // eslint-disable-next-line eqeqeq
+
       expect(zero == false).toBe(true);
-      // eslint-disable-next-line eqeqeq
+
       expect(empty == false).toBe(true);
-      // eslint-disable-next-line eqeqeq
+
       expect(null == undefined).toBe(true);
     });
   });

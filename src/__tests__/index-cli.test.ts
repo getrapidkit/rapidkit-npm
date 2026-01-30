@@ -192,10 +192,10 @@ describe('CLI Command Structure', () => {
     it('should support option defaults', () => {
       const cmd = program
         .command('create')
-        .option('--python-version <version>', 'Python version', '3.11');
+        .option('--python-version <version>', 'Python version', '3.10');
 
       const opt = cmd.options.find((o) => o.long === '--python-version');
-      expect(opt?.defaultValue).toBe('3.11');
+      expect(opt?.defaultValue).toBe('3.10');
     });
   });
 

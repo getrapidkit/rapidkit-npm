@@ -37,14 +37,14 @@ describe('Error classes', () => {
 
   describe('PythonNotFoundError', () => {
     it('should create PythonNotFoundError with version', () => {
-      const error = new PythonNotFoundError('3.11');
-      expect(error.message).toContain('Python 3.11+');
+      const error = new PythonNotFoundError('3.10');
+      expect(error.message).toContain('Python 3.10+');
       expect(error.code).toBe('PYTHON_NOT_FOUND');
       expect(error.details).toContain('python.org');
     });
 
     it('should create PythonNotFoundError with found version', () => {
-      const error = new PythonNotFoundError('3.11', '3.9');
+      const error = new PythonNotFoundError('3.10', '3.9');
       expect(error.message).toContain('required');
       expect(error.message).toContain('found 3.9');
       expect(error.code).toBe('PYTHON_NOT_FOUND');
@@ -132,13 +132,13 @@ describe('Error classes', () => {
       const error = new RapidKitNotAvailableError();
       expect(error.message).toContain('not yet available');
       expect(error.code).toBe('RAPIDKIT_NOT_AVAILABLE');
-      expect(error.details).toContain('--template');
+      expect(error.details).toContain('create project');
     });
 
     it('should suggest alternatives', () => {
       const error = new RapidKitNotAvailableError();
-      expect(error.details).toContain('--test-mode');
-      expect(error.details).toContain('PyPI');
+      expect(error.details).toContain('Python 3.10+');
+      expect(error.details).toContain('RAPIDKIT_SHOW_LEGACY');
     });
   });
 

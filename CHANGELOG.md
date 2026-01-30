@@ -5,57 +5,35 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - v0.15.0 (Stabilization Release)
+## [0.15.0] - 2026-01-30
 
-### Focus: Polish & Core Integration Preparation
+### Added
 
-This release focuses on stabilizing the existing codebase and preparing for seamless integration with RapidKit Python Core when released.
+- 🔧 **CLI wrapper flags:** `--create-workspace` and `--no-workspace` are now handled by the npm wrapper for `create project` flows. Wrapper processes workspace creation UX before invoking the Python engine and filters wrapper-only flags so they are not forwarded to the core CLI.
+- 🧩 **`registerWorkspaceAtPath()` helper:** Register an existing directory as a RapidKit workspace. Creates `.rapidkit-workspace`, `.gitignore`, workspace launcher (`rapidkit`, `rapidkit.cmd`), `README.md` and installs RapidKit engine (Poetry/venv/pipx).
+- 🧪 **Tests:** Unit tests and e2e smoke tests for workspace registration and Scenario C regression tests added to prevent regressions.
+- ⚙️ **CI workflow:** `.github/workflows/e2e-smoke.yml` added to run focused e2e smoke and Scenario C regression tests on PRs.
+
+### Changed
+
+- 🐍 **Poetry behavior:** `installWithPoetry()` now configures `poetry config virtualenvs.in-project true` to ensure in-project `.venv` is created by default (parity with VS Code extension behavior).
+- 🧭 **Create UX:** Creating a project outside a workspace prompts the user by default (unless `--yes` or wrapper flags specify otherwise).
+
+### Fixed
+
+- 🛠️ **Scenario C:** Improved Python core detection heuristics in the bridge to avoid bootstrapping a bridge venv when the system Python already has `rapidkit-core` installed. This prevents unnecessary environment changes and confusing UX.
 
 ### Documentation
 
-- 📚 **Enhanced README** - Clearer messaging about preview status and upcoming features
-- 📚 **Roadmap updates** - Added detailed stabilization plan and Core integration architecture
-- 📚 **Coming Soon messaging** - AI features clearly marked as post-Core release
-- 📚 **Requirements clarity** - Specific version requirements (Node 20.19.6+, Python 3.10.14+, Poetry 2.2.1+)
-
-### Code Quality
-
-- 🧹 **Bundle optimization** - Target: reduce from 72KB to <60KB
-- 🧹 **Dependency audit** - Remove unused packages
-- 🧹 **Error handling** - Consistent error messages and recovery strategies
-- 🧹 **JSDoc comments** - Better API documentation for public functions
-
-### Testing
-
-- ✅ **Maintained coverage** - 449 tests, 100% passing
-- ✅ **Cross-platform testing** - Validated on Linux, macOS, Windows
-- ✅ **Performance benchmarks** - Project creation time tracking
-- ✅ **Integration tests** - Edge case coverage
-
-### Core Integration Preparation
-
-- 🔧 **Core bridge design** - Architecture for Python Core communication
-- 🔧 **Version compatibility** - Checker for Core version requirements
-- 🔧 **Fallback mechanisms** - Graceful degradation when Core unavailable
-- 🔧 **Mock Core CLI** - For testing integration paths
-
-### Developer Experience
-
-- 💡 **VS Code sync** - Ensure CLI matches extension expectations
-- 💡 **Error messages** - More helpful diagnostics and suggestions
-- 💡 **Progress indicators** - Better feedback during long operations
-
-### AI Feature
-
-- 🔮 **On hold** - AI Recommender feature complete in `feature/ai-recommender` branch
-- 🔮 **Waiting for Core** - Will merge after Python Core modules are available
-- 🔮 **76 AI tests ready** - 100% passing, ready to activate
+- 📝 Updated README and docs to document new flags and the create-project outside-workspace UX.
 
 ### Notes
 
-- This is a **stabilization release** - no major new features
-- Preparing foundation for powerful Core-backed version
-- Focus on quality, documentation, and integration readiness
+- This release stabilizes CLI-to-core interactions and UX around workspace creation to align npm wrapper behavior with the VS Code extension.
+
+## [Unreleased]
+
+### Focus: Ongoing polishing
 
 ## [0.14.1] - 2025-12-31
 

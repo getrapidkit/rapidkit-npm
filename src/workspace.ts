@@ -65,6 +65,22 @@ Thumbs.db
 `;
     await fs.writeFile(path.join(workspacePath, '.gitignore'), gitignore);
 
+    // Create VS Code extension-compatible workspace marker for auto-detection.
+    await fs.writeFile(
+      path.join(workspacePath, '.rapidkit-workspace'),
+      JSON.stringify(
+        {
+          signature: 'RAPIDKIT_VSCODE_WORKSPACE',
+          createdBy: 'rapidkit-npm',
+          version: getVersion(),
+          createdAt: new Date().toISOString(),
+          name: options.name,
+        },
+        null,
+        2
+      )
+    );
+
     // Copy templates to workspace
     await copyTemplates(workspacePath);
 

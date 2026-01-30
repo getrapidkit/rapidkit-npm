@@ -1,50 +1,7 @@
 #!/usr/bin/env bash
-# RapidKit CLI - Local project commands
-# This wrapper delegates to .rapidkit/cli.py with smart Python detection
+# RapidKit CLI - Local project entrypoint
+# Delegates to the project-local launcher under .rapidkit
 
 set -euo pipefail
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CLI_PY="${SCRIPT_DIR}/.rapidkit/cli.py"
-
-# Find the best Python to use
-find_python() {
-  # 1. Project venv
-  if [ -x "${SCRIPT_DIR}/.venv/bin/python" ]; then
-    echo "${SCRIPT_DIR}/.venv/bin/python"
-    return 0
-  fi
-  
-  # 2. Poetry's python
-  if command -v poetry >/dev/null 2>&1; then
-    POETRY_PY="$(poetry env info --executable 2>/dev/null || true)"
-    if [ -n "$POETRY_PY" ] && [ -x "$POETRY_PY" ]; then
-      echo "$POETRY_PY"
-      return 0
-    fi
-  fi
-  
-  # 3. System python3
-  if command -v python3 >/dev/null 2>&1; then
-    echo "python3"
-    return 0
-  fi
-  
-  # 4. System python
-  if command -v python >/dev/null 2>&1; then
-    echo "python"
-    return 0
-  fi
-  
-  return 1
-}
-
-# Find Python
-PYTHON_CMD="$(find_python)" || {
-  echo "❌ No Python interpreter found."
-  echo "💡 Install Python 3.11+ and try again."
-  exit 127
-}
-
-# Execute the CLI
-exec "$PYTHON_CMD" "$CLI_PY" "$@"
+exec "${SCRIPT_DIR}/.rapidkit/rapidkit" "$@"

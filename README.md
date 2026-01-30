@@ -5,69 +5,170 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![GitHub Stars](https://img.shields.io/github/stars/getrapidkit/rapidkit-npm.svg?style=flat-square)](https://github.com/getrapidkit/rapidkit-npm/stargazers)
 
-> ⚠️ **PREVIEW VERSION** - This package provides demo templates for testing RapidKit's workflow.  
-> Full module ecosystem and advanced features will be available after the Python Core release.
-
-🚀 The easiest way to create FastAPI and NestJS projects with RapidKit templates!
+This is the official RapidKit CLI on npm.
 
 > 🔮 **Coming Soon:** AI-powered module recommendations when Core modules are released!
+>
+> _Note: The AI recommender feature is complete in the `feature/ai-recommender` branch but not yet released. We will announce it when Core module support is available._
+
+RapidKit's single source of truth for kits and global commands is **RapidKit Core (Python)**.
+This npm package is a **bridge/wrapper** that:
+
+- Delegates project commands (e.g. `init`, `dev`, `test`) to the project-local launcher when you are inside a RapidKit project.
+- Forwards global/core commands (e.g. `list`, `info`, `create`, `add`, `doctor`, `--tui`, `--json`) to `python -m rapidkit ...`.
+- If `rapidkit-core` is not available in your system Python, it can bootstrap a cached virtualenv and install Core there.
 
 **💡 Tip:** Use the [RapidKit VS Code Extension](https://marketplace.visualstudio.com/items?itemName=rapidkit.rapidkit-vscode) for a visual interface!
 
 ## Quick Start
 
-### Create a FastAPI Project
+### Create a Project (FastAPI)
 
 ```bash
-npx rapidkit my-api --template fastapi
+npx rapidkit create project fastapi.standard my-api --output .
 cd my-api
 npx rapidkit init           # Install dependencies
 npx rapidkit dev            # Start dev server at http://localhost:8000
 ```
 
-### Create a NestJS Project
+### Create a Project (NestJS)
 
 ```bash
-npx rapidkit my-api --template nestjs
+npx rapidkit create project nestjs.standard my-api --output .
 cd my-api
 npx rapidkit init           # Install dependencies
 npx rapidkit dev            # Start dev server at http://localhost:8000
 ```
 
-Your API will be available at `http://localhost:8000` with Swagger docs at `/docs`
+### Interactive mode (recommended)
+
+```bash
+npx rapidkit create
+```
+
+This runs the RapidKit Core wizard (`python -m rapidkit create`) and guides you through kit selection and project creation.
 
 ## Two Modes of Operation
 
-### 1. Direct Project Creation (with `--template`)
+### 1. Direct Project Creation (Core-first)
 
-Create a standalone project directly:
+Create a standalone project directly via Core:
 
 ```bash
-npx rapidkit my-api --template fastapi   # Create FastAPI project
-npx rapidkit my-api --template nestjs    # Create NestJS project
+npx rapidkit create project fastapi.standard my-api --output .
+npx rapidkit create project nestjs.standard my-api --output .
 ```
 
-### 2. Workspace Mode (without `--template`)
+### 2. RapidKit Environment Mode (without `--template`)
 
 Create a workspace to organize multiple projects:
 
 ```bash
-npx rapidkit my-workspace                     # Create workspace
+npx rapidkit my-workspace                     # Create a RapidKit environment (installs python core)
 cd my-workspace
-npx rapidkit my-api --template fastapi        # Create FastAPI project
-npx rapidkit admin-api --template nestjs      # Create NestJS project
+
+# Interactive project creation (recommended)
+rapidkit create
+
+# Or non-interactive via kit slug
+rapidkit create project fastapi.standard my-api --output .
+rapidkit create project nestjs.standard admin-api --output .
 ```
 
-> **Note:** The same `npx rapidkit <name> --template <type>` command works everywhere - in any directory or inside a workspace!
+This mode creates a "RapidKit environment" directory (Poetry/venv/pipx) and installs the Python Core there, so you can create/manage projects from the same CLI.
 
-## Templates
+Note: when you choose Poetry, the virtualenv is typically created in Poetry's cache (not as a local `.venv` folder). Activate it via:
 
-| Template  | Framework | Description                                            |
-| --------- | --------- | ------------------------------------------------------ |
-| `fastapi` | FastAPI   | Python async web framework with automatic API docs     |
-| `nestjs`  | NestJS    | TypeScript Node.js framework with modular architecture |
+```bash
+source "$(poetry env info --path)/bin/activate"
+```
 
-> 📦 **Note:** These templates are designed for testing the RapidKit workflow. Full module ecosystem coming with Core release!
+## Kits / Templates
+
+Kits/templates are provided by the Python Core. This npm package is not limited to two templates.
+
+List kits:
+
+```bash
+rapidkit list
+rapidkit list --json
+```
+
+Create a project with any kit slug:
+
+```bash
+npx rapidkit create project <kit-slug> my-service --output .
+```
+
+Examples:
+
+```bash
+npx rapidkit create project fastapi.standard my-service --output .
+npx rapidkit create project nestjs.standard my-service --output .
+```
+
+### Offline fallback (deprecated, last resort)
+
+**Deprecated:** With the Python Core (PyPI `rapidkit-core`) now providing dynamic kits and the interactive wizard, the npm package no longer relies on static embedded templates. The offline fallback remains available only as an absolute last-resort for environments where Python/Core cannot be used, but it is not recommended for normal usage.
+
+If you still need the fallback it supports:
+
+- `fastapi.standard` (and `fastapi` shorthand)
+- `nestjs.standard` (and `nestjs` shorthand)
+
+Example (deprecated fallback):
+
+```bash
+npx rapidkit create project fastapi.standard my-api --output .
+```
+
+Limitations of the offline fallback (deprecated):
+
+- Only FastAPI/NestJS embedded templates are supported.
+- The full kit catalog (`rapidkit list`) and the interactive wizard (`rapidkit create`) require Python Core.
+- `--json` output is not supported for fallback `create`.
+
+---
+
+### Bootstrapping Python Core into a workspace
+
+The recommended flow is to use the Python Core (`rapidkit-core` on PyPI) as the single source of truth for kits and modules. The npm CLI will bootstrap the Python Core into a workspace virtual environment so you can create and manage projects even on a fresh machine.
+
+Example: create a workspace and verify Core is bootstrapped
+
+```bash
+# Create a RapidKit workspace non-interactively (workspace .venv will be created)
+npx rapidkit my-workspace --yes --skip-git
+
+# Activate the workspace environment
+cd my-workspace
+source .venv/bin/activate
+
+# Confirm rapidkit-core is installed inside the workspace venv
+python -m pip show rapidkit-core
+# -> Name: rapidkit-core
+# -> Version: 0.2.1rc1 (or newer)
+```
+
+## Install Python Core (optional) 🐍🔧
+
+RapidKit's engine is provided by the Python package `rapidkit-core` on PyPI. If you prefer to install the engine manually (for development or testing), you can do so:
+
+```bash
+# Install for current user
+pip install --user rapidkit-core
+
+# Or install into an active virtual environment / system
+pip install rapidkit-core
+```
+
+Project page: https://pypi.org/project/rapidkit-core/
+
+Notes:
+
+- The CLI will prefer system Python with `rapidkit-core` if available. If not present it bootstraps `rapidkit-core` into the workspace `.venv` (or a cached bridge venv as a fallback for some global flows).
+- To emulate a clean system in CI/QA, ensure `rapidkit-core` is not installed in the global/system Python before running the workspace creation script.
+- If you prefer Poetry to create in-project virtualenvs (`.venv`), enable it via `poetry config virtualenvs.in-project true` or let the workspace installer configure Poetry for you.
 
 ## CLI Options
 
@@ -81,7 +182,6 @@ npx rapidkit [project-name] [options]
 
 ### Options
 
-- `-t, --template <template>` - Template to use: `fastapi` or `nestjs` (creates direct project)
 - `--skip-git` - Skip git initialization
 - `--skip-install` - Skip installing dependencies (for NestJS)
 - `--debug` - Enable verbose debug logging
@@ -165,33 +265,36 @@ my-api/
 ## Requirements
 
 - **Node.js**: 20.19.6+ (LTS recommended)
-- **For FastAPI**: Python 3.10.14+ with Poetry 2.2.1+
-- **For NestJS**: Node.js 20+ with npm/yarn/pnpm
+- **Python**: Required for RapidKit Core commands (e.g. `list/info/create/add/...`). If Python is missing, the bridge fails with a clear error message.
+- For FastAPI projects: Python + Poetry (as required by the generated project)
+- For NestJS projects: Node + a package manager (npm/yarn/pnpm)
 - **Git**: For version control
 
 > 💡 **Tip:** Use [RapidKit VS Code Extension](https://marketplace.visualstudio.com/items?itemName=rapidkit.rapidkit-vscode) - includes system checker to verify all requirements!
 
-## What's Next?
+## How It Works (Under the Hood)
 
-This npm package is currently in **preview mode** with demo templates. Here's what's coming:
+This CLI runs a Node entrypoint (`dist/index.js`) that makes these decisions:
 
-### 🚀 After Core Release (v1.0.0)
+1. If you're inside a RapidKit project:
 
-- **Full Module Ecosystem** - 50+ production-ready modules
-- **AI-Powered Recommendations** - Intelligent module suggestions
-- **Seamless Integration** - npm package becomes thin wrapper over Python Core
-- **Dynamic Modules** - Install any module from the registry
-- **Advanced Features** - All RapidKit power through npm
+- It detects the project (via `.rapidkit/project.json` or other signals).
+- It delegates `rapidkit init/dev/test/...` to the project-local launcher (`./rapidkit` or `.rapidkit/rapidkit`).
 
-### 📦 Current Focus (v0.15.0)
+2. If you're not inside a project and run a global/core command (e.g. `rapidkit list --json`):
 
-- Polish existing features
-- Improve documentation
-- Optimize bundle size
-- Prepare Core integration bridge
-- Enhanced error messages
+- It forwards the request to the Python Core via `python -m rapidkit ...`.
+- If Core is not installed in system Python, it bootstraps a cached venv and installs `rapidkit-core` there.
 
-**Stay tuned!** Follow our progress on [GitHub](https://github.com/getrapidkit/rapidkit-npm).
+3. If you run `npx rapidkit <name>` without `--template`:
+
+- It creates a "RapidKit environment" directory (Poetry/venv/pipx) so you're ready to create and run real projects.
+
+### Bridge controls
+
+- Override Core install target (dev/test): `RAPIDKIT_CORE_PYTHON_PACKAGE=/path/to/core`
+- Cache location: `XDG_CACHE_HOME=...`
+- Upgrade pip during bootstrap (optional): `RAPIDKIT_BRIDGE_UPGRADE_PIP=1`
 
 ## Development
 
@@ -215,7 +318,7 @@ npm run dev
 
 ## Related Projects
 
-- **RapidKit Python** - The core framework (coming soon to PyPI)
+- **RapidKit Core (Python)** - The engine (PyPI: `rapidkit-core`)
 - **RapidKit Docs** - https://getrapidkit.com
 - **GitHub**: https://github.com/getrapidkit
 
@@ -227,13 +330,3 @@ MIT
 
 - 🐛 Report issues: [GitHub Issues](https://github.com/getrapidkit/rapidkit-npm/issues)
 - 📚 Docs: https://getrapidkit.com
-
----
-
-**v0.13.0** - NestJS test coverage boost (75%→90%), demo-kit improvements
-
-**v0.12.4** - Friendly shell activation UX with green headers and robust fallback logic
-
-**v0.12.2** - Simplified CLI: `rapidkit init` now handles environment activation automatically
-
-**v0.12.0** - Added NestJS template, workspace mode, and unified CLI

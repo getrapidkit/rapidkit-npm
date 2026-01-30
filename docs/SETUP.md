@@ -1,3 +1,56 @@
+# Setup & Workflow
+
+This doc is a quick command reference for contributors.
+
+## Prereqs
+
+- Node.js `>=20.19.6`
+- npm (or yarn/pnpm)
+
+## Install
+
+```bash
+npm install
+```
+
+## Validate (recommended before pushing)
+
+```bash
+npm run validate
+```
+
+## Build
+
+```bash
+npm run build
+```
+
+## Local CLI smoke tests
+
+```bash
+node dist/index.js --help
+node dist/index.js --version
+
+node dist/index.js create project fastapi.standard test-fastapi
+node dist/index.js create project nestjs.standard test-nest
+
+node dist/index.js my-workspace --yes --skip-git --no-update-check
+```
+
+## Scenario matrix (release confidence)
+
+```bash
+npm run test:scenarios
+npm run test:scenarios:full
+npm run test:scenarios:docker
+```
+
+## Packaging sanity check
+
+```bash
+npm pack --dry-run
+```
+
 # Quick Optimization Setup
 
 ## Install New Dependencies
@@ -85,13 +138,13 @@ npm audit fix
 ```bash
 # Local test - FastAPI
 npm run build
-node dist/index.js test-fastapi --template fastapi
+node dist/index.js create project fastapi.standard test-fastapi
 cd test-fastapi
 rapidkit init
 rapidkit dev
 
 # Local test - NestJS
-node dist/index.js test-nest --template nestjs
+node dist/index.js create project nestjs.standard test-nest
 cd test-nest
 rapidkit init
 rapidkit dev
@@ -99,12 +152,13 @@ rapidkit dev
 # Local test - Workspace
 node dist/index.js test-workspace
 cd test-workspace
-rapidkit create my-api --kit fastapi
+rapidkit create project fastapi.standard my-api --output .
 ```
 
 ## CI/CD (Optional)
 
 If you want automated CI/CD, GitHub Actions workflows will run automatically:
+
 - `ci.yml` - On every push/PR to main and develop
 - `release.yml` - On every git tag with v prefix (e.g., v1.0.0-beta.6)
 
@@ -113,17 +167,20 @@ If you want automated CI/CD, GitHub Actions workflows will run automatically:
 ## Implemented Optimizations
 
 ✅ **Code Quality**
+
 - ESLint for TypeScript
 - Prettier for formatting
 - Husky for pre-commit hooks
 - Lint-staged for staged changes
 
 ✅ **Performance**
+
 - Cache system with memory and disk caching
 - Performance monitoring utilities
 - Metrics tracking
 
 ✅ **New Scripts**
+
 - `npm run lint` - Check code
 - `npm run format` - Format code
 - `npm run typecheck` - Check types
@@ -132,12 +189,14 @@ If you want automated CI/CD, GitHub Actions workflows will run automatically:
 ## Next Steps (Optional)
 
 ### 1. Bundle Size Optimization
+
 ```bash
 npm install -D webpack-bundle-analyzer
 # Analyze bundle size
 ```
 
 ### 2. Replace Heavy Dependencies
+
 ```bash
 # Replace inquirer with prompts (lighter)
 npm uninstall inquirer @types/inquirer
@@ -149,6 +208,7 @@ npm install picocolors
 ```
 
 ### 3. Add More Tests
+
 ```bash
 # Integration tests
 # Performance benchmarks
@@ -165,12 +225,14 @@ npm install picocolors
 ## Common Issues and Solutions
 
 ### Husky Not Working
+
 ```bash
 rm -rf .git/hooks
 npx husky init
 ```
 
 ### ESLint Shows Many Errors
+
 ```bash
 # Auto-fix
 npm run lint:fix
@@ -180,6 +242,7 @@ npx eslint src --ext .ts --fix --max-warnings 10
 ```
 
 ### Tests Fail After Changes
+
 ```bash
 # Watch mode for detailed checking
 npm run test:watch
@@ -190,17 +253,17 @@ npm run test -- --reporter=verbose
 
 ## Quick Reference
 
-| Command | Description |
-|---------|-------------|
-| `npm run lint` | Check code with ESLint |
-| `npm run lint:fix` | Auto-fix linting errors |
-| `npm run format` | Format code with Prettier |
-| `npm run format:check` | Check formatting |
-| `npm run typecheck` | Check TypeScript types |
-| `npm run validate` | Run all checks |
-| `npm test` | Run tests |
-| `npm run test:coverage` | Run tests with coverage |
-| `npm run build` | Build the project |
+| Command                 | Description               |
+| ----------------------- | ------------------------- |
+| `npm run lint`          | Check code with ESLint    |
+| `npm run lint:fix`      | Auto-fix linting errors   |
+| `npm run format`        | Format code with Prettier |
+| `npm run format:check`  | Check formatting          |
+| `npm run typecheck`     | Check TypeScript types    |
+| `npm run validate`      | Run all checks            |
+| `npm test`              | Run tests                 |
+| `npm run test:coverage` | Run tests with coverage   |
+| `npm run build`         | Build the project         |
 
 ## Git Workflow
 

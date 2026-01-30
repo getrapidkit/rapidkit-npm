@@ -121,7 +121,7 @@ npm run typecheck          # No TS errors
 
 - [ ] Measure project creation time
   ```bash
-  time npx rapidkit test-api --template fastapi
+  time npx rapidkit create project fastapi.standard test-api --output .
   ```
 - [ ] Memory profiling
   ```bash

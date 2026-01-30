@@ -1,5 +1,6 @@
 import { promises as fsPromises } from 'fs';
 import * as fsExtra from 'fs-extra';
+import * as os from 'os';
 import path from 'path';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
@@ -7,6 +8,7 @@ import ora, { type Ora } from 'ora';
 import { execa } from 'execa';
 import { logger } from './logger.js';
 import { UserConfig, getTestRapidKitPath } from './config.js';
+import { getVersion } from './update-checker.js';
 import {
   DirectoryExistsError,
   PythonNotFoundError,
@@ -16,11 +18,280 @@ import {
   RapidKitNotAvailableError,
 } from './errors.js';
 
+async function writeWorkspaceMarker(workspacePath: string, workspaceName: string): Promise<void> {
+  const markerPath = path.join(workspacePath, '.rapidkit-workspace');
+  const marker = {
+    signature: 'RAPIDKIT_VSCODE_WORKSPACE',
+    createdBy: 'rapidkit-npm',
+    version: getVersion(),
+    createdAt: new Date().toISOString(),
+    name: workspaceName,
+  };
+
+  // Use outputFile (instead of writeJson) so it works cleanly with test mocks.
+  await fsExtra.outputFile(markerPath, JSON.stringify(marker, null, 2) + '\n', 'utf-8');
+}
+
+async function writeWorkspaceGitignore(workspacePath: string): Promise<void> {
+  // Keep parity with the VS Code extension workspace output.
+  await fsExtra.outputFile(
+    path.join(workspacePath, '.gitignore'),
+    '.venv/\n__pycache__/\n*.pyc\n.env\n.rapidkit-workspace/\n\n',
+    'utf-8'
+  );
+}
+
+type InstallMethod = 'poetry' | 'venv' | 'pipx';
+
+type PipxInvoker = { kind: 'binary' } | { kind: 'python-module'; pythonCmd: string };
+
+function ensureUserLocalBinOnPath(): void {
+  // pipx typically installs shims into ~/.local/bin on Linux/macOS.
+  // Add it for this process so we can run `poetry` immediately after installing.
+  const localBin = path.join(os.homedir(), '.local', 'bin');
+  const current = process.env.PATH || '';
+  const parts = current.split(path.delimiter).filter(Boolean);
+  if (!parts.includes(localBin)) {
+    process.env.PATH = [localBin, ...parts].join(path.delimiter);
+  }
+}
+
+async function ensurePipxAvailable(spinner: Ora, yes: boolean): Promise<PipxInvoker> {
+  ensureUserLocalBinOnPath();
+
+  spinner.start('Checking pipx installation');
+  try {
+    await execa('pipx', ['--version']);
+    spinner.succeed('pipx found');
+    return { kind: 'binary' };
+  } catch (_error) {
+    // Try python -m pipx (pipx may be installed but not on PATH)
+  }
+
+  const pythonCmd = 'python3';
+  try {
+    await execa(pythonCmd, ['-m', 'pipx', '--version']);
+    spinner.succeed('pipx found');
+    return { kind: 'python-module', pythonCmd };
+  } catch (_error) {
+    // Continue to interactive flow below.
+  }
+
+  if (yes) {
+    throw new PipxNotFoundError();
+  }
+
+  const { installPipx } = (await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'installPipx',
+      message: 'pipx is not installed. Install it now (user install via python -m pip)?',
+      default: true,
+    },
+  ])) as { installPipx: boolean };
+
+  if (!installPipx) {
+    throw new PipxNotFoundError();
+  }
+
+  spinner.start('Installing pipx (user install)');
+  try {
+    // Best-effort: upgrade pip first, then install pipx.
+    try {
+      await execa(pythonCmd, ['-m', 'pip', 'install', '--user', '--upgrade', 'pip']);
+    } catch (_pipUpgradeError) {
+      // Ignore pip upgrade issues.
+    }
+    await execa(pythonCmd, ['-m', 'pip', 'install', '--user', '--upgrade', 'pipx']);
+  } catch (error: unknown) {
+    const err = error as { stderr?: unknown; shortMessage?: unknown; message?: unknown };
+    const msg = String(err?.stderr || err?.shortMessage || err?.message || '');
+    throw new InstallationError(
+      'Install pipx with python -m pip',
+      error instanceof Error ? error : new Error(msg)
+    );
+  }
+  spinner.succeed('pipx installed');
+
+  ensureUserLocalBinOnPath();
+  try {
+    await execa(pythonCmd, ['-m', 'pipx', '--version']);
+    return { kind: 'python-module', pythonCmd };
+  } catch (error: unknown) {
+    const err = error as { stderr?: unknown; shortMessage?: unknown; message?: unknown };
+    const msg = String(
+      err?.stderr || err?.shortMessage || err?.message || 'pipx not runnable after install'
+    );
+    throw new InstallationError(
+      'Verify pipx after install',
+      new Error(`${msg}\n\nTry reopening your terminal or run: python3 -m pipx ensurepath`)
+    );
+  }
+}
+
+async function execaPipx(invoker: PipxInvoker, args: string[]) {
+  if (invoker.kind === 'binary') {
+    return execa('pipx', args);
+  }
+  return execa(invoker.pythonCmd, ['-m', 'pipx', ...args]);
+}
+
+async function ensurePoetryAvailable(spinner: Ora, yes: boolean): Promise<void> {
+  ensureUserLocalBinOnPath();
+
+  spinner.start('Checking Poetry installation');
+  try {
+    await execa('poetry', ['--version']);
+    spinner.succeed('Poetry found');
+    return;
+  } catch (_error) {
+    // Continue to interactive flow below.
+  }
+
+  if (yes) {
+    throw new PoetryNotFoundError();
+  }
+
+  const { installPoetry } = (await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'installPoetry',
+      message: 'Poetry is not installed. Install it now using pipx?',
+      default: true,
+    },
+  ])) as { installPoetry: boolean };
+
+  if (!installPoetry) {
+    throw new PoetryNotFoundError();
+  }
+
+  const pipx = await ensurePipxAvailable(spinner, yes);
+
+  spinner.start('Installing Poetry with pipx');
+  try {
+    await execaPipx(pipx, ['install', 'poetry']);
+  } catch (error: unknown) {
+    const err = error as { stderr?: unknown; shortMessage?: unknown; message?: unknown };
+    const msg = String(err?.stderr || err?.shortMessage || err?.message || '');
+    // If it's already installed, attempt an upgrade; otherwise treat as a hard failure.
+    if (/already\s+installed|already\s+seems\s+to\s+be\s+installed|exists/i.test(msg)) {
+      try {
+        await execaPipx(pipx, ['upgrade', 'poetry']);
+      } catch (_upgradeError) {
+        // ignore upgrade errors; we just need a working poetry
+      }
+    } else {
+      throw new InstallationError(
+        'Install Poetry with pipx',
+        error instanceof Error ? error : new Error(msg)
+      );
+    }
+  }
+  spinner.succeed('Poetry installed');
+
+  ensureUserLocalBinOnPath();
+  try {
+    await execa('poetry', ['--version']);
+  } catch (error: unknown) {
+    const err = error as { stderr?: unknown; shortMessage?: unknown; message?: unknown };
+    const msg = String(
+      err?.stderr || err?.shortMessage || err?.message || 'Poetry not found on PATH'
+    );
+    throw new InstallationError(
+      'Verify Poetry after pipx install',
+      new Error(
+        `${msg}\n\nPoetry may be installed but not on PATH yet. Try reopening your terminal or run: pipx ensurepath`
+      )
+    );
+  }
+}
+
+function workspaceLauncherSh(installMethod: InstallMethod): string {
+  // Intentionally avoid calling bare `rapidkit` to prevent recursion into the npm wrapper.
+  // Prefer the in-workspace venv when present, otherwise fall back to `poetry run rapidkit`.
+  const allowPoetry = installMethod === 'poetry';
+  return `#!/usr/bin/env sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+VENV_RAPIDKIT="$SCRIPT_DIR/.venv/bin/rapidkit"
+if [ -x "$VENV_RAPIDKIT" ]; then
+  exec "$VENV_RAPIDKIT" "$@"
+fi
+
+${
+  allowPoetry
+    ? `if command -v poetry >/dev/null 2>&1 && [ -f "$SCRIPT_DIR/pyproject.toml" ]; then
+  exec poetry run rapidkit "$@"
+fi
+
+`
+    : ''
+}echo "RapidKit launcher could not find a local Python CLI." 1>&2
+echo "- If you used venv: ensure .venv exists (or re-run the installer)." 1>&2
+${
+  allowPoetry
+    ? `echo "- If you used Poetry: run 'poetry install' and retry, or activate the env." 1>&2
+`
+    : ''
+}echo "Tip: you can also run: ./.venv/bin/rapidkit --help" 1>&2
+exit 1
+`;
+}
+
+function workspaceLauncherCmd(installMethod: InstallMethod): string {
+  const allowPoetry = installMethod === 'poetry';
+  // Windows launcher: prefer in-project venv, else fall back to Poetry.
+  return `@echo off
+setlocal
+
+set "SCRIPT_DIR=%~dp0"
+
+if exist "%SCRIPT_DIR%\\.venv\\Scripts\\rapidkit.exe" (
+  "%SCRIPT_DIR%\\.venv\\Scripts\\rapidkit.exe" %*
+  exit /b %ERRORLEVEL%
+)
+
+${
+  allowPoetry
+    ? `where poetry >nul 2>nul
+if %ERRORLEVEL%==0 if exist "%SCRIPT_DIR%\\pyproject.toml" (
+  poetry run rapidkit %*
+  exit /b %ERRORLEVEL%
+)
+
+`
+    : ''
+}echo RapidKit launcher could not find a local Python CLI. 1>&2
+echo Tip: run .venv\\Scripts\\rapidkit.exe --help 1>&2
+exit /b 1
+`;
+}
+
+async function writeWorkspaceLauncher(
+  workspacePath: string,
+  installMethod: InstallMethod
+): Promise<void> {
+  // Always create the launcher; it degrades gracefully for pipx installs.
+  await fsExtra.outputFile(
+    path.join(workspacePath, 'rapidkit'),
+    workspaceLauncherSh(installMethod),
+    { encoding: 'utf-8', mode: 0o755 }
+  );
+  await fsExtra.outputFile(
+    path.join(workspacePath, 'rapidkit.cmd'),
+    workspaceLauncherCmd(installMethod),
+    'utf-8'
+  );
+}
+
 interface CreateProjectOptions {
   skipGit?: boolean;
   testMode?: boolean;
   demoMode?: boolean;
   dryRun?: boolean;
+  yes?: boolean;
   userConfig?: UserConfig;
 }
 
@@ -28,11 +299,16 @@ export async function createProject(
   projectName: string | undefined,
   options: CreateProjectOptions
 ) {
+  // Existing directories cannot be registered as a workspace via createProject. If callers need
+  // to register the current directory as a workspace (e.g., when creating a project outside a
+  // workspace) use `registerWorkspaceAtPath` instead.
+
   const {
     skipGit = false,
     testMode = false,
     demoMode = false,
     dryRun = false,
+    yes = false,
     userConfig = {},
   } = options;
 
@@ -57,27 +333,34 @@ export async function createProject(
     return;
   }
 
-  // Step 1: Choose Python version and install method
-  const pythonAnswers = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'pythonVersion',
-      message: 'Select Python version for RapidKit:',
-      choices: ['3.10', '3.11', '3.12'],
-      default: userConfig.pythonVersion || '3.11',
-    },
-    {
-      type: 'list',
-      name: 'installMethod',
-      message: 'How would you like to install RapidKit?',
-      choices: [
-        { name: '🎯 Poetry (Recommended - includes virtual env)', value: 'poetry' },
-        { name: '📦 pip with venv (Standard)', value: 'venv' },
-        { name: '🔧 pipx (Global isolated install)', value: 'pipx' },
-      ],
-      default: userConfig.defaultInstallMethod || 'poetry',
-    },
-  ]);
+  // Step 1: Choose Python version and install method (or auto-select with --yes)
+  const pythonAnswers: { pythonVersion: string; installMethod: InstallMethod } = yes
+    ? {
+        pythonVersion: userConfig.pythonVersion || '3.10',
+        // Prefer user config when available; otherwise use venv (least external deps).
+        installMethod: (userConfig.defaultInstallMethod as InstallMethod | undefined) || 'venv',
+      }
+    : ((await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'pythonVersion',
+          message: 'Select Python version for RapidKit:',
+          choices: ['3.10', '3.11', '3.12'],
+          default: userConfig.pythonVersion || '3.10',
+        },
+        {
+          type: 'list',
+          name: 'installMethod',
+          message: 'How would you like to install RapidKit?',
+          choices: [
+            { name: '🎯 Poetry (Recommended - includes virtual env)', value: 'poetry' },
+            { name: '📦 pip with venv (Standard)', value: 'venv' },
+            { name: '🔧 pipx (Global isolated install)', value: 'pipx' },
+          ],
+          // The VS Code extension workspace uses venv+pip by default.
+          default: userConfig.defaultInstallMethod || 'venv',
+        },
+      ])) as { pythonVersion: string; installMethod: InstallMethod });
 
   logger.step(1, 3, 'Setting up RapidKit environment');
   const spinner = ora('Creating directory').start();
@@ -87,6 +370,12 @@ export async function createProject(
     await fsExtra.ensureDir(projectPath);
     spinner.succeed('Directory created');
 
+    // Create workspace marker compatible with the VS Code extension.
+    await writeWorkspaceMarker(projectPath, name);
+
+    // Create .gitignore regardless of git initialization (matches VS Code extension behavior).
+    await writeWorkspaceGitignore(projectPath);
+
     // Install RapidKit based on method
     if (pythonAnswers.installMethod === 'poetry') {
       await installWithPoetry(
@@ -94,7 +383,8 @@ export async function createProject(
         pythonAnswers.pythonVersion,
         spinner,
         testMode,
-        userConfig
+        userConfig,
+        yes
       );
     } else if (pythonAnswers.installMethod === 'venv') {
       await installWithVenv(
@@ -105,8 +395,11 @@ export async function createProject(
         userConfig
       );
     } else {
-      await installWithPipx(projectPath, spinner, testMode, userConfig);
+      await installWithPipx(projectPath, spinner, testMode, userConfig, yes);
     }
+
+    // Create a local launcher so users can run RapidKit without activating the env.
+    await writeWorkspaceLauncher(projectPath, pythonAnswers.installMethod);
 
     // Create README with instructions
     await createReadme(projectPath, pythonAnswers.installMethod);
@@ -118,11 +411,6 @@ export async function createProject(
       spinner.start('Initializing git repository');
       try {
         await execa('git', ['init'], { cwd: projectPath });
-        await fsExtra.outputFile(
-          path.join(projectPath, '.gitignore'),
-          '.venv/\n__pycache__/\n*.pyc\n.env\n.rapidkit-workspace/\n',
-          'utf-8'
-        );
         await execa('git', ['add', '.'], { cwd: projectPath });
         await execa('git', ['commit', '-m', 'Initial commit: RapidKit environment'], {
           cwd: projectPath,
@@ -143,6 +431,7 @@ export async function createProject(
       // Check Poetry version for activation command
       let activateCmd = 'source $(poetry env info --path)/bin/activate';
       try {
+        ensureUserLocalBinOnPath();
         const { stdout } = await execa('poetry', ['--version']);
         const versionMatch = stdout.match(/Poetry.*?(\d+)\.(\d+)/);
         if (versionMatch) {
@@ -202,16 +491,10 @@ async function installWithPoetry(
   pythonVersion: string,
   spinner: Ora,
   testMode?: boolean,
-  userConfig?: UserConfig
+  userConfig?: UserConfig,
+  yes = false
 ) {
-  spinner.start('Checking Poetry installation');
-
-  try {
-    await execa('poetry', ['--version']);
-    spinner.succeed('Poetry found');
-  } catch (_error) {
-    throw new PoetryNotFoundError();
-  }
+  await ensurePoetryAvailable(spinner, yes);
 
   spinner.start('Initializing Poetry project');
   await execa('poetry', ['init', '--no-interaction', '--python', `^${pythonVersion}`], {
@@ -228,6 +511,16 @@ async function installWithPoetry(
   await fsPromises.writeFile(pyprojectPath, updatedContent, 'utf-8');
 
   spinner.succeed('Poetry project initialized');
+
+  // Ensure Poetry creates virtual environments inside the project (match VS Code extension behavior)
+  spinner.start('Configuring Poetry to create in-project virtualenv');
+  try {
+    await execa('poetry', ['config', 'virtualenvs.in-project', 'true'], { cwd: projectPath });
+    spinner.succeed('Poetry configured');
+  } catch (_error) {
+    // Not a fatal error; continue with installation. Some Poetry versions or environments may not support this.
+    spinner.warn('Could not configure Poetry virtualenvs.in-project');
+  }
 
   spinner.start('Installing RapidKit');
   if (testMode) {
@@ -246,7 +539,7 @@ async function installWithPoetry(
     // Production: Install from PyPI
     spinner.text = 'Installing RapidKit from PyPI';
     try {
-      await execa('poetry', ['add', 'rapidkit'], { cwd: projectPath });
+      await execa('poetry', ['add', 'rapidkit-core'], { cwd: projectPath });
     } catch (_error) {
       throw new RapidKitNotAvailableError();
     }
@@ -305,7 +598,7 @@ async function installWithVenv(
     // Production: Install from PyPI
     spinner.text = 'Installing RapidKit from PyPI';
     try {
-      await execa(pipPath, ['install', 'rapidkit'], { cwd: projectPath });
+      await execa(pipPath, ['install', 'rapidkit-core'], { cwd: projectPath });
     } catch (_error) {
       throw new RapidKitNotAvailableError();
     }
@@ -318,16 +611,10 @@ async function installWithPipx(
   projectPath: string,
   spinner: Ora,
   testMode?: boolean,
-  userConfig?: UserConfig
+  userConfig?: UserConfig,
+  yes = false
 ) {
-  spinner.start('Checking pipx installation');
-
-  try {
-    await execa('pipx', ['--version']);
-    spinner.succeed('pipx found');
-  } catch (_error) {
-    throw new PipxNotFoundError();
-  }
+  const pipx = await ensurePipxAvailable(spinner, yes);
 
   spinner.start('Installing RapidKit globally with pipx');
   if (testMode) {
@@ -341,12 +628,12 @@ async function installWithPipx(
     }
     logger.debug(`Installing from local path: ${localPath}`);
     spinner.text = 'Installing RapidKit from local path (test mode)';
-    await execa('pipx', ['install', '-e', localPath]);
+    await execaPipx(pipx, ['install', '-e', localPath]);
   } else {
     // Production: Install from PyPI
     spinner.text = 'Installing RapidKit from PyPI';
     try {
-      await execa('pipx', ['install', 'rapidkit']);
+      await execaPipx(pipx, ['install', 'rapidkit-core']);
     } catch (_error) {
       throw new RapidKitNotAvailableError();
     }
@@ -361,6 +648,72 @@ async function installWithPipx(
   );
 }
 
+// Register an existing directory as a RapidKit workspace and install the engine.
+export async function registerWorkspaceAtPath(
+  workspacePath: string,
+  options?: {
+    skipGit?: boolean;
+    testMode?: boolean;
+    userConfig?: UserConfig;
+    yes?: boolean;
+    installMethod?: InstallMethod;
+    pythonVersion?: string;
+  }
+) {
+  const {
+    skipGit = false,
+    testMode = false,
+    userConfig = {},
+    yes = false,
+    installMethod,
+    pythonVersion = '3.10',
+  } = options || {};
+
+  // Create marker and gitignore
+  await writeWorkspaceMarker(workspacePath, path.basename(workspacePath));
+  await writeWorkspaceGitignore(workspacePath);
+
+  const spinner = ora('Registering workspace').start();
+
+  try {
+    // Choose install method
+    const method: InstallMethod =
+      (installMethod as InstallMethod) ||
+      (userConfig.defaultInstallMethod as InstallMethod) ||
+      'venv';
+
+    if (method === 'poetry') {
+      await installWithPoetry(workspacePath, pythonVersion, spinner, testMode, userConfig, yes);
+    } else if (method === 'venv') {
+      await installWithVenv(workspacePath, pythonVersion, spinner, testMode, userConfig);
+    } else {
+      await installWithPipx(workspacePath, spinner, testMode, userConfig, yes);
+    }
+
+    await writeWorkspaceLauncher(workspacePath, method);
+    await createReadme(workspacePath, method);
+
+    spinner.succeed('Workspace registered');
+
+    if (!skipGit) {
+      spinner.start('Initializing git repository');
+      try {
+        await execa('git', ['init'], { cwd: workspacePath });
+        await execa('git', ['add', '.'], { cwd: workspacePath });
+        await execa('git', ['commit', '-m', 'Initial commit: RapidKit workspace'], {
+          cwd: workspacePath,
+        });
+        spinner.succeed('Git repository initialized');
+      } catch (_error) {
+        spinner.warn('Could not initialize git repository');
+      }
+    }
+  } catch (e) {
+    spinner.fail('Failed to register workspace');
+    throw e;
+  }
+}
+
 // Create README with usage instructions
 async function createReadme(projectPath: string, installMethod: string) {
   const activationCmd =
@@ -369,6 +722,13 @@ async function createReadme(projectPath: string, installMethod: string) {
       : installMethod === 'venv'
         ? 'source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate'
         : 'N/A (globally installed)';
+
+  const noActivateCmd =
+    installMethod === 'poetry'
+      ? '# No activation needed (recommended):\n./rapidkit --help\n# or:\npoetry run rapidkit --help'
+      : installMethod === 'venv'
+        ? '# No activation needed (recommended):\n./rapidkit --help\n# or direct:\n./.venv/bin/rapidkit --help'
+        : '# Optional: use the local launcher\n./rapidkit --help\n# (pipx installs may require Poetry/venv to be present in this folder)';
 
   const readmeContent = `# RapidKit Workspace
 
@@ -379,6 +739,14 @@ This directory contains a RapidKit development environment.
 **${installMethod === 'poetry' ? 'Poetry' : installMethod === 'venv' ? 'Python venv + pip' : 'pipx (global)'}**
 
 ## Getting Started
+
+### 0. Run Without Activation (Recommended)
+
+This workspace includes a local launcher script so you can run the Python Core CLI without activating the environment:
+
+\`\`\`bash
+${noActivateCmd}
+\`\`\`
 
 ### 1. Activate Environment
 
@@ -1073,7 +1441,7 @@ async function showDryRun(
     console.log(chalk.gray('  - Bundled templates included'));
   } else {
     console.log(chalk.white('\n⚙️  Configuration:'));
-    console.log(chalk.gray(`  - Python version: ${userConfig.pythonVersion || '3.11'}`));
+    console.log(chalk.gray(`  - Python version: ${userConfig.pythonVersion || '3.10'}`));
     console.log(chalk.gray(`  - Install method: ${userConfig.defaultInstallMethod || 'poetry'}`));
     console.log(chalk.gray(`  - Git initialization: ${userConfig.skipGit ? 'No' : 'Yes'}`));
     console.log(chalk.white('\n📝 Files to create:'));

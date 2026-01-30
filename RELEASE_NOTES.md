@@ -1,12 +1,39 @@
 # Release Notes
 
-## Latest Release: v0.14.2 (January 23, 2026)
+## Latest Release: v0.15.0 (January 30, 2026)
+
+### ✨ v0.15.0 — Core Integration & Workspace UX (Stabilization)
+
+This release focuses on bridging the npm wrapper and the upcoming Python Core, and improves the Create Project UX when run outside of an existing workspace.
+
+**What's New:**
+
+- 🔧 **CLI: wrapper-level workspace flags** — `--create-workspace` and `--no-workspace` are now handled by the npm wrapper so they are not forwarded to the Python engine. Creating a project outside a workspace now prompts the user (interactive) and respects `--yes`/`--no` behaviors. (`--create-workspace` creates and registers a workspace in the current directory.)
+- 🧩 **Workspace registration helper** — added `registerWorkspaceAtPath()` which creates a `.rapidkit-workspace` marker, `.gitignore`, launcher (`rapidkit`/`rapidkit.cmd`), `README.md`, and installs the Python engine into the workspace (supports Poetry/venv/pipx).
+- 🐍 **Poetry in-project venv parity** — `installWithPoetry()` configures `poetry config virtualenvs.in-project true` so `poetry` creates `.venv` inside the workspace by default to match VS Code extension behavior.
+- 🛠️ **Scenario C fix (bridge detection)** — improved Python engine detection heuristics so the bridge does not bootstrap a venv when the system Python already has `rapidkit-core` installed (prevents unnecessary bootstrap and preserves existing environment).
+- ✅ **Tests & CI** — added focused unit and e2e tests (register workspace, create-workspace smoke test, Scenario C regression) and a GitHub Actions workflow `.github/workflows/e2e-smoke.yml` to run the smoke/regression tests on PRs.
+- 🧾 **Docs** — updated README and documentation to document the new flags and the create-project outside-workspace UX.
+
+### ⬆️ Upgrade
+
+```bash
+npm install -g rapidkit@0.15.0
+# or
+npx rapidkit@0.15.0 create project fastapi.standard my-api --output .
+```
+
+---
+
+## Previous Release: v0.14.2 (January 23, 2026)
 
 ### 📚 Documentation & Cleanup Release
 
-This is a documentation-focused release preparing the npm package for seamless integration with RapidKit Python Core.
+This was a documentation-focused release preparing the npm package for seamless integration with RapidKit Python Core.
 
-**What's New:**
+**What was included:**
+
+(see older notes in this file)
 
 ### Documentation Updates
 

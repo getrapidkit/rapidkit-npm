@@ -213,7 +213,7 @@ const template = options.template || config.defaultTemplate;
 **Time:** 1 hour
 
 ```bash
-npx rapidkit my-api --template fastapi --dry-run
+npx rapidkit my-workspace --dry-run
 
 # Output:
 📦 Would create:
@@ -309,21 +309,18 @@ USAGE
   $ rapidkit [NAME] [OPTIONS]
 
 COMMANDS
-  rapidkit my-api --template fastapi    Create FastAPI project
   rapidkit my-workspace                 Create workspace
-  rapidkit init                         Install dependencies
-  rapidkit dev                          Start dev server
+  rapidkit create                        Interactive kit/project wizard
 
 OPTIONS
-  -t, --template <type>    Template (fastapi | nestjs)
   --skip-git               Skip git init
   --dry-run                Preview only
   -h, --help               Show help
   -v, --version            Show version
 
 EXAMPLES
-  $ rapidkit my-api --template fastapi
-  $ rapidkit my-api -t nestjs --skip-git
+  $ rapidkit my-workspace
+  $ rapidkit create project fastapi.standard my-api --output .
   $ rapidkit my-workspace
 
 LEARN MORE

@@ -32,7 +32,7 @@ describe('Create Module - Internal Functions', () => {
   describe('Poetry Installation Flow', () => {
     it('should install RapidKit with Poetry successfully', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'poetry',
       });
 
@@ -59,15 +59,15 @@ describe('Create Module - Internal Functions', () => {
       expect(execa).toHaveBeenCalledWith('poetry', ['--version']);
       expect(execa).toHaveBeenCalledWith(
         'poetry',
-        ['init', '--no-interaction', '--python', '^3.11'],
+        ['init', '--no-interaction', '--python', '^3.10'],
         expect.any(Object)
       );
-      expect(execa).toHaveBeenCalledWith('poetry', ['add', 'rapidkit'], expect.any(Object));
+      expect(execa).toHaveBeenCalledWith('poetry', ['add', 'rapidkit-core'], expect.any(Object));
     });
 
     it('should check for Poetry before installation', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'poetry',
       });
 
@@ -85,7 +85,7 @@ describe('Create Module - Internal Functions', () => {
 
     it('should install from local path in test mode', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'poetry',
       });
 
@@ -118,7 +118,7 @@ describe('Create Module - Internal Functions', () => {
       process.env.RAPIDKIT_DEV_PATH = '/local/rapidkit';
 
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'poetry',
       });
 
@@ -135,7 +135,7 @@ describe('Create Module - Internal Functions', () => {
 
     it('should update pyproject.toml with package-mode = false', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'poetry',
       });
 
@@ -154,18 +154,153 @@ describe('Create Module - Internal Functions', () => {
         'utf-8'
       );
     });
+
+    it('should prompt to install Poetry with pipx when missing', async () => {
+      // Route prompt responses by question name to avoid leaking mockResolvedValueOnce
+      // into subsequent tests if something changes.
+      vi.mocked(inquirer.prompt).mockImplementation(async (questions: any) => {
+        const names = Array.isArray(questions) ? questions.map((q) => q?.name) : [];
+        if (names.includes('installPoetry')) {
+          return { installPoetry: true } as any;
+        }
+        return {
+          pythonVersion: '3.10',
+          installMethod: 'poetry',
+        } as any;
+      });
+
+      let poetryVersionChecks = 0;
+      vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
+        if (command === 'poetry' && args?.[0] === '--version') {
+          // First check fails (missing), subsequent checks succeed.
+          if (poetryVersionChecks === 0) {
+            poetryVersionChecks += 1;
+            return Promise.reject(new Error('Command not found: poetry'));
+          }
+          poetryVersionChecks += 1;
+          return Promise.resolve({ stdout: 'Poetry 2.0.0', stderr: '', exitCode: 0 } as any);
+        }
+        if (command === 'pipx' && args?.[0] === '--version') {
+          return Promise.resolve({ stdout: '1.4.0', stderr: '', exitCode: 0 } as any);
+        }
+        if (command === 'pipx' && args?.[0] === 'install' && args?.[1] === 'poetry') {
+          return Promise.resolve({ stdout: 'installed', stderr: '', exitCode: 0 } as any);
+        }
+        if (command === 'poetry' && args?.[0] === 'init') {
+          return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+        }
+        if (command === 'poetry' && args?.[0] === 'add') {
+          return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+        }
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+      });
+
+      vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]\nname = "test"');
+
+      await createProject('test-project', {});
+
+      // Confirm we offered to install Poetry, then used pipx.
+      expect(inquirer.prompt).toHaveBeenCalledTimes(2);
+      expect(execa).toHaveBeenCalledWith('pipx', ['install', 'poetry']);
+    });
+
+    it('should prompt to install pipx when missing (for Poetry install)', async () => {
+      // 1) choose poetry, 2) confirm installPoetry, 3) confirm installPipx
+      vi.mocked(inquirer.prompt).mockImplementation(async (questions: any) => {
+        const names = Array.isArray(questions) ? questions.map((q) => q?.name) : [];
+        if (names.includes('installPoetry')) return { installPoetry: true } as any;
+        if (names.includes('installPipx')) return { installPipx: true } as any;
+        return { pythonVersion: '3.10', installMethod: 'poetry' } as any;
+      });
+
+      let poetryVersionChecks = 0;
+      let pipxBinaryChecks = 0;
+      let pipxModuleAvailable = false;
+      vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
+        // Poetry is missing first, then available.
+        if (command === 'poetry' && args?.[0] === '--version') {
+          if (poetryVersionChecks === 0) {
+            poetryVersionChecks += 1;
+            return Promise.reject(new Error('Command not found: poetry'));
+          }
+          poetryVersionChecks += 1;
+          return Promise.resolve({ stdout: 'Poetry 2.0.0', stderr: '', exitCode: 0 } as any);
+        }
+
+        // pipx binary is missing.
+        if (command === 'pipx' && args?.[0] === '--version') {
+          pipxBinaryChecks += 1;
+          return Promise.reject(new Error('Command not found: pipx'));
+        }
+
+        // python3 -m pipx becomes available after we "install" it.
+        if (command === 'python3' && args?.[0] === '-m' && args?.[1] === 'pipx') {
+          if (args?.[2] === '--version') {
+            if (!pipxModuleAvailable) {
+              return Promise.reject(new Error('No module named pipx'));
+            }
+            return Promise.resolve({ stdout: '1.4.0', stderr: '', exitCode: 0 } as any);
+          }
+          if (args?.[2] === 'install' && args?.[3] === 'poetry') {
+            return Promise.resolve({ stdout: 'installed', stderr: '', exitCode: 0 } as any);
+          }
+          if (args?.[2] === 'upgrade' && args?.[3] === 'poetry') {
+            return Promise.resolve({ stdout: 'upgraded', stderr: '', exitCode: 0 } as any);
+          }
+        }
+
+        // pip install --user pipx
+        if (command === 'python3' && args?.[0] === '-m' && args?.[1] === 'pip') {
+          pipxModuleAvailable = true;
+          return Promise.resolve({ stdout: 'ok', stderr: '', exitCode: 0 } as any);
+        }
+
+        if (command === 'poetry' && args?.[0] === 'init') {
+          return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+        }
+        if (command === 'poetry' && args?.[0] === 'add') {
+          return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+        }
+
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+      });
+
+      vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]\nname = "test"');
+
+      await createProject('test-project', {});
+
+      expect(pipxBinaryChecks).toBeGreaterThan(0);
+      // We should have prompted for both: installing pipx and installing poetry.
+      const promptCalls = vi.mocked(inquirer.prompt).mock.calls;
+      const askedNames = promptCalls
+        .flatMap(([questions]) => (Array.isArray(questions) ? questions : [questions]))
+        .map((q: any) => q?.name)
+        .filter(Boolean);
+
+      expect(askedNames).toContain('installPipx');
+      expect(askedNames).toContain('installPoetry');
+      expect(execa).toHaveBeenCalledWith('python3', [
+        '-m',
+        'pip',
+        'install',
+        '--user',
+        '--upgrade',
+        'pipx',
+      ]);
+      expect(execa).toHaveBeenCalledWith('python3', ['-m', 'pipx', 'install', 'poetry']);
+    });
   });
 
   describe('Venv Installation Flow', () => {
     it('should install RapidKit with venv successfully', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'venv',
       });
 
       vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
         if (command === 'python3' && args?.[0] === '--version') {
-          return Promise.resolve({ stdout: 'Python 3.11.5', stderr: '', exitCode: 0 } as any);
+          return Promise.resolve({ stdout: 'Python 3.10', stderr: '', exitCode: 0 } as any);
         }
         if (command === 'python3' && args?.[0] === '-m' && args?.[1] === 'venv') {
           return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
@@ -184,7 +319,7 @@ describe('Create Module - Internal Functions', () => {
 
     it('should throw error when Python not found', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'venv',
       });
 
@@ -202,7 +337,7 @@ describe('Create Module - Internal Functions', () => {
       process.env.RAPIDKIT_DEV_PATH = '/local/rapidkit';
 
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'venv',
       });
 
@@ -229,7 +364,7 @@ describe('Create Module - Internal Functions', () => {
   describe('Pipx Installation Flow', () => {
     it('should install RapidKit with pipx successfully', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'pipx',
       });
 
@@ -246,12 +381,12 @@ describe('Create Module - Internal Functions', () => {
       await createProject('test-project', {});
 
       expect(execa).toHaveBeenCalledWith('pipx', ['--version']);
-      expect(execa).toHaveBeenCalledWith('pipx', ['install', 'rapidkit']);
+      expect(execa).toHaveBeenCalledWith('pipx', ['install', 'rapidkit-core']);
     });
 
     it('should check for pipx before installation', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'pipx',
       });
 
@@ -266,7 +401,7 @@ describe('Create Module - Internal Functions', () => {
       process.env.RAPIDKIT_DEV_PATH = '/local/rapidkit';
 
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'pipx',
       });
 
@@ -283,12 +418,66 @@ describe('Create Module - Internal Functions', () => {
 
       delete process.env.RAPIDKIT_DEV_PATH;
     });
+
+    it('should prompt to install pipx when missing (for pipx install)', async () => {
+      vi.mocked(inquirer.prompt).mockImplementation(async (questions: any) => {
+        const names = Array.isArray(questions) ? questions.map((q) => q?.name) : [];
+        if (names.includes('installPipx')) return { installPipx: true } as any;
+        return { pythonVersion: '3.10', installMethod: 'pipx' } as any;
+      });
+
+      let pipxModuleAvailable = false;
+      vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
+        // pipx binary missing
+        if (command === 'pipx' && args?.[0] === '--version') {
+          return Promise.reject(new Error('Command not found: pipx'));
+        }
+
+        // python3 -m pipx only works after we "install" pipx
+        if (command === 'python3' && args?.[0] === '-m' && args?.[1] === 'pipx') {
+          if (!pipxModuleAvailable) {
+            return Promise.reject(new Error('No module named pipx'));
+          }
+          return Promise.resolve({ stdout: '1.4.0', stderr: '', exitCode: 0 } as any);
+        }
+
+        // pip install --user pipx flips availability
+        if (command === 'python3' && args?.[0] === '-m' && args?.[1] === 'pip') {
+          pipxModuleAvailable = true;
+          return Promise.resolve({ stdout: 'ok', stderr: '', exitCode: 0 } as any);
+        }
+
+        // install rapidkit-core via python -m pipx
+        if (
+          command === 'python3' &&
+          args?.[0] === '-m' &&
+          args?.[1] === 'pipx' &&
+          args?.[2] === 'install'
+        ) {
+          return Promise.resolve({ stdout: 'installed', stderr: '', exitCode: 0 } as any);
+        }
+
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+      });
+
+      await createProject('test-project', {});
+
+      expect(execa).toHaveBeenCalledWith('python3', [
+        '-m',
+        'pip',
+        'install',
+        '--user',
+        '--upgrade',
+        'pipx',
+      ]);
+      expect(execa).toHaveBeenCalledWith('python3', ['-m', 'pipx', 'install', 'rapidkit-core']);
+    });
   });
 
   describe('README Creation', () => {
     it('should create .gitignore with Poetry installation', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'poetry',
       });
 
@@ -306,7 +495,7 @@ describe('Create Module - Internal Functions', () => {
 
     it('should create .gitignore with venv installation', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'venv',
       });
 
@@ -323,7 +512,7 @@ describe('Create Module - Internal Functions', () => {
 
     it('should create files with pipx installation', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'pipx',
       });
 
@@ -339,7 +528,7 @@ describe('Create Module - Internal Functions', () => {
   describe('Git Integration', () => {
     it('should initialize git repository by default', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'poetry',
       });
 
@@ -353,7 +542,7 @@ describe('Create Module - Internal Functions', () => {
 
     it('should skip git when skipGit is true', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'poetry',
       });
 
@@ -368,7 +557,7 @@ describe('Create Module - Internal Functions', () => {
 
     it('should create .gitignore file', async () => {
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'poetry',
       });
 
@@ -395,7 +584,7 @@ describe('Create Module - Internal Functions', () => {
     it('should create directory if it does not exist', async () => {
       vi.mocked(fsExtra.pathExists).mockResolvedValue(false);
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'poetry',
       });
       vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
@@ -436,12 +625,12 @@ describe('Create Module - Internal Functions', () => {
 
     it('should use userConfig default install method', async () => {
       const userConfig = {
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         defaultInstallMethod: 'pipx' as const,
       };
 
       vi.mocked(inquirer.prompt).mockResolvedValue({
-        pythonVersion: '3.11',
+        pythonVersion: '3.10',
         installMethod: 'pipx',
       });
 
