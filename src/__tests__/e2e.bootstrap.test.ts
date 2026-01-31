@@ -33,8 +33,13 @@ describe('E2E Bootstrap Tests', () => {
     // Ensure workspace exists
     await expect(fileExists(workspacePath)).resolves.toBe(true);
 
-    // Ensure .venv Python exists
-    const venvPython = join(workspacePath, '.venv', 'bin', 'python');
+    // Ensure .venv Python exists (cross-platform)
+    const venvPython = join(
+      workspacePath,
+      '.venv',
+      process.platform === 'win32' ? 'Scripts' : 'bin',
+      process.platform === 'win32' ? 'python.exe' : 'python'
+    );
     await expect(fileExists(venvPython)).resolves.toBe(true);
 
     // Run pip show inside the workspace venv to verify rapidkit-core is installed

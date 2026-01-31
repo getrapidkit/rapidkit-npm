@@ -32,8 +32,13 @@ describe('E2E Smoke: Create Workspace', () => {
       }
     );
 
-    // Ensure workspace .venv Python exists
-    const venvPython = join(workspacePath, '.venv', 'bin', 'python');
+    // Ensure workspace .venv Python exists (cross-platform)
+    const venvPython = join(
+      workspacePath,
+      '.venv',
+      process.platform === 'win32' ? 'Scripts' : 'bin',
+      process.platform === 'win32' ? 'python.exe' : 'python'
+    );
     await expect(fileExists(venvPython)).resolves.toBe(true);
 
     // Verify rapidkit-core is installed in the workspace venv

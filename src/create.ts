@@ -482,7 +482,8 @@ export async function createProject(
       // Ignore cleanup errors
     }
 
-    process.exit(1);
+    // Re-throw the error for callers to handle (e.g., tests and CLI error handlers)
+    throw _error;
   }
 }
 

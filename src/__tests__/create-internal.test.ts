@@ -5,7 +5,7 @@ import inquirer from 'inquirer';
 import { promises as fsPromises } from 'fs';
 import { createProject } from '../create';
 import { getPythonCommand } from '../utils';
-import { DirectoryExistsError } from '../errors';
+import { DirectoryExistsError, PythonNotFoundError } from '../errors';
 
 vi.mock('fs-extra');
 vi.mock('execa');
@@ -280,7 +280,7 @@ describe('Create Module - Internal Functions', () => {
 
       expect(askedNames).toContain('installPipx');
       expect(askedNames).toContain('installPoetry');
-      expect(execa).toHaveBeenCalledWith('python3', [
+      expect(execa).toHaveBeenCalledWith(expect.stringMatching(/^python(3)?$/), [
         '-m',
         'pip',
         'install',
@@ -288,7 +288,12 @@ describe('Create Module - Internal Functions', () => {
         '--upgrade',
         'pipx',
       ]);
-      expect(execa).toHaveBeenCalledWith('python3', ['-m', 'pipx', 'install', 'poetry']);
+      expect(execa).toHaveBeenCalledWith(expect.stringMatching(/^python(3)?$/), [
+        '-m',
+        'pipx',
+        'install',
+        'poetry',
+      ]);
     });
   });
 
@@ -330,13 +335,15 @@ describe('Create Module - Internal Functions', () => {
       });
 
       vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
-        if (command === 'python3' && args?.[0] === '--version') {
-          return Promise.reject(new Error('Command not found: python3'));
+        // Reject on any python --version call (both python and python3)
+        if ((command === 'python' || command === 'python3') && args?.[0] === '--version') {
+          return Promise.reject(new Error('Command not found: python'));
         }
+        // Return success for other commands to avoid unrelated failures
         return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
       });
 
-      await expect(createProject('test-project', {})).rejects.toThrow();
+      await expect(createProject('test-project', {})).rejects.toThrow(PythonNotFoundError);
     });
 
     it('should install from local path in venv test mode', async () => {
@@ -470,7 +477,8 @@ describe('Create Module - Internal Functions', () => {
 
       await createProject('test-project', {});
 
-      expect(execa).toHaveBeenCalledWith('python3', [
+      // Accept both python and python3 (platform-dependent)
+      expect(execa).toHaveBeenCalledWith(expect.stringMatching(/^python(3)?$/), [
         '-m',
         'pip',
         'install',
@@ -478,7 +486,12 @@ describe('Create Module - Internal Functions', () => {
         '--upgrade',
         'pipx',
       ]);
-      expect(execa).toHaveBeenCalledWith('python3', ['-m', 'pipx', 'install', 'rapidkit-core']);
+      expect(execa).toHaveBeenCalledWith(expect.stringMatching(/^python(3)?$/), [
+        '-m',
+        'pipx',
+        'install',
+        'rapidkit-core',
+      ]);
     });
   });
 
