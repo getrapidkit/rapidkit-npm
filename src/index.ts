@@ -543,19 +543,23 @@ program
     ).hideHelp()
   )
   .option('-y, --yes', 'Skip prompts and use defaults')
-  .option('--skip-git', 'Skip git initialization')
+  .addOption(new Option('--skip-git', 'Skip git initialization').hideHelp())
   .addOption(
     new Option('--skip-install', 'Legacy: skip installing dependencies (template mode)').hideHelp()
   )
   .option('--debug', 'Enable debug logging')
-  .option('--dry-run', 'Show what would be created without creating it')
-  .option(
-    '--create-workspace',
-    'When creating a project outside a workspace: create and register a workspace in the current directory'
+  .addOption(new Option('--dry-run', 'Show what would be created without creating it').hideHelp())
+  .addOption(
+    new Option(
+      '--create-workspace',
+      'When creating a project outside a workspace: create and register a workspace in the current directory'
+    ).hideHelp()
   )
-  .option(
-    '--no-workspace',
-    'When creating a project outside a workspace: do not create a workspace'
+  .addOption(
+    new Option(
+      '--no-workspace',
+      'When creating a project outside a workspace: do not create a workspace'
+    ).hideHelp()
   )
   .option('--no-update-check', 'Skip checking for updates')
   .action(async (name, options) => {
