@@ -79,6 +79,9 @@ exec "$sys_python" "$@"
 
     // Verify that the bridge venv path does NOT exist
     const bridgeVenv = join(cacheDir, 'rapidkit', 'npm-bridge', 'venv');
+    // Ensure any leftover bridge venv is removed (tests should be isolated).
+    // This avoids flakes where a previous test created the cached venv.
+    await fsExtra.remove(bridgeVenv);
     const exists = await fsExtra.pathExists(bridgeVenv);
     expect(exists).toBe(false);
   }, 120000);
