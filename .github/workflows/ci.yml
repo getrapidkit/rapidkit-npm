@@ -1,4 +1,4 @@
-name: CI
+name: CI & Metrics Matrix
 
 on:
   push:
@@ -7,112 +7,99 @@ on:
     branches: [main, develop]
 
 jobs:
-  test:
-    name: Test
+  build-test-matrix:
+    name: Build & Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         node-version: [20]
-    
+
     steps:
+      # Checkout repository
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Setup Node.js
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: npm
 
+      # Setup Python (Linux & macOS only)
+      - name: Setup Python
+        if: runner.os != 'Windows'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      # Install rapidkit-core (Python)
+      - name: Install rapidkit-core (Python)
+        if: runner.os != 'Windows'
+        run: |
+          python -m pip install --upgrade pip
+          pip install rapidkit-core
+
+      # Install Node dependencies
       - name: Install dependencies
         shell: bash
         run: |
           npm ci
-          # Workaround for npm optional dependency bug - install platform-specific rollup binary
+
+          # Platform-specific Rollup optional binaries (temporary workaround)
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             npm install @rollup/rollup-darwin-arm64 --save-dev --no-audit || true
           elif [[ "${{ runner.os }}" == "Windows" ]]; then
             npm install @rollup/rollup-win32-x64-msvc --save-dev --no-audit || true
           fi
 
-      - name: Build package
+      # Build
+      - name: Build project
         run: npm run build
 
+      # Lint
       - name: Run linter
         run: npm run lint
 
+      # Type check
       - name: Run type check
         run: npm run typecheck
 
+      # Format check (skip Windows)
       - name: Run format check
+        if: runner.os != 'Windows'
         run: npm run format:check
-        if: matrix.os != 'windows-latest'
 
-      - name: Run tests
+      # Tests + coverage
+      - name: Run tests with coverage
         run: npm run test:coverage
 
+      # Metrics (Linux only)
+      - name: Run metrics collection
+        if: runner.os == 'Linux'
+        run: npx tsx scripts/metrics.ts
+
+      # Bundle size guard (Linux only)
+      - name: Check bundle size
+        if: runner.os == 'Linux'
+        run: |
+          npm run bundle-size
+          BUNDLE_SIZE=$(du -sk dist/ | cut -f1)
+          echo "Bundle size: ${BUNDLE_SIZE} KB"
+          if [ "$BUNDLE_SIZE" -gt 500 ]; then
+            echo "❌ Bundle size exceeds 500 KB!"
+            exit 1
+          fi
+
+      # Upload coverage (Linux only)
       - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+        if: runner.os == 'Linux'
         uses: codecov/codecov-action@v4
         with:
-          file: ./coverage/coverage-final.json
+          files: ./coverage/coverage-final.json
           flags: unittests
-          name: codecov-umbrella
+          name: rapidkit-coverage
           fail_ci_if_error: false
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build package
-        run: npm run build
-
-      - name: Check bundle size
-        run: |
-          npm run build
-          du -sh dist/
-          echo "Bundle files:"
-          ls -lh dist/
-
-  security:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run security audit (production only)
-        run: |
-          echo "🔒 Checking production dependencies for high severity vulnerabilities..."
-          npm audit --production --audit-level=high || echo "⚠️  Production audit completed with warnings"
-        continue-on-error: true
-
-      - name: Run full security audit (including dev dependencies)
-        run: |
-          echo "🔍 Checking all dependencies (dev vulnerabilities don't affect published package)..."
-          npm audit --audit-level=moderate || echo "⚠️  Dev dependency vulnerabilities detected (vitest/vite/esbuild) - these are not included in the published package"
-        continue-on-error: true
