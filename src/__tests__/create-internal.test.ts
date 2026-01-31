@@ -4,6 +4,7 @@ import { execa } from 'execa';
 import inquirer from 'inquirer';
 import { promises as fsPromises } from 'fs';
 import { createProject } from '../create';
+import { getPythonCommand } from '../utils';
 import { DirectoryExistsError } from '../errors';
 
 vi.mock('fs-extra');
@@ -299,13 +300,16 @@ describe('Create Module - Internal Functions', () => {
       });
 
       vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
-        if (command === 'python3' && args?.[0] === '--version') {
+        // Handle version checks
+        if (args?.[0] === '--version') {
           return Promise.resolve({ stdout: 'Python 3.10', stderr: '', exitCode: 0 } as any);
         }
-        if (command === 'python3' && args?.[0] === '-m' && args?.[1] === 'venv') {
+        // Handle venv creation
+        if (args?.[0] === '-m' && args?.[1] === 'venv') {
           return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
         }
-        if (args?.[0] === 'install') {
+        // Handle pip operations (now via python -m pip)
+        if (args?.includes('-m') && args?.includes('pip')) {
           return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
         }
         return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
@@ -313,8 +317,10 @@ describe('Create Module - Internal Functions', () => {
 
       await createProject('test-project', {});
 
-      expect(execa).toHaveBeenCalledWith('python3', ['--version']);
-      expect(execa).toHaveBeenCalledWith('python3', ['-m', 'venv', '.venv'], expect.any(Object));
+      // Accept either python3 or python depending on OS
+      const pythonCmd = getPythonCommand();
+      expect(execa).toHaveBeenCalledWith(pythonCmd, ['--version']);
+      expect(execa).toHaveBeenCalledWith(pythonCmd, ['-m', 'venv', '.venv'], expect.any(Object));
     });
 
     it('should throw error when Python not found', async () => {
@@ -342,18 +348,20 @@ describe('Create Module - Internal Functions', () => {
       });
 
       vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
-        if (command.includes('pip') && args?.[0] === 'install' && args?.[1] === '-e') {
+        // Mock python -m pip install calls
+        if (args?.includes('-m') && args?.includes('pip') && args?.includes('install')) {
           return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
         }
+        // Also need to handle version checks and venv creation
         return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
       });
 
       await createProject('test-project', { testMode: true });
 
-      // Verify editable install was called
+      // Verify editable install was called with python -m pip (not direct pip)
       expect(execa).toHaveBeenCalledWith(
-        expect.stringContaining('pip'),
-        ['install', '-e', '/local/rapidkit'],
+        expect.stringMatching(/python/),
+        expect.arrayContaining(['-m', 'pip', 'install', '-e', '/local/rapidkit']),
         expect.any(Object)
       );
 

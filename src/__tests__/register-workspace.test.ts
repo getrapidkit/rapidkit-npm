@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { registerWorkspaceAtPath } from '../create.js';
+import { getPythonCommand } from '../utils.js';
 import * as fsExtra from 'fs-extra';
 import { execa } from 'execa';
 
@@ -35,8 +36,8 @@ describe('registerWorkspaceAtPath', () => {
     vi.mocked(fsExtra.outputFile).mockResolvedValue(undefined);
     vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
 
-    const path = '/tmp/my-ws';
-    await registerWorkspaceAtPath(path, { skipGit: true });
+    const testPath = '/tmp/my-ws';
+    await registerWorkspaceAtPath(testPath, { skipGit: true });
 
     // marker
     expect(fsExtra.outputFile).toHaveBeenCalledWith(
@@ -52,15 +53,24 @@ describe('registerWorkspaceAtPath', () => {
       'utf-8'
     );
 
+    const pythonCmd = getPythonCommand();
     // venv creation command
-    expect(execa).toHaveBeenCalledWith('python3', ['-m', 'venv', '.venv'], { cwd: path });
+    expect(execa).toHaveBeenCalledWith(pythonCmd, ['-m', 'venv', '.venv'], { cwd: testPath });
 
-    // pip install
+    // pip upgrade using venv python -m pip
+    const expectedVenvPythonPath = expect.stringContaining('.venv');
     expect(execa).toHaveBeenCalledWith(
-      expect.stringContaining('.venv/bin/pip'),
-      ['install', 'rapidkit-core'],
+      expectedVenvPythonPath,
+      ['-m', 'pip', 'install', '--upgrade', 'pip'],
+      { cwd: testPath }
+    );
+
+    // pip install rapidkit-core using venv python -m pip
+    expect(execa).toHaveBeenCalledWith(
+      expectedVenvPythonPath,
+      ['-m', 'pip', 'install', 'rapidkit-core'],
       {
-        cwd: path,
+        cwd: testPath,
       }
     );
   });

@@ -17,6 +17,7 @@ import {
   InstallationError,
   RapidKitNotAvailableError,
 } from './errors.js';
+import { getPythonCommand } from './utils.js';
 
 async function writeWorkspaceMarker(workspacePath: string, workspaceName: string): Promise<void> {
   const markerPath = path.join(workspacePath, '.rapidkit-workspace');
@@ -68,7 +69,7 @@ async function ensurePipxAvailable(spinner: Ora, yes: boolean): Promise<PipxInvo
     // Try python -m pipx (pipx may be installed but not on PATH)
   }
 
-  const pythonCmd = 'python3';
+  const pythonCmd = getPythonCommand();
   try {
     await execa(pythonCmd, ['-m', 'pipx', '--version']);
     spinner.succeed('pipx found');
@@ -557,8 +558,7 @@ async function installWithVenv(
 ) {
   spinner.start(`Checking Python ${pythonVersion}`);
 
-  const isWindows = process.platform === 'win32';
-  const pythonCmd = isWindows ? 'python' : 'python3';
+  const pythonCmd = getPythonCommand();
   try {
     const { stdout } = await execa(pythonCmd, ['--version']);
     const version = stdout.match(/Python (\d+\.\d+)/)?.[1];
@@ -580,18 +580,16 @@ async function installWithVenv(
   spinner.succeed('Virtual environment created');
 
   spinner.start('Installing RapidKit');
-  // Resolve pip path for created venv. Use platform-appropriate folder but
-  // normalize separators to forward-slashes when invoking so unit-tests that
-  // assert on posix-style snippets continue to pass on Windows.
-  const pipRaw = path.join(
+  // Use python -m pip for cross-platform compatibility.
+  // Windows 25.0+ requires this instead of calling pip.exe directly.
+  const venvPython = path.join(
     projectPath,
     '.venv',
-    isWindows ? 'Scripts' : 'bin',
-    isWindows ? 'pip.exe' : 'pip'
+    process.platform === 'win32' ? 'Scripts' : 'bin',
+    process.platform === 'win32' ? 'python.exe' : 'python'
   );
-  const pipPath = pipRaw.split(path.sep).join('/');
 
-  await execa(pipPath, ['install', '--upgrade', 'pip'], { cwd: projectPath });
+  await execa(venvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'], { cwd: projectPath });
 
   if (testMode) {
     // Test mode: Install from local path (configured via environment or config file)
@@ -604,12 +602,12 @@ async function installWithVenv(
     }
     logger.debug(`Installing from local path: ${localPath}`);
     spinner.text = 'Installing RapidKit from local path (test mode)';
-    await execa(pipPath, ['install', '-e', localPath], { cwd: projectPath });
+    await execa(venvPython, ['-m', 'pip', 'install', '-e', localPath], { cwd: projectPath });
   } else {
     // Production: Install from PyPI
     spinner.text = 'Installing RapidKit from PyPI';
     try {
-      await execa(pipPath, ['install', 'rapidkit-core'], { cwd: projectPath });
+      await execa(venvPython, ['-m', 'pip', 'install', 'rapidkit-core'], { cwd: projectPath });
     } catch (_error) {
       throw new RapidKitNotAvailableError();
     }
