@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { join } from 'path';
 
 vi.mock('fs-extra', () => {
   return {
@@ -25,7 +26,11 @@ describe('pythonRapidkitExec workspace runner preference', () => {
     const execaMock = execa as unknown as ReturnType<typeof vi.fn>;
 
     const cwd = '/work/ws/projects/api';
-    const venvRapidkit = '/work/ws/projects/api/.venv/bin/rapidkit';
+    // Use platform-appropriate venv path
+    const venvRapidkit =
+      process.platform === 'win32'
+        ? join(cwd, '.venv', 'Scripts', 'rapidkit.exe')
+        : join(cwd, '.venv', 'bin', 'rapidkit');
 
     pathExists.mockImplementation(async (p: string) => p === venvRapidkit);
 
