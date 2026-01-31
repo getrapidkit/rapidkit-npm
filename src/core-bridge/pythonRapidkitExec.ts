@@ -652,3 +652,10 @@ export async function getCachedCoreTopLevelCommands(): Promise<Set<string> | nul
   if (!cached.commands?.length) return null;
   return new Set(cached.commands);
 }
+// --- internal/private functions for testing ---
+export const __test__ = {
+  pickSystemPython,
+  ensureBridgeVenv,
+  parseCoreCommandsFromHelp,
+  tryRapidkit,
+};

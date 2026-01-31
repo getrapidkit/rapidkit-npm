@@ -1,6 +1,6 @@
 {
   "name": "rapidkit",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "type": "module",
   "description": "Create RapidKit projects with a single command - The official CLI for RapidKit framework",
   "keywords": [
@@ -74,6 +74,7 @@
     "@typescript-eslint/parser": "^8.46.2",
     "@vitest/coverage-v8": "^4.0.15",
     "@vitest/ui": "^4.0.15",
+    "c8": "^10.1.3",
     "eslint": "^9.39.2",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",

@@ -30,8 +30,9 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run tests (focused: e2e smoke & Scenario C)
-        run: npm test -- src/__tests__/e2e.create-workspace-smoke.test.ts src/__tests__/scenario-c-system-python-has-core.test.ts
+      - name: "Run tests (focused: e2e smoke & Scenario C)"
+        run: |
+          npm test -- src/__tests__/e2e.create-workspace-smoke.test.ts src/__tests__/scenario-c-system-python-has-core.test.ts
         env:
           # Keep cache/use ephemeral runner tmp directory for bridging artifacts
           XDG_CACHE_HOME: ${{ runner.temp }}

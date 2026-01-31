@@ -5,6 +5,28 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - 2026-01-31
+
+### Added
+
+- 🧪 **Bridge tests:** Added comprehensive unit tests for Python bridge internals, including command discovery, system Python detection, and bootstrap command handling.
+- 🧩 **Bootstrap command coverage:** Explicit tests for core bootstrap command sets to prevent regressions during cold start and help-command failures.
+
+### Changed
+
+- 🧠 **Command discovery logic:** Improved `getCoreTopLevelCommands()` fallback behavior to ensure a stable, non-empty command set when `--help` probing fails.
+- ⚙️ **CI smoke workflow:** Updated e2e smoke workflow to stay aligned with the refined bridge and command discovery behavior.
+
+### Fixed
+
+- 🛠️ **Bridge edge cases:** Fixed scenarios where command discovery could return inconsistent or partial results due to help-command failures or cached state.
+- 🧪 **Test stability:** Reduced brittle assertions in bridge tests to make them resilient to internal implementation changes.
+
+### Notes
+
+- This patch release focuses on stability, test coverage, and safer command discovery behavior in the npm ↔ Python Core bridge layer.
+
+
 ## [0.15.0] - 2026-01-30
 
 ### Added
