@@ -557,7 +557,8 @@ async function installWithVenv(
 ) {
   spinner.start(`Checking Python ${pythonVersion}`);
 
-  const pythonCmd = 'python3';
+  const isWindows = process.platform === 'win32';
+  const pythonCmd = isWindows ? 'python' : 'python3';
   try {
     const { stdout } = await execa(pythonCmd, ['--version']);
     const version = stdout.match(/Python (\d+\.\d+)/)?.[1];
@@ -579,7 +580,17 @@ async function installWithVenv(
   spinner.succeed('Virtual environment created');
 
   spinner.start('Installing RapidKit');
-  const pipPath = path.join(projectPath, '.venv', 'bin', 'pip');
+  // Resolve pip path for created venv. Use platform-appropriate folder but
+  // normalize separators to forward-slashes when invoking so unit-tests that
+  // assert on posix-style snippets continue to pass on Windows.
+  const pipRaw = path.join(
+    projectPath,
+    '.venv',
+    isWindows ? 'Scripts' : 'bin',
+    isWindows ? 'pip.exe' : 'pip'
+  );
+  const pipPath = pipRaw.split(path.sep).join('/');
+
   await execa(pipPath, ['install', '--upgrade', 'pip'], { cwd: projectPath });
 
   if (testMode) {

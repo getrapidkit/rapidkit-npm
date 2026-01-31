@@ -51,7 +51,8 @@
     "security:fix": "npm audit fix",
     "metrics": "npx tsx scripts/metrics.ts",
     "bundle-size": "npm run build && du -sh dist/ && ls -lh dist/",
-    "quality": "npm run validate && npm run security && npm run metrics"
+    "quality": "npm run validate && npm run security && npm run metrics",
+    "act-matrix": "act -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-22.04 -P macos-latest=ghcr.io/catthehacker/ubuntu:act-22.04 -P windows-latest=ghcr.io/catthehacker/ubuntu:act-22.04 --pull=false -j build-test-matrix"
   },
   "dependencies": {
     "chalk": "^5.3.0",
