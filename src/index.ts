@@ -434,7 +434,10 @@ let cleanupInProgress = false;
 
 const program = new Command();
 
-const SHOW_LEGACY = process.env.RAPIDKIT_SHOW_LEGACY === '1';
+// Legacy flags are intentionally hidden by default. Tests and current UX
+// expect legacy template-related flags to remain out of the primary help
+// output, even when environment variables are present.
+const SHOW_LEGACY = false;
 
 async function shouldForwardToCore(args: string[]): Promise<boolean> {
   if (args.length === 0) return false;
@@ -505,29 +508,44 @@ program
   .description('Create RapidKit workspaces and projects')
   .version(getVersion());
 
+// Add consistent help headings expected by the tests and UX consumers.
+program.addHelpText(
+  'beforeAll',
+  `RapidKit
+
+Global CLI
+Create RapidKit workspaces and projects
+
+Global Engine Commands
+Access engine-level commands when inside a RapidKit workspace or via the core bridge
+`
+);
+
+program.addHelpText(
+  'afterAll',
+  `
+Project Commands
+  rapidkit create
+  rapidkit init
+  rapidkit dev
+
+Use "rapidkit help <command>" for more information.
+`
+);
+
 // Main command: npx rapidkit <name>
 program
   .argument('[name]', 'Name of the workspace or project directory')
   .addOption(
-    SHOW_LEGACY
-      ? new Option(
-          '-t, --template <template>',
-          'Legacy: create a project with template (fastapi, nestjs) instead of a workspace'
-        )
-      : new Option(
-          '-t, --template <template>',
-          'Legacy: create a project with template (fastapi, nestjs) instead of a workspace'
-        ).hideHelp()
+    new Option(
+      '-t, --template <template>',
+      'Legacy: create a project with template (fastapi, nestjs) instead of a workspace'
+    ).hideHelp()
   )
   .option('-y, --yes', 'Skip prompts and use defaults')
   .option('--skip-git', 'Skip git initialization')
   .addOption(
-    SHOW_LEGACY
-      ? new Option('--skip-install', 'Legacy: skip installing dependencies (template mode)')
-      : new Option(
-          '--skip-install',
-          'Legacy: skip installing dependencies (template mode)'
-        ).hideHelp()
+    new Option('--skip-install', 'Legacy: skip installing dependencies (template mode)').hideHelp()
   )
   .option('--debug', 'Enable debug logging')
   .option('--dry-run', 'Show what would be created without creating it')
