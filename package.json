@@ -1,6 +1,6 @@
 {
   "name": "rapidkit",
-  "version": "0.16.0",
+  "version": "0.16.3",
   "type": "module",
   "description": "Create RapidKit projects with a single command - The official CLI for RapidKit framework",
   "keywords": [
@@ -27,6 +27,7 @@
     "dist"
   ],
   "scripts": {
+    "sync-kits": "bash scripts/sync-kits.sh",
     "build": "tsup",
     "build:watch": "tsup --watch",
     "dev": "tsup --watch",

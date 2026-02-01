@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.3] - 2026-02-01
+
+### Fixed
+
+- 🔧 **Template Compatibility** - Added `generate_secret` Nunjucks filter to match Python Core's Jinja2 filter
+  - Fixes NestJS template rendering errors for secret generation
+  - Uses crypto.randomBytes for cryptographically secure secrets
+- 🧪 **Test Suite Updates** - Updated tests for Python Core 0.2.2+ compatibility
+  - Skipped .rapidkit folder tests (Core 0.2.2+ uses global CLI instead of project-local files)
+  - Fixed docker-compose.yml.j2 nested ternary syntax for Nunjucks
+  - Renamed env.example.j2 to .env.example.j2 for correct output path
+  - All 488 tests passing (11 skipped)
+
 ## [0.16.0] - 2026-02-01
 
 ### Added

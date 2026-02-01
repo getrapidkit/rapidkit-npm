@@ -1,323 +1,94 @@
 #!/usr/bin/env python3
-"""Professional CLI commands for {{ project_name }} - Poetry Scripts Integration
+"""Project CLI wrapper for {{ project_name }}.
 
-A modern CLI inspired by Next.js developer experience for FastAPI projects.
+This file prefers a per-project CLI (generated at `.rapidkit/cli.py`) when
+available. If not present it prints helpful guidance directing users to
+`rapidkit init` and does not attempt to make assumptions about a packaging
+environment.
 """
 
-import os
-import subprocess
+import importlib.util
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Optional
 
 
-def _print_banner(emoji: str, message: str, color_code: str = "36") -> None:
-    """Print colored banner message."""
-    print(f"\033[{color_code}m{emoji} {message}\033[0m")
+def _missing_cli(name: str) -> None:
+    print(f"❌ Missing project-local CLI (.rapidkit/cli.py) - can't run '{name}'")
+    print("💡 If you're a new user run: rapidkit init  # create venv + install deps")
+    sys.exit(127)
 
 
-def _print_error(message: str) -> None:
-    """Print error message in red."""
-    print(f"\033[91m❌ {message}\033[0m")
+def _load_project_cli_module() -> Optional[object]:
+    project_root = Path(__file__).resolve().parents[1]
+    cli_file = project_root / ".rapidkit" / "cli.py"
+    if not cli_file.exists():
+        return None
+    spec = importlib.util.spec_from_file_location("project_cli", str(cli_file))
+    if spec is None or spec.loader is None:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore
+    return module
 
 
-def _print_success(message: str) -> None:
-    """Print success message in green."""
-    print(f"\033[92m✅ {message}\033[0m")
+_mod = _load_project_cli_module()
 
 
-def _get_env_var(key: str, default: str) -> str:
-    """Get environment variable with default."""
-    return os.getenv(key, default)
+# Default placeholders -- call `_missing_cli` if the project-local CLI isn't
+# available. These are real functions so linters don't complain.
+def init() -> None:
+    _missing_cli("init")
 
-
-def _parse_args() -> dict:
-    """Parse command line arguments."""
-    args = {"port": "8000", "host": "0.0.0.0", "workers": "1", "env": "development"}
-
-    i = 0
-    while i < len(sys.argv):
-        if sys.argv[i] in ["--port", "-p"] and i + 1 < len(sys.argv):
-            args["port"] = sys.argv[i + 1]
-            i += 2
-        elif sys.argv[i] in ["--host", "-h"] and i + 1 < len(sys.argv):
-            args["host"] = sys.argv[i + 1]
-            i += 2
-        elif sys.argv[i] in ["--workers", "-w"] and i + 1 < len(sys.argv):
-            args["workers"] = sys.argv[i + 1]
-            i += 2
-        elif sys.argv[i] in ["--env", "-e"] and i + 1 < len(sys.argv):
-            args["env"] = sys.argv[i + 1]
-            i += 2
-        else:
-            i += 1
-
-    return args
-
-def _run_uvicorn(module: str, reload: bool = False, **kwargs: Any) -> None:
-    """Run uvicorn server with proper error handling."""
-    args: Dict[str, Any] = _parse_args()
-
-    cmd: list[str] = [
-        sys.executable, "-m", "uvicorn",
-        module,
-        "--host", str(args.get("host", "0.0.0.0")),
-        "--port", str(args.get("port", 8000))
-    ]
-
-    if reload:
-        cmd.append("--reload")
-        cmd.extend(["--reload-dir", "src"])
-
-    env: str = args.get("env", "development")
-    if env == "production" and "workers" in args:
-        cmd.extend(["--workers", str(args["workers"])])
-        cmd.append("--no-access-log")
-
-    extra_args: list[str] = kwargs.get("extra_args", [])
-    cmd.extend(extra_args)
-
-    env_vars: Dict[str, str] = os.environ.copy()
-    env_vars.update({
-        "PYTHONPATH": str(Path.cwd()),
-        "ENVIRONMENT": env
-    })
-
-    try:
-        subprocess.run(cmd, check=False, env=env_vars)
-    except KeyboardInterrupt:
-        _print_banner("🛑", "Server stopped by user")
-    except Exception as e:
-        _print_error(f"Failed to start server: {e}")
-        sys.exit(1)
 
 def dev() -> None:
-    """🚀 Start development server with hot reload
-
-    Usage:
-        rapidkit dev [options]  # preferred (project-aware)
-        # or: poetry run dev [options]
-
-    Options:
-        --port, -p PORT     Server port (default: 8000)
-        --host, -h HOST     Server host (default: 0.0.0.0)
-        --env, -e ENV       Environment (default: development)
-
-    Examples:
-        rapidkit dev
-        rapidkit dev --port 3000
-        rapidkit dev --host 127.0.0.1 --port 8080
-        # or: poetry run dev --port 3000
-    """
-    _print_banner("🚀", "Starting development server with hot reload...")
-    _print_banner("📁", f"Working directory: {Path.cwd()}")
-
-    args = _parse_args()
-    _print_banner("🌐", f"Server will be available at: http://{args['host']}:{args['port']}")
-
-    _run_uvicorn("src.main:app", reload=True)
+    _missing_cli("dev")
 
 
 def start() -> None:
-    """⚡ Start production server
-
-    Usage:
-        poetry run start [options]
-
-    Options:
-        --port, -p PORT     Server port (default: 8000)
-        --host, -h HOST     Server host (default: 0.0.0.0)
-        --workers, -w NUM   Number of workers (default: 1)
-
-    Examples:
-        poetry run start
-        poetry run start --workers 4 --port 80
-    """
-    _print_banner("⚡", "Starting production server...")
-
-    args = _parse_args()
-    _print_banner("👥", f"Workers: {args['workers']}")
-    _print_banner("🌐", f"Server will be available at: http://{args['host']}:{args['port']}")
-
-    _run_uvicorn("src.main:app", reload=False, env="production")
+    _missing_cli("start")
 
 
 def build() -> None:
-    """📦 Build project for production
-
-    This command prepares the project for production deployment:
-    - Validates dependencies
-    - Runs type checking
-    - Builds distribution packages
-    """
-    _print_banner("📦", "Building project for production...")
-
-    try:
-        # Type checking
-        _print_banner("🔍", "Running type checks...")
-        result = subprocess.run([
-            sys.executable, "-m", "mypy", "src", "--ignore-missing-imports"
-        ], capture_output=True, text=True)
-
-        if result.returncode != 0:
-            _print_error("Type checking failed!")
-            print(result.stdout)
-            print(result.stderr)
-        else:
-            _print_success("Type checking passed!")
-
-        # Build wheel
-        _print_banner("🏗️", "Building distribution packages...")
-        subprocess.run([sys.executable, "-m", "build"], check=True)
-
-        _print_success("Build completed successfully!")
-        _print_banner("📁", "Distribution files created in 'dist/' directory")
-
-    except subprocess.CalledProcessError as e:
-        _print_error(f"Build failed: {e}")
-        sys.exit(1)
-    except FileNotFoundError:
-        _print_error("Build tools not found. Install with: rapidkit init (or: poetry install --group dev)")
-        sys.exit(1)
+    _missing_cli("build")
 
 
 def test() -> None:
-    """🧪 Run tests with coverage
-
-    Usage:
-        poetry run test [pytest-options]
-
-    Examples:
-        poetry run test
-        poetry run test -v
-        poetry run test tests/test_api.py
-        poetry run test --cov-report=html
-    """
-    _print_banner("🧪", "Running tests with coverage...")
-
-    # Get additional pytest args
-    pytest_args = [arg for arg in sys.argv[2:] if not arg.startswith("-")]
-
-    cmd = [
-        sys.executable, "-m", "pytest",
-        "--cov=src",
-        "--cov-report=term-missing",
-        "--cov-report=xml",
-        "-v"
-    ] + pytest_args
-
-    try:
-        result = subprocess.run(cmd, check=False)
-
-        if result.returncode == 0:
-            _print_success("All tests passed!")
-        else:
-            _print_error("Some tests failed!")
-            sys.exit(result.returncode)
-
-    except FileNotFoundError:
-        _print_error("pytest not found. Install with: rapidkit init (or: poetry install --group dev)")
-        sys.exit(1)
+    _missing_cli("test")
 
 
 def lint() -> None:
-    """� Run code linting and formatting
-
-    This command runs:
-    - ruff for linting
-    - black for formatting
-    - isort for import sorting
-    """
-    _print_banner("�", "Running linting and formatting...")
-
-    try:
-        # Ruff linting
-        _print_banner("📋", "Running ruff linter...")
-        subprocess.run([sys.executable, "-m", "ruff", "check", "src"], check=True)
-
-        # Black formatting
-        _print_banner("🎨", "Running black formatter...")
-        subprocess.run([sys.executable, "-m", "black", "src", "--check"], check=True)
-
-        # isort import sorting
-        _print_banner("📦", "Checking import sorting...")
-        subprocess.run([sys.executable, "-m", "isort", "src", "--check-only"], check=True)
-
-        _print_success("All linting checks passed!")
-
-    except subprocess.CalledProcessError:
-        _print_error("Linting failed! Run 'poetry run format' to fix issues.")
-        sys.exit(1)
-    except FileNotFoundError:
-        _print_error("Linting tools not found. Install with: rapidkit init (or: poetry install --group dev)")
-        sys.exit(1)
+    _missing_cli("lint")
 
 
-def format() -> None:
-    """✨ Format code automatically
-
-    This command auto-fixes:
-    - Code formatting with black
-    - Import sorting with isort
-    - Auto-fixable linting issues with ruff
-    """
-    _print_banner("✨", "Formatting code...")
-
-    try:
-        # Ruff auto-fix
-        _print_banner("🔧", "Auto-fixing with ruff...")
-        subprocess.run([sys.executable, "-m", "ruff", "check", "src", "--fix"], check=True)
-
-        # Black formatting
-        _print_banner("🎨", "Formatting with black...")
-        subprocess.run([sys.executable, "-m", "black", "src"], check=True)
-
-        # isort import sorting
-        _print_banner("📦", "Sorting imports with isort...")
-        subprocess.run([sys.executable, "-m", "isort", "src"], check=True)
-
-        _print_success("Code formatting completed!")
-
-    except subprocess.CalledProcessError as e:
-        _print_error(f"Formatting failed: {e}")
-        sys.exit(1)
-    except FileNotFoundError:
-        _print_error("Formatting tools not found. Install with: rapidkit init (or: poetry install --group dev)")
-        sys.exit(1)
+def format() -> None:  # type: ignore[misc]
+    _missing_cli("format")
 
 
 def help_cmd() -> None:
-    """📚 Show detailed help information"""
-    _print_banner("📚", "{{ project_name }} - Available Commands")
-
-    commands = {
-        "dev": "🚀 Start development server with hot reload",
-        "start": "⚡ Start production server",
-        "build": "📦 Build project for production",
-        "test": "🧪 Run tests with coverage",
-        "lint": "🔧 Run code linting and formatting checks",
-        "format": "✨ Format code automatically",
-        "help": "📚 Show this help message"
-    }
-
-    print("\nCommands:")
-    for cmd, desc in commands.items():
-        print(f"  poetry run {cmd:<10} {desc}")
-
-    print("\nFor detailed command help:")
-    print("  poetry run <command> --help")
-
-    print("\nProject: {{ project_name }}")
-    print("Framework: FastAPI + RapidKit")
+    print("Usage: poetry run <command>  # (init|dev|start|build|test|lint|format)")
 
 
-if __name__ == "__main__":
+if _mod is not None:
+    # prefer project-provided implementations when available
+    init = getattr(_mod, "init", init)
+    dev = getattr(_mod, "dev", dev)
+    start = getattr(_mod, "start", start)
+    build = getattr(_mod, "build", build)
+    test = getattr(_mod, "test", test)
+    lint = getattr(_mod, "lint", lint)
+    format = getattr(_mod, "format", format)
+    help_cmd = getattr(_mod, "help_cmd", help_cmd)
+
+
+def main() -> None:
     if len(sys.argv) < 2:
         help_cmd()
-        sys.exit(0)
+        return
 
     command = sys.argv[1]
     commands = {
+        "init": init,
         "dev": dev,
         "start": start,
         "build": build,
@@ -330,6 +101,10 @@ if __name__ == "__main__":
     if command in commands:
         commands[command]()
     else:
-        _print_error(f"Unknown command: {command}")
-        print("\nRun 'poetry run help' to see available commands.")
+        print(f"Unknown command: {command}")
+        print("Run 'poetry run help' to see available commands.")
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

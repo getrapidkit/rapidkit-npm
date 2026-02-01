@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-# RapidKit CLI - Local project entrypoint
-# Delegates to the project-local launcher under .rapidkit
-
-set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-exec "${SCRIPT_DIR}/.rapidkit/rapidkit" "$@"

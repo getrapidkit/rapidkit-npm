@@ -6,6 +6,7 @@ import ora from 'ora';
 import { fileURLToPath } from 'url';
 import { execa } from 'execa';
 import { getVersion } from './update-checker.js';
+import crypto from 'crypto';
 
 // Get the directory of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +22,20 @@ interface KitVariables {
   package_manager?: string;
   skipGit?: boolean;
   skipInstall?: boolean;
+  engine?: 'poetry' | 'venv' | 'pipx' | 'pip';
+}
+
+/**
+ * Generate a cryptographically secure random secret
+ */
+function generateSecret(length: number = 32): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = crypto.randomBytes(length);
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += alphabet[bytes[i] % alphabet.length];
+  }
+  return result;
 }
 
 export async function generateDemoKit(projectPath: string, variables: KitVariables): Promise<void> {
@@ -40,6 +55,11 @@ export async function generateDemoKit(projectPath: string, variables: KitVariabl
       autoescape: false,
       trimBlocks: true,
       lstripBlocks: true,
+    });
+
+    // Add custom filter for generating secrets
+    env.addFilter('generate_secret', function (_value: any, length: number = 32) {
+      return generateSecret(length);
     });
 
     // Default variables
@@ -105,11 +125,10 @@ export async function generateDemoKit(projectPath: string, variables: KitVariabl
         'tsconfig.build.json.j2',
         'nest-cli.json.j2',
         'jest.config.ts.j2',
-        '.eslintrc.js.j2',
-        '.prettierrc.j2',
-        '.nvmrc.j2',
-        '.node-version.j2',
+        'eslint.config.cjs.j2',
         '.env.example.j2',
+        'docker-compose.yml.j2',
+        'Dockerfile.j2',
         'README.md.j2',
         '.rapidkit/project.json.j2',
         '.rapidkit/rapidkit.j2',
@@ -153,6 +172,24 @@ export async function generateDemoKit(projectPath: string, variables: KitVariabl
         outputFile === 'rapidkit'
       ) {
         await fs.chmod(outputPath, 0o755);
+      }
+    }
+
+    // Copy static context.json file (not a template)
+    if (isFastAPI) {
+      const contextJsonSource = path.join(templatesPath, '.rapidkit', 'context.json');
+      const contextJsonDest = path.join(projectPath, '.rapidkit', 'context.json');
+      try {
+        await fs.mkdir(path.join(projectPath, '.rapidkit'), { recursive: true });
+        await fs.copyFile(contextJsonSource, contextJsonDest);
+      } catch (err) {
+        // If context.json doesn't exist in templates, create a minimal one
+        await fs.mkdir(path.join(projectPath, '.rapidkit'), { recursive: true });
+        const engine = variables.engine || 'pip'; // Default to pip if not specified
+        await fs.writeFile(
+          contextJsonDest,
+          JSON.stringify({ engine, created_by: 'rapidkit-npm-fallback' }, null, 2)
+        );
       }
     }
 
@@ -267,6 +304,14 @@ coverage/
 
     // Success message
     const projectName = path.basename(projectPath);
+
+    // Fallback mode warning
+    console.log(`
+${chalk.yellow('⚠️  Limited offline mode:')} This project was created using basic templates.
+${chalk.gray('For full kit features, install Python 3.10+ and rapidkit-core:')}
+${chalk.cyan('  sudo apt install python3 python3-pip python3-venv')}
+${chalk.cyan('  pip install rapidkit-core')}
+`);
 
     if (isFastAPI) {
       console.log(`

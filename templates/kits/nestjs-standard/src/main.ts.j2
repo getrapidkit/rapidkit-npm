@@ -21,6 +21,8 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // <<<inject:global-middleware>>>
+
   const port = parseInt(process.env.PORT ?? '8000', 10);
   const host = process.env.HOST ?? '0.0.0.0';
 
@@ -28,9 +30,9 @@ async function bootstrap() {
   const enableDocs = process.env.RAPIDKIT_ENABLE_SWAGGER === '1' || process.env.NODE_ENV !== 'production';
   if (enableDocs) {
     const config = new DocumentBuilder()
-      .setTitle('{{ project_name }} API')
-      .setDescription('{{ description }}')
-      .setVersion('{{ app_version }}')
+      .setTitle('{{ project_name | default("RapidKit App") }} API')
+      .setDescription('Auto-generated API docs')
+      .setVersion('{{ app_version | default("1.0.0") }}')
       .addBearerAuth()
       .build();
 
@@ -41,7 +43,7 @@ async function bootstrap() {
   await app.listen(port, host);
 
   logger.log(`🚀 Application is running on http://${host}:${port}`);
-  logger.log(`📚 API docs available at http://${host}:${port}/docs`);
+  // <<<inject:bootstrap-hooks>>>
 }
 
 bootstrap().catch((error) => {

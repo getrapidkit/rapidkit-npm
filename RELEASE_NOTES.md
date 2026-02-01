@@ -1,6 +1,33 @@
 # Release Notes
 
-## Latest Release: v0.16.0 (February 1, 2026)
+## Latest Release: v0.16.3 (February 1, 2026)
+
+### 🔧 v0.16.3 — Template Fixes & Python Core 0.2.2 Compatibility (Patch)
+
+This patch release fixes template rendering issues and updates tests for compatibility with Python Core 0.2.2+.
+
+**What's Fixed:**
+
+- 🔧 **Template Compatibility:** Added `generate_secret` Nunjucks filter to match Python Core's Jinja2 implementation
+  - Fixes NestJS template rendering errors when generating secrets
+  - Uses crypto.randomBytes for cryptographically secure random strings
+- 🧪 **Test Suite Updates:** Updated for Python Core 0.2.2+ which no longer generates `.rapidkit/` project-local CLI files
+  - Skipped 5 tests related to `.rapidkit` folder (Core now uses global CLI)
+  - Fixed docker-compose.yml.j2 nested ternary syntax for Nunjucks compatibility
+  - Renamed env.example.j2 to .env.example.j2 for correct dotfile output
+  - All 488 tests passing, 11 skipped
+
+**Migration Note:** If you previously relied on `.rapidkit/cli.py` or `.rapidkit/rapidkit` launcher scripts in projects, Python Core 0.2.2+ now uses the global `rapidkit` CLI command instead. Update your workflows accordingly.
+
+### ⬆️ Upgrade
+
+```bash
+npm install -g rapidkit@0.16.3
+# or
+npx rapidkit@0.16.3 create project fastapi.standard my-api --output .
+```
+
+## Previous Releases
 
 ### ✨ v0.16.0 — Workspace Registry & Cross-Tool Integration (Minor)
 
@@ -32,6 +59,7 @@ npx rapidkit@0.16.0 create project fastapi.standard my-api --output .
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.16.3](releases/RELEASE_NOTES_v0.16.3.md) | Feb 1, 2026  | Template fixes, Python Core 0.2.2 compatibility, test updates       |
 | [v0.16.0](releases/RELEASE_NOTES_v0.16.0.md) | Feb 1, 2026  | Workspace registry, unified signatures, cross-tool integration       |
 | [v0.15.1](releases/RELEASE_NOTES_v0.15.1.md) | Jan 31, 2026 | Bridge stability, command fallback, improved test coverage           |
 | [v0.15.0](releases/RELEASE_NOTES_v0.15.0.md) | Jan 30, 2026 | Core integration, workspace UX, Scenario C fix, tests & CI           |

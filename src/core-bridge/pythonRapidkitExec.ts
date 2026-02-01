@@ -442,6 +442,32 @@ async function ensureBridgeVenv(pythonCmd: PythonCommand): Promise<string> {
     await runBootstrap(pythonCmd, ['-m', 'venv', venvDir]);
 
     const vpy = bridgePython(venvDir);
+
+    // Check if pip is available in venv (some systems create venv without pip)
+    const pipCheck = await execa(vpy, ['-m', 'pip', '--version'], {
+      reject: false,
+      stdio: 'pipe',
+      timeout: 2000,
+    });
+
+    if (pipCheck.exitCode !== 0) {
+      // pip not available, try to bootstrap it using ensurepip
+      const ensurePipResult = await execa(vpy, ['-m', 'ensurepip', '--default-pip'], {
+        reject: false,
+        stdio: ['ignore', 'pipe', 'inherit'],
+        env: bootstrapEnv,
+      });
+
+      if (ensurePipResult.exitCode !== 0) {
+        // ensurepip also failed, throw error with helpful message
+        throw new Error(
+          'Failed to install pip in virtual environment.\n' +
+            'Your Python installation may be missing the ensurepip module.\n' +
+            'On Debian/Ubuntu, install: sudo apt install python3-venv python3-pip'
+        );
+      }
+    }
+
     if (process.env.RAPIDKIT_BRIDGE_UPGRADE_PIP === '1') {
       await runBootstrap(vpy, ['-m', 'pip', 'install', '-U', 'pip']);
     }

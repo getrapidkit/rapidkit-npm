@@ -2,31 +2,21 @@
 
 from __future__ import annotations
 
+from time import monotonic
+
 from fastapi import APIRouter
 
-try:
-    from src.health.registry import (
-        list_registered_health_routes as _list_registered_health_routes,
-    )
-except ImportError:  # pragma: no cover - registry not generated yet
-    def _list_registered_health_routes(
-        prefix: str = "/api/health",
-    ) -> list[dict[str, str]]:
-        return []
+router = APIRouter(tags=["health"])
 
-
-router = APIRouter(prefix="/health", tags=["health"])
+_START_TIME = monotonic()
 
 
 @router.get("/", summary="Health check")
-async def heartbeat() -> dict[str, str]:
+async def heartbeat() -> dict[str, object]:
     """Return basic service heartbeat."""
-
-    return {"status": "ok"}
-
-
-@router.get("/modules", summary="Registered module health endpoints")
-async def module_health_catalog() -> dict[str, list[dict[str, str]]]:
-    """Expose metadata for module-provided health routers."""
-
-    return {"routes": _list_registered_health_routes()}
+    return {
+        "status": "ok",
+        "version": "{{ app_version }}",
+        "uptime": monotonic() - _START_TIME,
+        "module": "app",
+    }

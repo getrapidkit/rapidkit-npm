@@ -21,17 +21,27 @@ describe('AppController (e2e)', () => {
   });
 
   it('/health (GET)', () => {
-    return request(app.getHttpServer()).get('/health').expect(200).expect({
-      status: 'ok',
-      timestamp: expect.any(String),
-    });
+    return request(app.getHttpServer())
+      .get('/health')
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toEqual(
+          expect.objectContaining({
+            status: 'ok',
+            timestamp: expect.any(String),
+            version: expect.any(String),
+            uptime: expect.any(Number),
+            module: expect.any(String),
+          }),
+        );
+      });
   });
 
   it('/examples/notes (POST + GET)', async () => {
     const server = app.getHttpServer();
     const createResponse = await request(server)
       .post('/examples/notes')
-      .send({ title: 'test', body: 'e2e test note' })
+      .send({ title: 'ddd', body: 'documented via e2e' })
       .expect(201);
 
     const noteId = createResponse.body.id;
@@ -41,8 +51,10 @@ describe('AppController (e2e)', () => {
       .expect(200)
       .expect((res) => {
         expect(res.body).toEqual(
-          expect.arrayContaining([expect.objectContaining({ id: noteId, title: 'test' })]),
+          expect.arrayContaining([expect.objectContaining({ id: noteId, title: 'ddd' })]),
         );
       });
   });
+
+  // <<<inject:e2e-tests>>>
 });

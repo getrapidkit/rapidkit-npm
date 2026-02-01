@@ -1,22 +1,14 @@
 {
   "name": "{{ project_name | replace('_', '-') | lower }}",
-  "version": "{{ app_version }}",
-  "description": "{{ description }}",
-  "license": "{{ license }}",
+  "version": "{{ app_version | default('1.0.0') }}",
+  "description": "{{ description | default('NestJS application generated with RapidKit') }}",
+  "license": "{{ license | default('Apache-2.0') }}",
   "author": "{{ author }}",
   "engines": {
-    "node": ">=20.19.6"
+    "node": ">={{ node_version }}"
   },
   "private": true,
   "scripts": {
-    "rapidkit": "./.rapidkit/rapidkit",
-    "rapidkit:init": "npm install",
-    "rapidkit:dev": "./.rapidkit/rapidkit dev",
-    "rapidkit:start": "./.rapidkit/rapidkit start",
-    "rapidkit:build": "./.rapidkit/rapidkit build",
-    "rapidkit:test": "./.rapidkit/rapidkit test",
-    "rapidkit:lint": "./.rapidkit/rapidkit lint",
-    "rapidkit:format": "./.rapidkit/rapidkit format",
     "start": "node dist/main",
     "dev": "nest start --watch",
     "start:dev": "nest start --watch",
@@ -45,9 +37,38 @@
     "winston": "^3.19.0",
     "joi": "^18.0.2",
     "@nestjs/terminus": "^11.0.0",
+    {% if database_type in ['postgresql', 'mysql'] %}
+    "@nestjs/typeorm": "^11.0.0",
+    "typeorm": "^0.3.28",
+    {% if database_type == 'postgresql' %}
+    "pg": "^8.16.3",
+    {% elif database_type == 'mysql' %}
+    "mysql2": "^3.15.3",
+    {% endif %}
+    {% elif database_type == 'mongodb' %}
+    "@nestjs/mongoose": "^11.0.3",
+    "mongoose": "^9.0.1",
+    {% endif %}
+    {% if include_caching %}
+    "@nestjs/cache-manager": "^3.0.1",
+    "cache-manager": "^7.2.6",
+    "cache-manager-redis-store": "^3.0.1",
+    "ioredis": "^5.8.2",
+    {% endif %}
+    {% if include_monitoring %}
+    "prom-client": "^15.1.3",
+    {% endif %}
+    {% if auth_type in ['jwt', 'oauth2'] %}
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/passport": "^11.0.5",
+    "bcrypt": "^6.0.0",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    {% endif %}
     "dotenv": "^17.2.3"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
     "@nestjs/cli": "^11.0.14",
     "@nestjs/schematics": "^11.0.9",
     "@nestjs/testing": "^11.1.10",
@@ -71,5 +92,9 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "cross-spawn": "7.0.5",
+    "glob": "10.5.0"
   }
 }

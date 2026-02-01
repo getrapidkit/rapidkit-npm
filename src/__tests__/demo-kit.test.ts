@@ -190,47 +190,10 @@ describe('Demo Kit Generator', () => {
       // This test verifies the directory is created successfully
     });
 
-    it('should generate .rapidkit folder with all required files', async () => {
-      const projectPath = path.join(testDir, 'rapidkit-folder-test');
-      const variables = {
-        project_name: 'rapidkit_folder_test',
-        author: 'Test Author',
-      };
+    // NOTE: Python Core 0.2.2+ no longer generates .rapidkit folder
+    // Projects now use the global RapidKit CLI instead of project-local CLI files
 
-      await generateDemoKit(projectPath, variables);
-
-      // Check .rapidkit folder exists
-      const rapidkitPath = path.join(projectPath, '.rapidkit');
-      const rapidkitExists = await fs
-        .stat(rapidkitPath)
-        .then(() => true)
-        .catch(() => false);
-      expect(rapidkitExists).toBe(true);
-
-      // Check required files exist
-      const projectJsonPath = path.join(rapidkitPath, 'project.json');
-      const cliPyPath = path.join(rapidkitPath, 'cli.py');
-      const rapidkitLauncherPath = path.join(rapidkitPath, 'rapidkit');
-
-      const projectJsonExists = await fs
-        .stat(projectJsonPath)
-        .then(() => true)
-        .catch(() => false);
-      const cliPyExists = await fs
-        .stat(cliPyPath)
-        .then(() => true)
-        .catch(() => false);
-      const rapidkitLauncherExists = await fs
-        .stat(rapidkitLauncherPath)
-        .then(() => true)
-        .catch(() => false);
-
-      expect(projectJsonExists).toBe(true);
-      expect(cliPyExists).toBe(true);
-      expect(rapidkitLauncherExists).toBe(true);
-    });
-
-    it('should make .rapidkit/rapidkit and .rapidkit/cli.py executable', async () => {
+    it.skip('should make .rapidkit/rapidkit and .rapidkit/cli.py executable', async () => {
       const projectPath = path.join(testDir, 'executable-test');
       const variables = {
         project_name: 'executable_test',
@@ -255,7 +218,7 @@ describe('Demo Kit Generator', () => {
       }
     });
 
-    it('should generate valid project.json content', async () => {
+    it.skip('should generate valid project.json content', async () => {
       const projectPath = path.join(testDir, 'json-content-test');
       const variables = {
         project_name: 'json_content_test',
@@ -273,7 +236,7 @@ describe('Demo Kit Generator', () => {
       expect(projectJson.kit_name).toBe('fastapi.standard');
     });
 
-    it('should generate cli.py with dev command', async () => {
+    it.skip('should generate cli.py with dev command', async () => {
       const projectPath = path.join(testDir, 'cli-content-test');
       const variables = {
         project_name: 'cli_content_test',
@@ -292,7 +255,7 @@ describe('Demo Kit Generator', () => {
       expect(content).toContain('uvicorn');
     });
 
-    it('should generate rapidkit launcher script', async () => {
+    it.skip('should generate rapidkit launcher script', async () => {
       const projectPath = path.join(testDir, 'launcher-test');
       const variables = {
         project_name: 'launcher_test',
@@ -375,7 +338,7 @@ describe('Demo Kit Generator', () => {
       expect(appModuleExists).toBe(true);
     });
 
-    it('should generate NestJS .rapidkit folder', async () => {
+    it.skip('should generate NestJS .rapidkit folder', async () => {
       const projectPath = path.join(testDir, 'nestjs-rapidkit-folder');
       const variables = {
         project_name: 'nestjs_rapidkit_folder',

@@ -2,25 +2,45 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # <<<inject:imports>>>
 
+try:
+    # canonical health package
+    from src.health import register_health_routes as _core_register_health_routes
+except ImportError:  # pragma: no cover - health package not generated yet
+
+    def _register_health_routes(_: FastAPI) -> None:
+        return None
+
+else:
+
+    def _register_health_routes(app: FastAPI) -> None:
+        try:
+            _core_register_health_routes(app)
+        except Exception:  # pragma: no cover - defensive best-effort registration
+            return None
+
+
 from .routing import api_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Application lifespan context manager for startup/shutdown events."""
-    # Startup
+    """Coordinate startup/shutdown hooks contributed by RapidKit modules."""
+
+    _ = app  # ensure the app reference stays available for injected hooks
     # <<<inject:startup>>>
-    yield
-    # Shutdown
-    # <<<inject:shutdown>>>
+    try:
+        yield
+    finally:
+        # <<<inject:shutdown>>>
+        pass
 
 
 app = FastAPI(
@@ -41,4 +61,6 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix="/api")
+# Expose module-provided health routers under /api/health/module/*
+_register_health_routes(app)
 # <<<inject:routes>>>

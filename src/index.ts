@@ -108,16 +108,35 @@ async function runCreateFallback(args: string[], reasonCode: BridgeFailureCode):
       return 1;
     }
 
+    // Try to detect workspace engine from marker
+    let engine: 'poetry' | 'venv' | 'pipx' | 'pip' = 'pip';
+    const workspacePath = findWorkspaceUp(process.cwd());
+    if (workspacePath) {
+      try {
+        const { readWorkspaceMarker } = await import('./workspace-marker.js');
+        const marker = await readWorkspaceMarker(workspacePath);
+        if (marker?.metadata?.npm?.installMethod) {
+          engine = marker.metadata.npm.installMethod;
+          console.log(`[DEBUG] Detected workspace engine: ${engine}`);
+        }
+      } catch (err) {
+        console.log(`[DEBUG] Failed to read workspace marker:`, err);
+        // Ignore errors, use default 'pip'
+      }
+    } else {
+      console.log(`[DEBUG] No workspace found, using default engine: pip`);
+    }
+
     await fsExtra.ensureDir(projectPath);
     await generateDemoKit(projectPath, {
       project_name: name,
       template,
       skipGit,
       skipInstall,
+      engine,
     });
 
     // Sync workspace to register the new project
-    const workspacePath = findWorkspaceUp(process.cwd());
     if (workspacePath) {
       const { syncWorkspaceProjects } = await import('./workspace.js');
       await syncWorkspaceProjects(workspacePath, true); // silent sync
