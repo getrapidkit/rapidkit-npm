@@ -18,19 +18,19 @@ import {
   RapidKitNotAvailableError,
 } from './errors.js';
 import { getPythonCommand } from './utils.js';
+import {
+  createNpmWorkspaceMarker,
+  writeWorkspaceMarker as writeMarker,
+} from './workspace-marker.js';
 
-async function writeWorkspaceMarker(workspacePath: string, workspaceName: string): Promise<void> {
-  const markerPath = path.join(workspacePath, '.rapidkit-workspace');
-  const marker = {
-    signature: 'RAPIDKIT_VSCODE_WORKSPACE',
-    createdBy: 'rapidkit-npm',
-    version: getVersion(),
-    createdAt: new Date().toISOString(),
-    name: workspaceName,
-  };
+async function writeWorkspaceMarker(
+  workspacePath: string,
+  workspaceName: string,
+  installMethod?: 'poetry' | 'venv' | 'pipx'
+): Promise<void> {
+  const marker = createNpmWorkspaceMarker(workspaceName, getVersion(), installMethod);
 
-  // Use outputFile (instead of writeJson) so it works cleanly with test mocks.
-  await fsExtra.outputFile(markerPath, JSON.stringify(marker, null, 2) + '\n', 'utf-8');
+  await writeMarker(workspacePath, marker);
 }
 
 async function writeWorkspaceGitignore(workspacePath: string): Promise<void> {
@@ -294,6 +294,7 @@ interface CreateProjectOptions {
   dryRun?: boolean;
   yes?: boolean;
   userConfig?: UserConfig;
+  installMethod?: InstallMethod;
 }
 
 export async function createProject(
@@ -311,6 +312,7 @@ export async function createProject(
     dryRun = false,
     yes = false,
     userConfig = {},
+    installMethod: providedInstallMethod,
   } = options;
 
   // Default to 'rapidkit' directory
@@ -338,8 +340,11 @@ export async function createProject(
   const pythonAnswers: { pythonVersion: string; installMethod: InstallMethod } = yes
     ? {
         pythonVersion: userConfig.pythonVersion || '3.10',
-        // Prefer user config when available; otherwise use venv (least external deps).
-        installMethod: (userConfig.defaultInstallMethod as InstallMethod | undefined) || 'venv',
+        // Prefer CLI flag, then user config, then default to poetry (recommended).
+        installMethod:
+          providedInstallMethod ||
+          (userConfig.defaultInstallMethod as InstallMethod | undefined) ||
+          'poetry',
       }
     : ((await inquirer.prompt([
         {
@@ -358,8 +363,8 @@ export async function createProject(
             { name: '📦 pip with venv (Standard)', value: 'venv' },
             { name: '🔧 pipx (Global isolated install)', value: 'pipx' },
           ],
-          // The VS Code extension workspace uses venv+pip by default.
-          default: userConfig.defaultInstallMethod || 'venv',
+          // Poetry is recommended as default
+          default: userConfig.defaultInstallMethod || 'poetry',
         },
       ])) as { pythonVersion: string; installMethod: InstallMethod });
 
@@ -372,7 +377,7 @@ export async function createProject(
     spinner.succeed('Directory created');
 
     // Create workspace marker compatible with the VS Code extension.
-    await writeWorkspaceMarker(projectPath, name);
+    await writeWorkspaceMarker(projectPath, name, pythonAnswers.installMethod);
 
     // Create .gitignore regardless of git initialization (matches VS Code extension behavior).
     await writeWorkspaceGitignore(projectPath);
@@ -420,6 +425,15 @@ export async function createProject(
       } catch (_error) {
         spinner.warn('Could not initialize git repository');
       }
+    }
+
+    // Register workspace in shared registry for Extension compatibility
+    try {
+      const { registerWorkspace } = await import('./workspace.js');
+      await registerWorkspace(projectPath, name);
+    } catch (_err) {
+      // Silent fail - registry is optional, but log warning
+      console.warn(chalk.gray('Note: Could not register workspace in shared registry'));
     }
 
     // Success message
@@ -577,8 +591,45 @@ async function installWithVenv(
   }
 
   spinner.start('Creating virtual environment');
-  await execa(pythonCmd, ['-m', 'venv', '.venv'], { cwd: projectPath });
-  spinner.succeed('Virtual environment created');
+  try {
+    await execa(pythonCmd, ['-m', 'venv', '.venv'], { cwd: projectPath });
+    spinner.succeed('Virtual environment created');
+  } catch (venvError: unknown) {
+    spinner.fail('Failed to create virtual environment');
+
+    // Type guard: check if error has stdout property (from execa)
+    const hasStdout = (err: unknown): err is { stdout: string } => {
+      return (
+        typeof err === 'object' &&
+        err !== null &&
+        'stdout' in err &&
+        typeof (err as Record<string, unknown>).stdout === 'string'
+      );
+    };
+
+    // Check if it's the ensurepip issue
+    if (hasStdout(venvError) && venvError.stdout.includes('ensurepip is not')) {
+      const match = venvError.stdout.match(/apt install (python[\d.]+-venv)/);
+      const packageName = match ? match[1] : 'python3-venv';
+
+      throw new InstallationError(
+        'Python venv module not available',
+        new Error(
+          `Virtual environment creation failed.\n\n` +
+            `On Debian/Ubuntu systems, install the venv package:\n` +
+            `  sudo apt install ${packageName}\n\n` +
+            `Or use Poetry instead (recommended):\n` +
+            `  npx rapidkit ${path.basename(projectPath)} --yes`
+        )
+      );
+    }
+
+    // Other venv errors
+    throw new InstallationError(
+      'Virtual environment creation',
+      venvError instanceof Error ? venvError : new Error(String(venvError))
+    );
+  }
 
   spinner.start('Installing RapidKit');
   // Use python -m pip for cross-platform compatibility.
@@ -679,19 +730,19 @@ export async function registerWorkspaceAtPath(
     pythonVersion = '3.10',
   } = options || {};
 
+  // Choose install method (Poetry is now default, recommended)
+  const method: InstallMethod =
+    (installMethod as InstallMethod) ||
+    (userConfig.defaultInstallMethod as InstallMethod) ||
+    'poetry';
+
   // Create marker and gitignore
-  await writeWorkspaceMarker(workspacePath, path.basename(workspacePath));
+  await writeWorkspaceMarker(workspacePath, path.basename(workspacePath), method);
   await writeWorkspaceGitignore(workspacePath);
 
   const spinner = ora('Registering workspace').start();
 
   try {
-    // Choose install method
-    const method: InstallMethod =
-      (installMethod as InstallMethod) ||
-      (userConfig.defaultInstallMethod as InstallMethod) ||
-      'venv';
-
     if (method === 'poetry') {
       await installWithPoetry(workspacePath, pythonVersion, spinner, testMode, userConfig, yes);
     } else if (method === 'venv') {
@@ -704,6 +755,14 @@ export async function registerWorkspaceAtPath(
     await createReadme(workspacePath, method);
 
     spinner.succeed('Workspace registered');
+
+    // Register in shared registry for Extension compatibility
+    try {
+      const { registerWorkspace } = await import('./workspace.js');
+      await registerWorkspace(workspacePath, path.basename(workspacePath));
+    } catch (_err) {
+      // Silent fail - registry is optional
+    }
 
     if (!skipGit) {
       spinner.start('Initializing git repository');

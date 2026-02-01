@@ -3,12 +3,254 @@ import path from 'path';
 import chalk from 'chalk';
 import ora from 'ora';
 import { execa } from 'execa';
+import os from 'os';
 import { getVersion } from './update-checker.js';
+
+interface WorkspaceProject {
+  name: string;
+  path: string;
+}
+
+interface WorkspaceEntry {
+  name: string;
+  path: string;
+  mode?: string;
+  projects: WorkspaceProject[];
+}
+
+interface WorkspaceRegistry {
+  workspaces: WorkspaceEntry[];
+}
 
 interface WorkspaceOptions {
   name: string;
   author: string;
   skipGit?: boolean;
+}
+
+/**
+ * Register workspace in shared registry (~/.rapidkit/workspaces.json)
+ * This enables VS Code Extension to discover workspaces created via npm
+ */
+export async function registerWorkspace(workspacePath: string, name: string): Promise<void> {
+  try {
+    // Use XDG_CONFIG_HOME on Unix, APPDATA on Windows, fallback to home
+    const configHome =
+      process.env.XDG_CONFIG_HOME || process.env.APPDATA || path.join(os.homedir(), '.config');
+
+    // On Windows, use APPDATA/.rapidkit, on Unix use ~/.rapidkit for backward compatibility
+    const registryDir =
+      process.platform === 'win32'
+        ? path.join(configHome, 'rapidkit')
+        : path.join(os.homedir(), '.rapidkit');
+
+    const registryFile = path.join(registryDir, 'workspaces.json');
+
+    // Ensure directory exists
+    await fs.mkdir(registryDir, { recursive: true });
+
+    // Read existing workspaces
+    let registry: WorkspaceRegistry = { workspaces: [] };
+    try {
+      const content = await fs.readFile(registryFile, 'utf8');
+      const parsed = JSON.parse(content) as WorkspaceRegistry;
+      if (parsed && Array.isArray(parsed.workspaces)) {
+        registry = parsed;
+      }
+    } catch (_error) {
+      // File doesn't exist or is invalid, start fresh
+    }
+
+    // Add workspace if not already registered
+    const exists = registry.workspaces.some((w) => w.path === workspacePath);
+    if (!exists) {
+      registry.workspaces.push({
+        name,
+        path: workspacePath,
+        mode: 'full',
+        projects: [],
+      });
+
+      await fs.writeFile(registryFile, JSON.stringify(registry, null, 2));
+    }
+  } catch (_error) {
+    // Silent fail - registry is optional
+    console.warn(chalk.gray('Note: Could not register workspace in shared registry'));
+  }
+}
+
+/**
+ * Register a project in its workspace's registry entry
+ * Updates the projects array in the workspace registry
+ */
+/**
+ * Scan workspace directory and register all projects that have .rapidkit/context.json
+ */
+export async function syncWorkspaceProjects(workspacePath: string, silent = false): Promise<void> {
+  try {
+    const configHome =
+      process.env.XDG_CONFIG_HOME || process.env.APPDATA || path.join(os.homedir(), '.config');
+
+    const registryDir =
+      process.platform === 'win32'
+        ? path.join(configHome, 'rapidkit')
+        : path.join(os.homedir(), '.rapidkit');
+
+    const registryFile = path.join(registryDir, 'workspaces.json');
+
+    // Read registry
+    let registry: WorkspaceRegistry = { workspaces: [] };
+    try {
+      const content = await fs.readFile(registryFile, 'utf8');
+      const parsed = JSON.parse(content) as WorkspaceRegistry;
+      if (parsed && Array.isArray(parsed.workspaces)) {
+        registry = parsed;
+      }
+    } catch (_error) {
+      if (!silent) console.log('⚠️  Workspace registry not found');
+      return;
+    }
+
+    // Find workspace in registry
+    const workspace = registry.workspaces.find((w) => w.path === workspacePath);
+    if (!workspace) {
+      if (!silent) console.log('⚠️  Workspace not registered in registry');
+      return;
+    }
+
+    // Initialize projects array if needed
+    if (!Array.isArray(workspace.projects)) {
+      workspace.projects = [];
+    }
+
+    // Scan workspace directory for projects
+    const entries = await fs.readdir(workspacePath, { withFileTypes: true });
+    let addedCount = 0;
+    let skippedCount = 0;
+
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith('.')) {
+        const projectPath = path.join(workspacePath, entry.name);
+
+        // Check for either context.json or project.json (different rapidkit versions)
+        const contextFile = path.join(projectPath, '.rapidkit', 'context.json');
+        const projectFile = path.join(projectPath, '.rapidkit', 'project.json');
+
+        // Check if this is a RapidKit project
+        try {
+          let isRapidkitProject = false;
+          try {
+            await fs.access(contextFile);
+            isRapidkitProject = true;
+          } catch {
+            // Try project.json instead
+            await fs.access(projectFile);
+            isRapidkitProject = true;
+          }
+
+          if (isRapidkitProject) {
+            // Check if already registered
+            const exists = workspace.projects.some(
+              (p) => p.path === projectPath || p.name === entry.name
+            );
+
+            if (!exists) {
+              workspace.projects.push({
+                name: entry.name,
+                path: projectPath,
+              });
+              addedCount++;
+              if (!silent) console.log(`✔ Added: ${entry.name}`);
+            } else {
+              skippedCount++;
+            }
+          }
+        } catch {
+          // Not a RapidKit project, skip
+        }
+      }
+    }
+
+    if (addedCount > 0) {
+      await fs.writeFile(registryFile, JSON.stringify(registry, null, 2));
+      if (!silent) console.log(`\n✅ Synced ${addedCount} project(s) to registry`);
+    } else {
+      if (!silent) console.log(`\n✅ All projects already registered (${skippedCount} found)`);
+    }
+  } catch (error) {
+    if (!silent) console.error('❌ Failed to sync projects:', (error as Error).message);
+  }
+}
+
+export async function registerProjectInWorkspace(
+  workspacePath: string,
+  projectName: string,
+  projectPath: string
+): Promise<void> {
+  try {
+    const configHome =
+      process.env.XDG_CONFIG_HOME || process.env.APPDATA || path.join(os.homedir(), '.config');
+
+    const registryDir =
+      process.platform === 'win32'
+        ? path.join(configHome, 'rapidkit')
+        : path.join(os.homedir(), '.rapidkit');
+
+    const registryFile = path.join(registryDir, 'workspaces.json');
+    console.log(`[REGISTRY DEBUG] Registry file: ${registryFile}`);
+
+    // Read registry
+    let registry: WorkspaceRegistry = { workspaces: [] };
+    try {
+      const content = await fs.readFile(registryFile, 'utf8');
+      const parsed = JSON.parse(content) as WorkspaceRegistry;
+      if (parsed && Array.isArray(parsed.workspaces)) {
+        registry = parsed;
+      }
+      console.log(`[REGISTRY DEBUG] Registry loaded, ${registry.workspaces.length} workspaces`);
+    } catch (_error) {
+      // Registry doesn't exist - silently return
+      console.log(`[REGISTRY DEBUG] Registry doesn't exist, returning`);
+      return;
+    }
+
+    // Find workspace
+    const workspace = registry.workspaces.find((w) => w.path === workspacePath);
+    if (!workspace) {
+      // Workspace not registered - silently return
+      console.log(`[REGISTRY DEBUG] Workspace not found in registry, returning`);
+      return;
+    }
+
+    console.log(`[REGISTRY DEBUG] Workspace found: ${workspace.name}`);
+
+    // Initialize projects array if needed
+    if (!Array.isArray(workspace.projects)) {
+      workspace.projects = [];
+    }
+
+    // Add project if not already in list
+    const projectExists = workspace.projects.some(
+      (p) => p.path === projectPath || p.name === projectName
+    );
+
+    if (!projectExists) {
+      console.log(`[REGISTRY DEBUG] Adding project to registry`);
+      workspace.projects.push({
+        name: projectName,
+        path: projectPath,
+      });
+
+      // Write back to registry
+      await fs.writeFile(registryFile, JSON.stringify(registry, null, 2));
+      console.log(`[REGISTRY DEBUG] Registry updated successfully`);
+    } else {
+      console.log(`[REGISTRY DEBUG] Project already exists in registry`);
+    }
+  } catch (error) {
+    // Silent fail - registry tracking is optional
+    console.log(`[REGISTRY DEBUG] Error: ${error}`);
+  }
 }
 
 export async function createWorkspace(
@@ -65,12 +307,12 @@ Thumbs.db
 `;
     await fs.writeFile(path.join(workspacePath, '.gitignore'), gitignore);
 
-    // Create VS Code extension-compatible workspace marker for auto-detection.
+    // Create workspace marker for auto-detection (compatible with Extension)
     await fs.writeFile(
       path.join(workspacePath, '.rapidkit-workspace'),
       JSON.stringify(
         {
-          signature: 'RAPIDKIT_VSCODE_WORKSPACE',
+          signature: 'RAPIDKIT_WORKSPACE',
           createdBy: 'rapidkit-npm',
           version: getVersion(),
           createdAt: new Date().toISOString(),
@@ -100,6 +342,9 @@ Thumbs.db
         gitSpinner.warn('Could not initialize git repository');
       }
     }
+
+    // Register workspace in shared registry for Extension compatibility
+    await registerWorkspace(workspacePath, options.name);
 
     // Success message
     console.log(`
@@ -870,4 +1115,56 @@ function renderTemplate(content: string, context: Record<string, string>): strin
   }
 
   return result;
+}
+
+/**
+ * List all registered workspaces from shared registry
+ */
+export async function listWorkspaces(): Promise<void> {
+  // Use same logic as registerWorkspace for consistency
+  const configHome =
+    process.env.XDG_CONFIG_HOME || process.env.APPDATA || path.join(os.homedir(), '.config');
+
+  const registryDir =
+    process.platform === 'win32'
+      ? path.join(configHome, 'rapidkit')
+      : path.join(os.homedir(), '.rapidkit');
+
+  const registryFile = path.join(registryDir, 'workspaces.json');
+
+  if (!(await fs.stat(registryFile).catch(() => null))) {
+    console.log(chalk.yellow('\n⚠️  No workspaces registered yet.\n'));
+    console.log(chalk.gray('Create a workspace with: npx rapidkit <workspace-name>\n'));
+    return;
+  }
+
+  try {
+    const content = await fs.readFile(registryFile, 'utf8');
+    const registry = JSON.parse(content);
+
+    if (!registry.workspaces || registry.workspaces.length === 0) {
+      console.log(chalk.yellow('\n⚠️  No workspaces registered yet.\n'));
+      return;
+    }
+
+    console.log(chalk.bold('\n📦 Registered RapidKit Workspaces:\n'));
+
+    for (const ws of registry.workspaces) {
+      console.log(chalk.cyan(`  ${ws.name}`));
+      console.log(chalk.gray(`    Path: ${ws.path}`));
+      console.log(chalk.gray(`    Projects: ${ws.projects?.length || 0}`));
+
+      // Check if workspace still exists
+      const exists = await fs.stat(ws.path).catch(() => null);
+      if (!exists) {
+        console.log(chalk.red('    ⚠️  Path not found'));
+      }
+      console.log();
+    }
+
+    console.log(chalk.gray(`Total: ${registry.workspaces.length} workspace(s)\n`));
+  } catch (error) {
+    console.error(chalk.red('\n❌ Failed to read workspace registry'));
+    console.error(chalk.gray(String(error)));
+  }
 }

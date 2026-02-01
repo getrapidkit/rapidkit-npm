@@ -116,6 +116,13 @@ async function runCreateFallback(args: string[], reasonCode: BridgeFailureCode):
       skipInstall,
     });
 
+    // Sync workspace to register the new project
+    const workspacePath = findWorkspaceUp(process.cwd());
+    if (workspacePath) {
+      const { syncWorkspaceProjects } = await import('./workspace.js');
+      await syncWorkspaceProjects(workspacePath, true); // silent sync
+    }
+
     return 0;
   } catch (e) {
     process.stderr.write(`RapidKit (npm) offline fallback failed: ${(e as Error)?.message ?? e}\n`);
@@ -199,10 +206,47 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
 
       try {
         await resolveRapidkitPython();
-        return await runCoreRapidkit(filteredArgs, { cwd: process.cwd() });
+        const exitCode = await runCoreRapidkit(filteredArgs, { cwd: process.cwd() });
+
+        // If project creation succeeded, sync workspace to register all projects
+        if (exitCode === 0) {
+          const workspacePath = findWorkspaceUp(process.cwd());
+          if (workspacePath) {
+            const { syncWorkspaceProjects } = await import('./workspace.js');
+            await syncWorkspaceProjects(workspacePath, true); // silent sync
+          }
+        }
+
+        return exitCode;
       } catch (e) {
         const code = bridgeFailureCode(e);
         if (code) return await runCreateFallback(filteredArgs, code);
+        process.stderr.write(
+          `RapidKit (npm) failed to run the Python core engine: ${(e as Error)?.message ?? e}\n`
+        );
+        return 1;
+      }
+    }
+
+    // Handle `create` command (interactive mode without explicit project subcommand)
+    if (args[0] === 'create' && args[1] !== 'project') {
+      try {
+        await resolveRapidkitPython();
+        const exitCode = await runCoreRapidkit(args, { cwd: process.cwd() });
+
+        // If create succeeded, sync workspace to register all projects
+        if (exitCode === 0) {
+          const workspacePath = findWorkspaceUp(process.cwd());
+          if (workspacePath) {
+            const { syncWorkspaceProjects } = await import('./workspace.js');
+            await syncWorkspaceProjects(workspacePath, true); // silent sync
+          }
+        }
+
+        return exitCode;
+      } catch (e) {
+        const code = bridgeFailureCode(e);
+        if (code) return await runCreateFallback(args, code);
         process.stderr.write(
           `RapidKit (npm) failed to run the Python core engine: ${(e as Error)?.message ?? e}\n`
         );
@@ -271,14 +315,36 @@ function findWorkspaceMarkerUp(start: string): string | null {
   return null;
 }
 
+/**
+ * Find workspace directory (not just marker file)
+ * Returns the directory containing .rapidkit-workspace
+ */
+function findWorkspaceUp(start: string): string | null {
+  let p = start;
+
+  while (true) {
+    const candidate = path.join(p, '.rapidkit-workspace');
+    if (fs.existsSync(candidate)) return p; // Return directory, not file
+    const parent = path.dirname(p);
+    if (parent === p) break;
+    p = parent;
+  }
+  return null;
+}
+
 async function delegateToLocalCLI(): Promise<boolean> {
   const cwd = process.cwd();
+  const args = process.argv.slice(2);
+
+  // CRITICAL: Never delegate 'create' command - npm CLI must handle it for project registry tracking
+  if (args[0] === 'create') {
+    return false;
+  }
 
   // UX improvement: when the user is already inside a RapidKit workspace created by the VS Code
   // extension (marker: .rapidkit-workspace), prefer showing the Python Core help output.
   // This avoids confusing users with npm workspace-creation help when they simply type `rapidkit`.
   try {
-    const args = process.argv.slice(2);
     const firstArg = args[0];
     const isHelpLike =
       !firstArg || firstArg === '--help' || firstArg === '-h' || firstArg === 'help';
@@ -294,18 +360,20 @@ async function delegateToLocalCLI(): Promise<boolean> {
   // Prefer the official Core contract when possible (best-effort).
   // This is safe here because this function is awaited before CLI execution.
   try {
-    const args = process.argv.slice(2);
     const firstArg = args[0];
 
     const allowShellActivate = firstArg === 'shell' && args[1] === 'activate';
 
+    // DON'T delegate `create` command - let npm CLI handle it for project registry tracking
+    const isCreateCommand = firstArg === 'create';
+
     const detected = await detectRapidkitProject(cwd, { cwd, timeoutMs: 1200 });
     if (detected.ok && detected.data?.isRapidkitProject && detected.data.engine === 'python') {
-      if (!allowShellActivate) {
+      if (!allowShellActivate && !isCreateCommand) {
         const code = await runCoreRapidkit(process.argv.slice(2), { cwd });
         process.exit(code);
       }
-      // allow npm-only shell helpers
+      // allow npm-only shell helpers and create command
     }
   } catch {
     // Ignore and fall back to filesystem detection.
@@ -334,12 +402,14 @@ async function delegateToLocalCLI(): Promise<boolean> {
     }
   }
 
-  const args = process.argv.slice(2);
   const firstArg = args[0];
+
+  // DON'T delegate `create` command - let npm CLI handle it for project registry tracking
+  const isCreateCommand = firstArg === 'create';
 
   // If we have a local script AND the command is a local command, delegate immediately
   // This works for projects created with --template (npm engine) and workspace projects
-  if (localScript && firstArg && LOCAL_COMMANDS.includes(firstArg)) {
+  if (localScript && firstArg && LOCAL_COMMANDS.includes(firstArg) && !isCreateCommand) {
     logger.debug(`Delegating to local CLI: ${localScript} ${args.join(' ')}`);
 
     const child = spawn(localScript, args, {
@@ -366,7 +436,6 @@ async function delegateToLocalCLI(): Promise<boolean> {
     try {
       const ctx = await fsExtra.readJson(contextFile);
       if (ctx.engine === 'pip') {
-        const args = process.argv.slice(2);
         const firstArg = args[0];
 
         // If a local project script exists, delegate there first (prefer local CLI)
@@ -445,8 +514,9 @@ async function shouldForwardToCore(args: string[]): Promise<boolean> {
   const first = args[0];
   const second = args[1];
 
-  // npm-only helper
+  // npm-only commands
   if (first === 'shell' && second === 'activate') return false;
+  if (first === 'workspace') return false; // workspace management is npm-only
 
   // core global flag
   if (args.includes('--tui')) return true;
@@ -549,6 +619,11 @@ program
   )
   .option('--debug', 'Enable debug logging')
   .addOption(new Option('--dry-run', 'Show what would be created without creating it').hideHelp())
+  .addOption(
+    new Option('--install-method <method>', 'Installation method: poetry, venv, or pipx')
+      .choices(['poetry', 'venv', 'pipx'])
+      .hideHelp()
+  )
   .addOption(
     new Option(
       '--create-workspace',
@@ -723,6 +798,7 @@ program
           dryRun: options.dryRun,
           yes: options.yes,
           userConfig,
+          installMethod: options.installMethod,
         });
       }
     } catch (error) {
@@ -833,6 +909,31 @@ program
       const snippet = `# RapidKit: activation snippet - eval "$(rapidkit shell activate)"\nVENV='.venv'\nif [ -f "$VENV/bin/activate" ]; then\n  . "$VENV/bin/activate"\nelif [ -f "$VENV/bin/activate.fish" ]; then\n  source "$VENV/bin/activate.fish"\nfi\nexport RAPIDKIT_PROJECT_ROOT="$(pwd)"\nexport PATH="$(pwd):$PATH"\n`;
       console.log(snippet);
       process.exit(0);
+    }
+  });
+
+// Workspace management command
+program
+  .command('workspace <action>')
+  .description('Manage RapidKit workspaces (list, sync)')
+  .action(async (action: string) => {
+    if (action === 'list') {
+      const { listWorkspaces } = await import('./workspace.js');
+      await listWorkspaces();
+    } else if (action === 'sync') {
+      const workspacePath = findWorkspaceUp(process.cwd());
+      if (!workspacePath) {
+        console.log(chalk.red('❌ Not inside a RapidKit workspace'));
+        console.log(chalk.gray('💡 Run this command from within a workspace directory'));
+        process.exit(1);
+      }
+      const { syncWorkspaceProjects } = await import('./workspace.js');
+      console.log(chalk.cyan(`📂 Scanning workspace: ${path.basename(workspacePath)}`));
+      await syncWorkspaceProjects(workspacePath);
+    } else {
+      console.log(chalk.red(`Unknown workspace action: ${action}`));
+      console.log(chalk.gray('Available: list, sync'));
+      process.exit(1);
     }
   });
 

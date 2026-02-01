@@ -390,7 +390,26 @@ async function ensureBridgeVenv(pythonCmd: PythonCommand): Promise<string> {
   const py = bridgePython(venvDir);
 
   if (await fsExtra.pathExists(py)) {
-    return py;
+    // Validate that rapidkit-core is actually installed in this venv
+    try {
+      const probeResult = await execa(
+        py,
+        ['-c', "import importlib.util; print(1 if importlib.util.find_spec('rapidkit') else 0)"],
+        {
+          reject: false,
+          stdio: 'pipe',
+          timeout: 2000,
+        }
+      );
+      if (probeResult.exitCode === 0 && (probeResult.stdout ?? '').toString().trim() === '1') {
+        return py;
+      }
+      // rapidkit not found in venv, remove it and rebuild
+      await fsExtra.remove(venvDir);
+    } catch {
+      // probe error, remove and rebuild
+      await fsExtra.remove(venvDir);
+    }
   }
 
   const bootstrapEnv: NodeJS.ProcessEnv = {

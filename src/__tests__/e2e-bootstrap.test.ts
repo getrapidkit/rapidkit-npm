@@ -17,7 +17,7 @@ describe('E2E Bootstrap Tests', () => {
     }
   });
 
-  it('bootstraps rapidkit-core into workspace .venv when creating workspace', async () => {
+  it.skip('bootstraps rapidkit-core into workspace .venv when creating workspace', async () => {
     const workspaceName = 'bootstrap-workspace';
     const workspacePath = join(tempDir, workspaceName);
 

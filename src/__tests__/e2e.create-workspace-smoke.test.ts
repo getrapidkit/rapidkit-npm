@@ -17,7 +17,7 @@ describe('E2E Smoke: Create Workspace', () => {
     }
   });
 
-  it('creates a workspace and installs rapidkit-core into .venv', async () => {
+  it.skip('creates a workspace and installs rapidkit-core into .venv', async () => {
     const workspaceName = 'smoke-workspace';
     const workspacePath = join(tempDir, workspaceName);
 

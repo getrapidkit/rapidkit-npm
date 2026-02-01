@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { registerWorkspaceAtPath } from '../create.js';
-import { getPythonCommand } from '../utils.js';
 import * as fsExtra from 'fs-extra';
 import { execa } from 'execa';
 
@@ -32,7 +31,7 @@ describe('registerWorkspaceAtPath', () => {
     vi.restoreAllMocks();
   });
 
-  it('should write workspace marker and gitignore and install via venv by default', async () => {
+  it('should write workspace marker and gitignore and install via Poetry by default', async () => {
     vi.mocked(fsExtra.outputFile).mockResolvedValue(undefined);
     vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
 
@@ -53,25 +52,16 @@ describe('registerWorkspaceAtPath', () => {
       'utf-8'
     );
 
-    const pythonCmd = getPythonCommand();
-    // venv creation command
-    expect(execa).toHaveBeenCalledWith(pythonCmd, ['-m', 'venv', '.venv'], { cwd: testPath });
-
-    // pip upgrade using venv python -m pip
-    const expectedVenvPythonPath = expect.stringContaining('.venv');
+    // Poetry commands (default install method)
+    expect(execa).toHaveBeenCalledWith('poetry', ['--version']);
     expect(execa).toHaveBeenCalledWith(
-      expectedVenvPythonPath,
-      ['-m', 'pip', 'install', '--upgrade', 'pip'],
+      'poetry',
+      ['init', '--no-interaction', '--python', '^3.10'],
       { cwd: testPath }
     );
-
-    // pip install rapidkit-core using venv python -m pip
-    expect(execa).toHaveBeenCalledWith(
-      expectedVenvPythonPath,
-      ['-m', 'pip', 'install', 'rapidkit-core'],
-      {
-        cwd: testPath,
-      }
-    );
+    expect(execa).toHaveBeenCalledWith('poetry', ['config', 'virtualenvs.in-project', 'true'], {
+      cwd: testPath,
+    });
+    expect(execa).toHaveBeenCalledWith('poetry', ['add', 'rapidkit-core'], { cwd: testPath });
   });
 });

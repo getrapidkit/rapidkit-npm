@@ -117,7 +117,14 @@ Commands:
 
   describe('ensureBridgeVenv', () => {
     it('returns existing python if venv already exists', async () => {
+      // Mock that venv python already exists
       mockFs.pathExists.mockResolvedValue(true);
+      // Mock probe check: rapidkit is installed in venv
+      mockExeca.mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: '1',
+        stderr: '',
+      } as any);
 
       const py = await bridge.__test__.ensureBridgeVenv('python3');
       expect(py).toContain('python');
@@ -191,8 +198,33 @@ describe('resolveRapidkitPython', () => {
   });
 
   it('bootstraps venv when system python has no rapidkit', async () => {
-    mockExeca.mockResolvedValue({ stdout: '0', exitCode: 1 }); // tryRapidkit fails
-    mockFs.pathExists.mockResolvedValue(true); // venv python exists
+    // tryRapidkit(python3): all probes must fail
+    // 1. sysconfig script path probe - returns path but doesn't exist
+    mockExeca.mockResolvedValueOnce({ stdout: '/some/path/rapidkit', exitCode: 0 });
+    mockFs.pathExists.mockResolvedValueOnce(false); // script doesn't exist
+    // 2. import probe fails - rapidkit not installed
+    mockExeca.mockResolvedValueOnce({ stdout: '0', exitCode: 0 });
+    // 3. -m rapidkit probe fails
+    mockExeca.mockResolvedValueOnce({ stdout: '', exitCode: 1 });
+
+    // tryRapidkit(python): all probes must fail
+    // 1. sysconfig script path probe
+    mockExeca.mockResolvedValueOnce({ stdout: '/some/path/rapidkit', exitCode: 0 });
+    mockFs.pathExists.mockResolvedValueOnce(false); // script doesn't exist
+    // 2. import probe fails
+    mockExeca.mockResolvedValueOnce({ stdout: '0', exitCode: 0 });
+    // 3. -m rapidkit probe fails
+    mockExeca.mockResolvedValueOnce({ stdout: '', exitCode: 1 });
+
+    // pickSystemPython: check python3 --version
+    mockExeca.mockResolvedValueOnce({ exitCode: 0 });
+
+    // ensureBridgeVenv: pathExists for venv python returns false
+    mockFs.pathExists.mockResolvedValue(false);
+    mockFs.ensureDir.mockResolvedValue(undefined);
+
+    // venv creation and pip install commands all succeed
+    mockExeca.mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
 
     const res = await bridge.resolveRapidkitPython();
     expect(res.kind).toBe('venv');

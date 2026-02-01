@@ -1,31 +1,38 @@
 # Release Notes
 
-## Latest Release: v0.15.1 (January 31, 2026)
+## Latest Release: v0.16.0 (February 1, 2026)
 
-### ✨ v0.15.1 — Bridge Stability & Test Coverage (Patch)
+### ✨ v0.16.0 — Workspace Registry & Cross-Tool Integration (Minor)
 
-This patch focuses on stabilizing the npm ↔ Python Core bridge, improving fallback behavior for command discovery, and adding comprehensive unit tests.
+This release introduces shared workspace registry for seamless integration between npm CLI and VS Code Extension, plus unified workspace signatures for better cross-tool compatibility.
 
 **What's New:**
 
-- 🧠 **Robust command discovery:** `getCoreTopLevelCommands()` now falls back to the bootstrap command set when `--help` probing fails, ensuring a stable non-empty command set.
-- 🧪 **Improved test coverage:** Added unit tests for Python bridge internals (`pythonRapidkitExec`), bootstrap commands, and system Python detection to prevent regressions.
-- ⚙️ **CI workflow update:** `.github/workflows/e2e-smoke.yml` updated to align with improved bridge behavior and ensure consistent results on GitHub Actions.
-- 🛠️ **Bridge fixes:** Edge cases in command discovery and bootstrap handling are now resolved to prevent partial or inconsistent results.
-- ✅ **Stability improvements:** Assertions in bridge tests made resilient to internal implementation changes, reducing flaky test failures.
+- 📋 **Workspace Registry:** Shared registry at `~/.rapidkit/workspaces.json` enables cross-tool workspace discovery between npm CLI and VS Code Extension
+  - `registerWorkspace()` function automatically registers workspaces
+  - `workspace list` command to view all registered workspaces (no Python dependency)
+  - VS Code Extension can discover npm-created workspaces and vice versa
+- 🏷️ **Unified Workspace Signature:** Changed marker from `RAPIDKIT_VSCODE_WORKSPACE` to `RAPIDKIT_WORKSPACE`
+  - Backward compatible: Both signatures recognized
+  - Workspace markers now identify creator: `createdBy: 'rapidkit-npm'`
+- 🔍 **Command Routing:** `workspace` command now handled by npm package only (not forwarded to Python Core)
+  - Enables workspace management without Python dependency
+  - Faster execution for workspace operations
+- 📝 **Documentation:** Comprehensive workspace registry and cross-tool compatibility docs added
 
 ### ⬆️ Upgrade
 
 ```bash
-npm install -g rapidkit@0.15.1
+npm install -g rapidkit@0.16.0
 # or
-npx rapidkit@0.15.1 create project fastapi.standard my-api --output .
+npx rapidkit@0.16.0 create project fastapi.standard my-api --output .
 ```
 
 ## Previous Releases
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.16.0](releases/RELEASE_NOTES_v0.16.0.md) | Feb 1, 2026  | Workspace registry, unified signatures, cross-tool integration       |
 | [v0.15.1](releases/RELEASE_NOTES_v0.15.1.md) | Jan 31, 2026 | Bridge stability, command fallback, improved test coverage           |
 | [v0.15.0](releases/RELEASE_NOTES_v0.15.0.md) | Jan 30, 2026 | Core integration, workspace UX, Scenario C fix, tests & CI           |
 | [v0.14.2](releases/RELEASE_NOTES_v0.14.2.md) | Jan 23, 2026 | Documentation & cleanup           |

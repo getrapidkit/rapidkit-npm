@@ -5,6 +5,35 @@ All notable changes to RapidKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.16.0] - 2026-02-01
+
+### Added
+
+- 📋 **Workspace Registry** - Shared workspace registry at `~/.rapidkit/workspaces.json` enables cross-tool workspace discovery
+  - `registerWorkspace()` function automatically registers workspaces in shared registry
+  - `workspace list` command to view all registered workspaces (npm-only, no Python dependency)
+  - VS Code Extension can discover npm-created workspaces
+  - npm package can discover Extension-created workspaces
+
+### Changed
+
+- 🏷️ **Unified Workspace Signature** - Changed workspace marker signature from `RAPIDKIT_VSCODE_WORKSPACE` to `RAPIDKIT_WORKSPACE`
+  - Improves cross-tool compatibility between npm package and VS Code Extension
+  - Backward compatible: Both signatures are recognized
+  - Workspace markers now clearly identify creator: `createdBy: 'rapidkit-npm'`
+
+- 🔍 **Command Routing** - `workspace` command now handled by npm package only (not forwarded to Python Core)
+  - Enables workspace management without Python dependency
+  - Faster execution for workspace listing
+
+### Documentation
+
+- 📝 Added comprehensive workspace registry documentation to README
+- 📝 Documented workspace marker format and cross-tool compatibility
+- 📝 Added examples for `workspace list` command
+
 ## [0.15.1] - 2026-01-31
 
 ### Added
