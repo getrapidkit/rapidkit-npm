@@ -182,7 +182,7 @@ export async function generateDemoKit(projectPath: string, variables: KitVariabl
       try {
         await fs.mkdir(path.join(projectPath, '.rapidkit'), { recursive: true });
         await fs.copyFile(contextJsonSource, contextJsonDest);
-      } catch (err) {
+      } catch (_err) {
         // If context.json doesn't exist in templates, create a minimal one
         await fs.mkdir(path.join(projectPath, '.rapidkit'), { recursive: true });
         const engine = variables.engine || 'pip'; // Default to pip if not specified
