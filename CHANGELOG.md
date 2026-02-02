@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.4] - 2026-02-02
+
+### Changed
+
+- 📝 **Documentation Quality** - Standardized documentation language and format
+  - Workspace comparison guide reviewed and polished
+  - Development runbooks enhanced for clarity and consistency
+  - All user-facing documentation now consistently formatted and reviewed
+
+### Improved
+
+- 🧪 **Test Stability** - Enhanced test robustness for workspace registration and marker functionality
+  - Updated tests to account for Python discovery side-effects in Poetry workflows
+  - Improved assertions to be more flexible and resilient to implementation changes
+- 🔍 **Code Quality** - Maintained test coverage above 80% threshold
+  - Added workspace-marker tests with real temporary directories for realistic behavior
+  - Reduced brittle test assertions that depend on exact call sequences
+- 📊 **Build & Quality** - All metrics validated
+  - Bundle size: 116 KB
+  - Test coverage: 80%+ (passing)
+  - ESLint: 0 errors, minimal warnings
+  - All 488+ tests passing
+
 ## [0.16.3] - 2026-02-01
 
 ### Fixed

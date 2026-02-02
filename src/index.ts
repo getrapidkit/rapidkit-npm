@@ -227,10 +227,34 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
         await resolveRapidkitPython();
         const exitCode = await runCoreRapidkit(filteredArgs, { cwd: process.cwd() });
 
-        // If project creation succeeded, sync workspace to register all projects
+        // If project creation succeeded, sync Python version and register workspace projects
         if (exitCode === 0) {
           const workspacePath = findWorkspaceUp(process.cwd());
           if (workspacePath) {
+            // Sync Python version from workspace to newly created project
+            try {
+              // Extract project name from args: create project <kit> <name>
+              const projectName = args[3];
+              if (projectName) {
+                const outputIndex = args.indexOf('--output');
+                const outputDir = outputIndex >= 0 ? args[outputIndex + 1] : '.';
+                const projectPath = path.resolve(process.cwd(), outputDir, projectName);
+
+                const workspacePythonVersionFile = path.join(workspacePath, '.python-version');
+                const projectPythonVersionFile = path.join(projectPath, '.python-version');
+
+                if (fs.existsSync(workspacePythonVersionFile) && fs.existsSync(projectPath)) {
+                  const pythonVersion = fs.readFileSync(workspacePythonVersionFile, 'utf-8');
+                  fs.writeFileSync(projectPythonVersionFile, pythonVersion.trim() + '\n');
+                  logger.debug(
+                    `Synced Python version ${pythonVersion.trim()} from workspace to ${projectName}`
+                  );
+                }
+              }
+            } catch (err) {
+              logger.debug('Could not sync Python version from workspace:', err);
+            }
+
             const { syncWorkspaceProjects } = await import('./workspace.js');
             await syncWorkspaceProjects(workspacePath, true); // silent sync
           }
@@ -807,9 +831,48 @@ program
         const createCode = await runCoreRapidkit(createArgs, { cwd: process.cwd() });
         if (createCode !== 0) process.exit(createCode);
 
+        // Copy workspace Python version to project if inside a workspace
+        // This must be done AFTER rapidkit-core creates the project, as it may
+        // overwrite .python-version during module installation
+        const workspaceMarker = findWorkspaceMarkerUp(process.cwd());
+        if (workspaceMarker) {
+          const workspaceRoot = path.dirname(workspaceMarker);
+          const workspacePythonVersionFile = path.join(workspaceRoot, '.python-version');
+          const projectPythonVersionFile = path.join(targetPath, '.python-version');
+
+          try {
+            if (await fsExtra.pathExists(workspacePythonVersionFile)) {
+              const pythonVersion = fs.readFileSync(workspacePythonVersionFile, 'utf-8');
+              fs.writeFileSync(projectPythonVersionFile, pythonVersion.trim() + '\n');
+              logger.debug(
+                `Synced Python version ${pythonVersion.trim()} from workspace to project`
+              );
+            }
+          } catch (err) {
+            logger.debug('Could not sync Python version from workspace:', err);
+          }
+        }
+
         if (!options.skipInstall) {
           const initCode = await runCoreRapidkit(['init', targetPath], { cwd: process.cwd() });
           if (initCode !== 0) process.exit(initCode);
+
+          // Sync Python version again after init, in case it was overwritten
+          if (workspaceMarker) {
+            const workspaceRoot = path.dirname(workspaceMarker);
+            const workspacePythonVersionFile = path.join(workspaceRoot, '.python-version');
+            const projectPythonVersionFile = path.join(targetPath, '.python-version');
+
+            try {
+              if (await fsExtra.pathExists(workspacePythonVersionFile)) {
+                const pythonVersion = fs.readFileSync(workspacePythonVersionFile, 'utf-8');
+                fs.writeFileSync(projectPythonVersionFile, pythonVersion.trim() + '\n');
+                logger.debug(`Re-synced Python version ${pythonVersion.trim()} after init`);
+              }
+            } catch (err) {
+              logger.debug('Could not re-sync Python version after init:', err);
+            }
+          }
         }
       } else {
         await createPythonEnvironment(name, {

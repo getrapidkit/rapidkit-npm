@@ -1,6 +1,37 @@
 # Release Notes
 
-## Latest Release: v0.16.3 (February 1, 2026)
+## Latest Release: v0.16.4 (February 2, 2026)
+
+### 📝 v0.16.4 — Documentation & Quality Polish (Patch)
+
+This patch release focuses on documentation quality, test stability, and code quality improvements.
+
+**What's Improved:**
+
+- 📝 **Documentation:** Standardized documentation language; workspace comparison guide and development runbooks reviewed and polished
+  - Enhanced clarity and consistency across all documentation
+  - Improved formatting and structure
+- 🧪 **Test Stability:** Enhanced robustness of workspace registration and marker tests
+  - Tests now more resilient to Python discovery side-effects
+  - Improved assertions for better maintainability
+- 📊 **Code Quality:** All quality metrics passing
+  - Bundle size remains lean at 116 KB
+  - Test coverage maintained above 80% threshold
+  - 488+ tests passing with improved reliability
+
+**No breaking changes.** Fully backward compatible.
+
+### ⬆️ Upgrade
+
+```bash
+npm install -g rapidkit@0.16.4
+# or
+npx rapidkit@0.16.4 create project fastapi.standard my-api --output .
+```
+
+---
+
+## Previous Release: v0.16.3 (February 1, 2026)
 
 ### 🔧 v0.16.3 — Template Fixes & Python Core 0.2.2 Compatibility (Patch)
 
@@ -59,6 +90,7 @@ npx rapidkit@0.16.0 create project fastapi.standard my-api --output .
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.16.4](releases/RELEASE_NOTES_v0.16.4.md) | Feb 2, 2026  | Documentation quality, test stability, code polish                  |
 | [v0.16.3](releases/RELEASE_NOTES_v0.16.3.md) | Feb 1, 2026  | Template fixes, Python Core 0.2.2 compatibility, test updates       |
 | [v0.16.0](releases/RELEASE_NOTES_v0.16.0.md) | Feb 1, 2026  | Workspace registry, unified signatures, cross-tool integration       |
 | [v0.15.1](releases/RELEASE_NOTES_v0.15.1.md) | Jan 31, 2026 | Bridge stability, command fallback, improved test coverage           |

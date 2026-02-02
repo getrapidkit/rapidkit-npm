@@ -59,9 +59,25 @@ describe('registerWorkspaceAtPath', () => {
       ['init', '--no-interaction', '--python', '^3.10'],
       { cwd: testPath }
     );
-    expect(execa).toHaveBeenCalledWith('poetry', ['config', 'virtualenvs.in-project', 'true'], {
-      cwd: testPath,
-    });
-    expect(execa).toHaveBeenCalledWith('poetry', ['add', 'rapidkit-core'], { cwd: testPath });
+    expect(execa).toHaveBeenCalledWith(
+      'poetry',
+      ['config', 'virtualenvs.in-project', 'true', '--local'],
+      {
+        cwd: testPath,
+      }
+    );
+    // Verify poetry add was called with the correct arguments
+    // Note: The exact call sequence may vary due to Python discovery and other checks
+    const addCalls = vi
+      .mocked(execa)
+      .mock.calls.filter(
+        (call) => call[0] === 'poetry' && Array.isArray(call[1]) && call[1][0] === 'add'
+      );
+    expect(addCalls.length).toBeGreaterThan(0);
+    // The first add call should have cwd and timeout
+    expect(addCalls[0][0]).toBe('poetry');
+    expect(addCalls[0][1]).toEqual(['add', 'rapidkit-core']);
+    expect(addCalls[0][2]).toHaveProperty('cwd', testPath);
+    expect(addCalls[0][2]).toHaveProperty('timeout');
   });
 });

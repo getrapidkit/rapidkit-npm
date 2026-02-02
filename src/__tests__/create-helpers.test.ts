@@ -121,7 +121,7 @@ describe('Create Module Helpers', () => {
       // Verify the exact config call arguments
       expect(vi.mocked(execa)).toHaveBeenCalledWith(
         'poetry',
-        ['config', 'virtualenvs.in-project', 'true'],
+        ['config', 'virtualenvs.in-project', 'true', '--local'],
         { cwd: expect.stringContaining('my-poetry-project') }
       );
     });

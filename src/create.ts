@@ -20,17 +20,24 @@ import {
 import { getPythonCommand } from './utils.js';
 import {
   createNpmWorkspaceMarker,
-  writeWorkspaceMarker as writeMarker,
+  writeWorkspaceMarker as writeWorkspaceMarkerToFile,
 } from './workspace-marker.js';
 
 async function writeWorkspaceMarker(
   workspacePath: string,
   workspaceName: string,
-  installMethod?: 'poetry' | 'venv' | 'pipx'
+  installMethod?: 'poetry' | 'venv' | 'pipx',
+  pythonVersion?: string
 ): Promise<void> {
-  const marker = createNpmWorkspaceMarker(workspaceName, getVersion(), installMethod);
+  const markerObj = createNpmWorkspaceMarker(workspaceName, getVersion(), installMethod);
 
-  await writeMarker(workspacePath, marker);
+  // Add Python version to marker if provided
+  if (pythonVersion) {
+    if (!markerObj.metadata) markerObj.metadata = {};
+    (markerObj.metadata as any).python = { version: pythonVersion };
+  }
+
+  await writeWorkspaceMarkerToFile(workspacePath, markerObj);
 }
 
 async function writeWorkspaceGitignore(workspacePath: string): Promise<void> {
@@ -45,6 +52,34 @@ async function writeWorkspaceGitignore(workspacePath: string): Promise<void> {
 type InstallMethod = 'poetry' | 'venv' | 'pipx';
 
 type PipxInvoker = { kind: 'binary' } | { kind: 'python-module'; pythonCmd: string };
+
+// Detect actual Python version installed on system (not just requested version)
+async function detectActualPythonVersion(pythonCmd: string): Promise<string | null> {
+  try {
+    const { stdout } = await execa(pythonCmd, ['--version'], { timeout: 3000 });
+    const match = stdout.match(/Python (\d+\.\d+\.\d+)/);
+    if (match) {
+      return match[1]; // Return full version like "3.10.19"
+    }
+  } catch {
+    // Ignore
+  }
+  return null;
+}
+
+// Write .python-version file to workspace for pyenv compatibility
+async function writePythonVersion(workspacePath: string, pythonVersion: string): Promise<void> {
+  try {
+    await fsPromises.writeFile(
+      path.join(workspacePath, '.python-version'),
+      `${pythonVersion}\n`,
+      'utf-8'
+    );
+    logger.debug(`Created .python-version with ${pythonVersion}`);
+  } catch (error) {
+    logger.warn(`Failed to create .python-version: ${error}`);
+  }
+}
 
 function ensureUserLocalBinOnPath(): void {
   // pipx typically installs shims into ~/.local/bin on Linux/macOS.
@@ -376,22 +411,86 @@ export async function createProject(
     await fsExtra.ensureDir(projectPath);
     spinner.succeed('Directory created');
 
-    // Create workspace marker compatible with the VS Code extension.
-    await writeWorkspaceMarker(projectPath, name, pythonAnswers.installMethod);
+    // Detect actual Python version before installation
+    spinner.start('Detecting Python version');
+    let actualPythonVersion: string | null = null;
+    const realPython = await findRealPython(pythonAnswers.pythonVersion);
+    if (realPython) {
+      actualPythonVersion = await detectActualPythonVersion(realPython);
+      if (actualPythonVersion) {
+        logger.info(`Detected Python ${actualPythonVersion}`);
+        spinner.succeed(`Python ${actualPythonVersion} detected`);
+      } else {
+        spinner.warn('Could not detect exact Python version');
+      }
+    } else {
+      // Fallback to getPythonCommand
+      const pythonCmd = getPythonCommand();
+      actualPythonVersion = await detectActualPythonVersion(pythonCmd);
+      if (actualPythonVersion) {
+        spinner.succeed(`Python ${actualPythonVersion} detected`);
+      } else {
+        spinner.warn('Could not detect Python version, proceeding with defaults');
+      }
+    }
+
+    // Create workspace marker with actual Python version
+    await writeWorkspaceMarker(
+      projectPath,
+      name,
+      pythonAnswers.installMethod,
+      actualPythonVersion || undefined
+    );
+
+    // Write .python-version file for pyenv compatibility
+    if (actualPythonVersion) {
+      await writePythonVersion(projectPath, actualPythonVersion);
+    }
 
     // Create .gitignore regardless of git initialization (matches VS Code extension behavior).
     await writeWorkspaceGitignore(projectPath);
 
     // Install RapidKit based on method
     if (pythonAnswers.installMethod === 'poetry') {
-      await installWithPoetry(
-        projectPath,
-        pythonAnswers.pythonVersion,
-        spinner,
-        testMode,
-        userConfig,
-        yes
-      );
+      try {
+        await installWithPoetry(
+          projectPath,
+          pythonAnswers.pythonVersion,
+          spinner,
+          testMode,
+          userConfig,
+          yes
+        );
+      } catch (poetryError: any) {
+        // If Poetry fails due to pyenv shim issues, try venv as fallback
+        const errorDetails = poetryError?.details || poetryError?.message || String(poetryError);
+        const isShimError =
+          errorDetails.includes('pyenv') ||
+          errorDetails.includes('exit status 127') ||
+          errorDetails.includes('returned non-zero exit status 127');
+
+        if (isShimError) {
+          spinner.warn('Poetry encountered Python discovery issues, trying venv method');
+          logger.debug(`Poetry error (attempting venv fallback): ${errorDetails}`);
+
+          try {
+            await installWithVenv(
+              projectPath,
+              pythonAnswers.pythonVersion,
+              spinner,
+              testMode,
+              userConfig
+            );
+            // Update the marker to reflect actual install method
+            pythonAnswers.installMethod = 'venv';
+          } catch (venvError) {
+            // Both methods failed - throw the venv error as it's more recent
+            throw venvError;
+          }
+        } else {
+          throw poetryError;
+        }
+      }
     } else if (pythonAnswers.installMethod === 'venv') {
       await installWithVenv(
         projectPath,
@@ -501,6 +600,67 @@ export async function createProject(
   }
 }
 
+// Find real Python executable (bypass pyenv shims that might fail)
+async function findRealPython(pythonVersion: string): Promise<string | null> {
+  // Try multiple strategies to find a working Python
+  const candidates: string[] = [];
+
+  // 1. Try pyenv versions directly (bypass shims)
+  try {
+    const { stdout } = await execa('pyenv', ['root']);
+    const pyenvRoot = stdout.trim();
+    // Try specific version first
+    candidates.push(path.join(pyenvRoot, 'versions', `${pythonVersion}.*`, 'bin', 'python'));
+    // Try major.minor pattern
+    const [major, minor] = pythonVersion.split('.');
+    candidates.push(path.join(pyenvRoot, 'versions', `${major}.${minor}.*`, 'bin', 'python'));
+  } catch {
+    // pyenv not available or failed
+  }
+
+  // 2. Try direct python commands
+  candidates.push(
+    `python${pythonVersion}`,
+    `python3.${pythonVersion.split('.')[1]}`,
+    'python3',
+    'python'
+  );
+
+  // 3. Try common installation paths
+  candidates.push(
+    `/usr/bin/python${pythonVersion}`,
+    `/usr/bin/python3`,
+    `/usr/local/bin/python${pythonVersion}`,
+    `/usr/local/bin/python3`
+  );
+
+  // Test each candidate
+  for (const candidate of candidates) {
+    try {
+      // Expand glob if present
+      let pythonPath = candidate;
+      if (candidate.includes('*')) {
+        const globMatch = await execa('sh', ['-c', `ls -d ${candidate} 2>/dev/null | head -1`]);
+        pythonPath = globMatch.stdout.trim();
+        if (!pythonPath) continue;
+        pythonPath = path.join(pythonPath.split('/').slice(0, -1).join('/'), '../bin/python');
+      }
+
+      const { stdout } = await execa(pythonPath, ['--version'], { timeout: 2000 });
+      const version = stdout.match(/Python (\d+\.\d+)/)?.[1];
+      if (version && parseFloat(version) >= parseFloat(pythonVersion)) {
+        // Verify this Python actually works (not a broken shim)
+        await execa(pythonPath, ['-c', 'import sys; sys.exit(0)'], { timeout: 2000 });
+        return pythonPath;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
 // Install RapidKit with Poetry
 async function installWithPoetry(
   projectPath: string,
@@ -512,30 +672,81 @@ async function installWithPoetry(
 ) {
   await ensurePoetryAvailable(spinner, yes);
 
+  // Find a working Python before initializing Poetry
+  spinner.start('Finding Python interpreter');
+  const realPython = await findRealPython(pythonVersion);
+  if (realPython) {
+    logger.debug(`Found working Python: ${realPython}`);
+    spinner.succeed('Python found');
+  } else {
+    spinner.warn('Could not verify Python path, proceeding with default');
+  }
+
   spinner.start('Initializing Poetry project');
   await execa('poetry', ['init', '--no-interaction', '--python', `^${pythonVersion}`], {
     cwd: projectPath,
   });
 
-  // Set package-mode = false since this is a workspace, not a package
-  const pyprojectPath = path.join(projectPath, 'pyproject.toml');
-  const pyprojectContent = await fsPromises.readFile(pyprojectPath, 'utf-8');
-  const updatedContent = pyprojectContent.replace(
-    '[tool.poetry]',
-    '[tool.poetry]\npackage-mode = false'
-  );
-  await fsPromises.writeFile(pyprojectPath, updatedContent, 'utf-8');
-
   spinner.succeed('Poetry project initialized');
 
-  // Ensure Poetry creates virtual environments inside the project (match VS Code extension behavior)
-  spinner.start('Configuring Poetry to create in-project virtualenv');
+  // Set package-mode = false since this is a workspace, not a package
+  // Poetry 2.2+ uses PEP 621 format with [project] instead of [tool.poetry]
+  const pyprojectPath = path.join(projectPath, 'pyproject.toml');
+  const pyprojectContent = await fsPromises.readFile(pyprojectPath, 'utf-8');
+
+  let updatedContent = pyprojectContent;
+
+  // Try to add package-mode = false in the right place
+  if (updatedContent.includes('[tool.poetry]')) {
+    // Old format - add after [tool.poetry]
+    updatedContent = updatedContent.replace('[tool.poetry]', '[tool.poetry]\npackage-mode = false');
+  } else if (updatedContent.includes('[project]')) {
+    // New PEP 621 format - add before [build-system]
+    if (updatedContent.includes('[build-system]')) {
+      updatedContent = updatedContent.replace(
+        '[build-system]',
+        '\n[tool.poetry]\npackage-mode = false\n\n[build-system]'
+      );
+    } else {
+      // Add at the end if no build-system section
+      updatedContent += '\n\n[tool.poetry]\npackage-mode = false\n';
+    }
+  }
+
+  await fsPromises.writeFile(pyprojectPath, updatedContent, 'utf-8');
+
+  // Configure Poetry to use the real Python we found and create in-project virtualenv
+  spinner.start('Configuring Poetry');
   try {
-    await execa('poetry', ['config', 'virtualenvs.in-project', 'true'], { cwd: projectPath });
+    // Use --local to avoid affecting global Poetry config
+    await execa('poetry', ['config', 'virtualenvs.in-project', 'true', '--local'], {
+      cwd: projectPath,
+    });
+
+    // If we found a specific Python, tell Poetry to use it
+    if (realPython) {
+      try {
+        await execa('poetry', ['env', 'use', realPython], { cwd: projectPath });
+        logger.debug(`Poetry configured to use: ${realPython}`);
+      } catch (envError) {
+        // Non-fatal - Poetry will use its default Python discovery
+        logger.debug(`Could not set Poetry env to ${realPython}: ${envError}`);
+      }
+    }
     spinner.succeed('Poetry configured');
   } catch (_error) {
     // Not a fatal error; continue with installation. Some Poetry versions or environments may not support this.
     spinner.warn('Could not configure Poetry virtualenvs.in-project');
+  }
+
+  // Create the virtualenv first with poetry install (this ensures in-project venv is created)
+  spinner.start('Creating virtualenv');
+  try {
+    await execa('poetry', ['install', '--no-root'], { cwd: projectPath, timeout: 30000 });
+    spinner.succeed('Virtualenv created');
+  } catch (venvError) {
+    logger.debug(`Failed to create virtualenv: ${venvError}`);
+    spinner.warn('Could not create virtualenv, proceeding with add command');
   }
 
   spinner.start('Installing RapidKit');
@@ -554,13 +765,76 @@ async function installWithPoetry(
   } else {
     // Production: Install from PyPI
     spinner.text = 'Installing RapidKit from PyPI';
-    try {
-      await execa('poetry', ['add', 'rapidkit-core'], { cwd: projectPath });
-    } catch (_error) {
-      throw new RapidKitNotAvailableError();
+
+    let installSuccess = false;
+    let lastError: any = null;
+
+    // Try up to 3 times with increasing timeouts
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await execa('poetry', ['add', 'rapidkit-core'], {
+          cwd: projectPath,
+          timeout: 60000 * attempt, // 60s, 120s, 180s
+        });
+        installSuccess = true;
+        break;
+      } catch (error) {
+        lastError = error;
+        logger.debug(`Poetry add attempt ${attempt} failed: ${error}`);
+
+        if (attempt < 3) {
+          spinner.text = `Retrying installation (attempt ${attempt + 1}/3)`;
+          await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2s between retries
+        }
+      }
+    }
+
+    if (!installSuccess) {
+      // All attempts failed - provide helpful error
+      const errorMsg = lastError?.stderr || lastError?.message || 'Unknown error';
+      logger.debug(`All Poetry install attempts failed. Last error: ${errorMsg}`);
+
+      // Check if it's a network/PyPI issue vs other issues
+      if (errorMsg.includes('Could not find') || errorMsg.includes('No matching distribution')) {
+        throw new RapidKitNotAvailableError();
+      } else {
+        throw new InstallationError(
+          'Install rapidkit-core with Poetry',
+          new Error(
+            `Failed to install rapidkit-core after 3 attempts.\n` +
+              `Error: ${errorMsg}\n\n` +
+              `Possible solutions:\n` +
+              `  1. Check your internet connection\n` +
+              `  2. Try installing manually: cd ${path.basename(projectPath)} && poetry add rapidkit-core\n` +
+              `  3. Use venv method instead: npx rapidkit ${path.basename(projectPath)} --install-method=venv`
+          )
+        );
+      }
     }
   }
-  spinner.succeed('RapidKit installed');
+  spinner.succeed('RapidKit installed in project virtualenv');
+
+  // Also install globally with pipx for CLI access
+  try {
+    const { checkRapidkitCoreAvailable } = await import('./core-bridge/pythonRapidkitExec.js');
+    const isGloballyAvailable = await checkRapidkitCoreAvailable();
+
+    if (!isGloballyAvailable && !testMode) {
+      spinner.start('Installing RapidKit globally with pipx for CLI access');
+      const pipx = await ensurePipxAvailable(spinner, yes);
+      try {
+        await execaPipx(pipx, ['install', 'rapidkit-core']);
+        spinner.succeed('RapidKit installed globally');
+      } catch (pipxError) {
+        // Not fatal - project virtualenv has it
+        spinner.warn('Could not install globally (non-fatal, project virtualenv has RapidKit)');
+        logger.debug(`pipx install failed: ${pipxError}`);
+      }
+    }
+  } catch (checkError) {
+    // Non-fatal - just skip global install
+    logger.debug(`Global install check skipped: ${checkError}`);
+  }
 }
 
 // Install RapidKit with venv + pip
@@ -569,7 +843,8 @@ async function installWithVenv(
   pythonVersion: string,
   spinner: Ora,
   testMode?: boolean,
-  userConfig?: UserConfig
+  userConfig?: UserConfig,
+  yes = false
 ) {
   spinner.start(`Checking Python ${pythonVersion}`);
 
@@ -658,13 +933,75 @@ async function installWithVenv(
   } else {
     // Production: Install from PyPI
     spinner.text = 'Installing RapidKit from PyPI';
-    try {
-      await execa(venvPython, ['-m', 'pip', 'install', 'rapidkit-core'], { cwd: projectPath });
-    } catch (_error) {
-      throw new RapidKitNotAvailableError();
+
+    let installSuccess = false;
+    let lastError: any = null;
+
+    // Try up to 3 times with increasing timeouts
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await execa(venvPython, ['-m', 'pip', 'install', 'rapidkit-core'], {
+          cwd: projectPath,
+          timeout: 60000 * attempt, // 60s, 120s, 180s
+        });
+        installSuccess = true;
+        break;
+      } catch (error) {
+        lastError = error;
+        logger.debug(`pip install attempt ${attempt} failed: ${error}`);
+
+        if (attempt < 3) {
+          spinner.text = `Retrying installation (attempt ${attempt + 1}/3)`;
+          await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2s between retries
+        }
+      }
+    }
+
+    if (!installSuccess) {
+      // All attempts failed
+      const errorMsg = lastError?.stderr || lastError?.message || 'Unknown error';
+      logger.debug(`All pip install attempts failed. Last error: ${errorMsg}`);
+
+      if (errorMsg.includes('Could not find') || errorMsg.includes('No matching distribution')) {
+        throw new RapidKitNotAvailableError();
+      } else {
+        throw new InstallationError(
+          'Install rapidkit-core with pip',
+          new Error(
+            `Failed to install rapidkit-core after 3 attempts.\n` +
+              `Error: ${errorMsg}\n\n` +
+              `Possible solutions:\n` +
+              `  1. Check your internet connection\n` +
+              `  2. Try installing manually: cd ${path.basename(projectPath)} && .venv/bin/python -m pip install rapidkit-core\n` +
+              `  3. Use Poetry instead: npx rapidkit ${path.basename(projectPath)} --install-method=poetry`
+          )
+        );
+      }
     }
   }
-  spinner.succeed('RapidKit installed');
+  spinner.succeed('RapidKit installed in project virtualenv');
+
+  // Also install globally with pipx for CLI access
+  try {
+    const { checkRapidkitCoreAvailable } = await import('./core-bridge/pythonRapidkitExec.js');
+    const isGloballyAvailable = await checkRapidkitCoreAvailable();
+
+    if (!isGloballyAvailable && !testMode) {
+      spinner.start('Installing RapidKit globally with pipx for CLI access');
+      const pipx = await ensurePipxAvailable(spinner, yes);
+      try {
+        await execaPipx(pipx, ['install', 'rapidkit-core']);
+        spinner.succeed('RapidKit installed globally');
+      } catch (pipxError) {
+        // Not fatal - project virtualenv has it
+        spinner.warn('Could not install globally (non-fatal, project virtualenv has RapidKit)');
+        logger.debug(`pipx install failed: ${pipxError}`);
+      }
+    }
+  } catch (checkError) {
+    // Non-fatal - just skip global install
+    logger.debug(`Global install check skipped: ${checkError}`);
+  }
 }
 
 // Install RapidKit with pipx (global)
@@ -696,6 +1033,7 @@ async function installWithPipx(
     try {
       await execaPipx(pipx, ['install', 'rapidkit-core']);
     } catch (_error) {
+      // pipx failed to install - could be network, PyPI availability, etc.
       throw new RapidKitNotAvailableError();
     }
   }

@@ -294,13 +294,52 @@ async function findWorkspaceRunner(startDir: string): Promise<RapidkitRunner | n
   return null;
 }
 
+// Read Python version from workspace marker or .python-version file
+async function getWorkspacePythonVersion(workspaceDir: string): Promise<string | null> {
+  // Try .python-version file first (most explicit)
+  try {
+    const pythonVersionPath = path.join(workspaceDir, '.python-version');
+    if (await fsExtra.pathExists(pythonVersionPath)) {
+      const content = await fsExtra.readFile(pythonVersionPath, 'utf-8');
+      const version = content.trim();
+      if (version) return version;
+    }
+  } catch {
+    // Ignore
+  }
+
+  // Try workspace marker
+  try {
+    const markerPath = path.join(workspaceDir, '.rapidkit-workspace');
+    if (await fsExtra.pathExists(markerPath)) {
+      const content = await fsExtra.readFile(markerPath, 'utf-8');
+      const marker = JSON.parse(content);
+      if (marker.pythonVersion) return marker.pythonVersion;
+    }
+  } catch {
+    // Ignore
+  }
+
+  return null;
+}
+
 async function resolveRapidkitRunner(cwd?: string): Promise<RapidkitRunner> {
   // If the user is inside a RapidKit workspace created by the npm package,
   // prefer its local .venv engine without requiring manual activation.
   if (cwd && cwd.trim()) {
     try {
       const local = await findWorkspaceRunner(cwd);
-      if (local) return local;
+      if (local) {
+        // Also set PYENV_VERSION based on workspace Python version
+        const workspaceDir = path.dirname(local.cmd).includes('.venv')
+          ? path.dirname(path.dirname(path.dirname(local.cmd)))
+          : path.dirname(local.cmd);
+        const pythonVersion = await getWorkspacePythonVersion(workspaceDir);
+        if (pythonVersion) {
+          process.env.PYENV_VERSION = pythonVersion;
+        }
+        return local;
+      }
     } catch {
       // Ignore and fall back to the default bridge/system resolution.
     }
@@ -374,6 +413,7 @@ async function resolveRapidkitRunner(cwd?: string): Promise<RapidkitRunner> {
 }
 
 async function pickSystemPython(): Promise<PythonCommand | null> {
+  // Try standard Python commands
   for (const cmd of ['python3', 'python'] as const) {
     try {
       await execa(cmd, ['--version'], { reject: false, stdio: 'pipe', timeout: 2000 });
@@ -383,6 +423,196 @@ async function pickSystemPython(): Promise<PythonCommand | null> {
     }
   }
   return null;
+}
+
+/**
+ * Check if rapidkit-core is available in ANY Python environment (comprehensive detection)
+ */
+async function checkRapidkitCoreAvailable(): Promise<boolean> {
+  const verbose = !!process.env.RAPIDKIT_DEBUG;
+  const debug = (msg: string) => {
+    if (verbose) {
+      process.stderr.write(`[DEBUG] checkRapidkitCore: ${msg}\n`);
+    }
+  };
+
+  // Method 1: Try standard Python commands with import
+  for (const cmd of ['python3', 'python', 'python3.10', 'python3.11', 'python3.12']) {
+    try {
+      debug(`Method 1: trying ${cmd} import`);
+      const result = await execa(cmd, ['-c', 'import rapidkit_core; print(1)'], {
+        reject: false,
+        stdio: 'pipe',
+        timeout: 3000,
+      });
+      if (result.exitCode === 0 && result.stdout?.trim() === '1') {
+        debug(`✓ Found via ${cmd} import`);
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // Method 2: Try python -m pip show
+  for (const cmd of ['python3', 'python']) {
+    try {
+      debug(`Method 2: trying ${cmd} -m pip show`);
+      const result = await execa(cmd, ['-m', 'pip', 'show', 'rapidkit-core'], {
+        reject: false,
+        stdio: 'pipe',
+        timeout: 3000,
+      });
+      if (result.exitCode === 0 && result.stdout?.includes('Name: rapidkit-core')) {
+        debug(`✓ Found via ${cmd} -m pip show`);
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // Method 3: Try direct pip/pip3 commands
+  for (const cmd of ['pip', 'pip3']) {
+    try {
+      debug(`Method 3: trying ${cmd} show`);
+      const result = await execa(cmd, ['show', 'rapidkit-core'], {
+        reject: false,
+        stdio: 'pipe',
+        timeout: 3000,
+      });
+      if (result.exitCode === 0 && result.stdout?.includes('Name: rapidkit-core')) {
+        debug(`✓ Found via ${cmd} show`);
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // Method 4: Check pyenv versions (direct path access)
+  try {
+    debug('Method 4: checking pyenv versions');
+    const versionsResult = await execa('pyenv', ['versions', '--bare'], {
+      reject: false,
+      stdio: 'pipe',
+      timeout: 3000,
+    });
+
+    if (versionsResult.exitCode === 0 && versionsResult.stdout) {
+      const versions = versionsResult.stdout.split('\n').filter((v) => v.trim());
+      debug(`Found pyenv versions: ${versions.join(', ')}`);
+
+      for (const version of versions) {
+        const pyenvRoot = process.env.PYENV_ROOT || path.join(os.homedir(), '.pyenv');
+        const pipPath = path.join(pyenvRoot, 'versions', version.trim(), 'bin', 'pip');
+
+        try {
+          const result = await execa(pipPath, ['show', 'rapidkit-core'], {
+            reject: false,
+            stdio: 'pipe',
+            timeout: 3000,
+          });
+          if (result.exitCode === 0 && result.stdout?.includes('Name: rapidkit-core')) {
+            debug(`✓ Found in pyenv ${version}`);
+            return true;
+          }
+        } catch {
+          // Try with PYENV_VERSION environment variable
+          try {
+            const result = await execa(
+              'bash',
+              ['-c', `PYENV_VERSION=${version.trim()} pyenv exec pip show rapidkit-core`],
+              { reject: false, stdio: 'pipe', timeout: 3000 }
+            );
+            if (result.exitCode === 0 && result.stdout?.includes('Name: rapidkit-core')) {
+              debug(`✓ Found in pyenv ${version} via PYENV_VERSION`);
+              return true;
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
+    }
+  } catch {
+    debug('pyenv not available');
+  }
+
+  // Method 5: Check user site-packages
+  for (const cmd of ['python3', 'python']) {
+    try {
+      debug(`Method 5: checking ${cmd} user site`);
+      const result = await execa(cmd, ['-m', 'site', '--user-site'], {
+        reject: false,
+        stdio: 'pipe',
+        timeout: 3000,
+      });
+
+      if (result.exitCode === 0 && result.stdout) {
+        const userSite = result.stdout.trim();
+        const pkgPath = path.join(userSite, 'rapidkit_core');
+
+        if (await fsExtra.pathExists(pkgPath)) {
+          debug(`✓ Found in user site-packages`);
+          return true;
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // Method 6: Check pipx
+  try {
+    debug('Method 6: checking pipx');
+    const result = await execa('pipx', ['list'], {
+      reject: false,
+      stdio: 'pipe',
+      timeout: 3000,
+    });
+    if (result.exitCode === 0 && result.stdout?.includes('rapidkit-core')) {
+      debug(`✓ Found via pipx`);
+      return true;
+    }
+  } catch {
+    debug('pipx not available');
+  }
+
+  // Method 7: Check poetry (if in a project directory)
+  try {
+    debug('Method 7: checking poetry');
+    const result = await execa('poetry', ['show', 'rapidkit-core'], {
+      reject: false,
+      stdio: 'pipe',
+      timeout: 3000,
+    });
+    if (result.exitCode === 0) {
+      debug(`✓ Found via poetry`);
+      return true;
+    }
+  } catch {
+    debug('poetry check failed');
+  }
+
+  // Method 8: Check conda
+  try {
+    debug('Method 8: checking conda');
+    const result = await execa('conda', ['list', 'rapidkit-core'], {
+      reject: false,
+      stdio: 'pipe',
+      timeout: 3000,
+    });
+    if (result.exitCode === 0 && result.stdout?.includes('rapidkit-core')) {
+      debug(`✓ Found via conda`);
+      return true;
+    }
+  } catch {
+    debug('conda not available');
+  }
+
+  debug('✗ Not found in any environment');
+  return false;
 }
 
 async function ensureBridgeVenv(pythonCmd: PythonCommand): Promise<string> {
@@ -703,4 +933,8 @@ export const __test__ = {
   ensureBridgeVenv,
   parseCoreCommandsFromHelp,
   tryRapidkit,
+  checkRapidkitCoreAvailable,
 };
+
+// Export the comprehensive detection function for public use
+export { checkRapidkitCoreAvailable };
