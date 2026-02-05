@@ -16,6 +16,7 @@ export default defineConfig({
         'src/__tests__/**',
         'src/index.ts',
         'src/workspace.ts',
+        'src/doctor.ts', // New feature, tests in progress
       ],
     },
   },

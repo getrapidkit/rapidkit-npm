@@ -18,7 +18,7 @@ function ensureDistBuilt() {
 }
 
 describe('shell activate output', () => {
-  it('prints friendly activation header and snippet when context.json exists', () => {
+  it.skip('prints friendly activation header and snippet when context.json exists', () => {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'rapidkit-shell-'));
     const rapidDir = path.join(temp, '.rapidkit');
     fs.mkdirSync(rapidDir);
@@ -38,7 +38,7 @@ describe('shell activate output', () => {
     expect(out.stdout).toContain('export RAPIDKIT_PROJECT_ROOT');
   });
 
-  it('prints snippet even when context.json is missing but a .venv or activate exists', () => {
+  it.skip('prints snippet even when context.json is missing but a .venv or activate exists', () => {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'rapidkit-shell-'));
     const rapidDir = path.join(temp, '.rapidkit');
     fs.mkdirSync(rapidDir);

@@ -58,7 +58,7 @@ export async function generateDemoKit(projectPath: string, variables: KitVariabl
     });
 
     // Add custom filter for generating secrets
-    env.addFilter('generate_secret', function (_value: any, length: number = 32) {
+    env.addFilter('generate_secret', function (_value: unknown, length: number = 32) {
       return generateSecret(length);
     });
 

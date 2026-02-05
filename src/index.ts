@@ -7,7 +7,7 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { logger } from './logger.js';
 import { checkForUpdates, getVersion } from './update-checker.js';
-import { loadUserConfig } from './config.js';
+import { loadUserConfig, loadRapidKitConfig, mergeConfigs } from './config.js';
 import { validateProjectName } from './validation.js';
 import { RapidKitError } from './errors.js';
 import * as fsExtra from 'fs-extra';
@@ -21,6 +21,7 @@ import {
 import { BOOTSTRAP_CORE_COMMANDS_SET } from './core-bridge/bootstrapCoreCommands.js';
 import { createProject as createPythonEnvironment, registerWorkspaceAtPath } from './create.js';
 import { generateDemoKit } from './demo-kit.js';
+import { runDoctor } from './doctor.js';
 
 type BridgeFailureCode = 'PYTHON_NOT_FOUND' | 'BRIDGE_VENV_BOOTSTRAP_FAILED';
 
@@ -560,6 +561,7 @@ async function shouldForwardToCore(args: string[]): Promise<boolean> {
   // npm-only commands
   if (first === 'shell' && second === 'activate') return false;
   if (first === 'workspace') return false; // workspace management is npm-only
+  if (first === 'doctor') return false; // doctor is npm-only health check
 
   // core global flag
   if (args.includes('--tui')) return true;
@@ -691,6 +693,18 @@ program
       // Load user configuration
       const userConfig = await loadUserConfig();
       logger.debug('User config loaded', userConfig);
+
+      // Load RapidKit config file (rapidkit.config.js)
+      const rapidkitConfig = await loadRapidKitConfig();
+      logger.debug('RapidKit config loaded', rapidkitConfig);
+
+      // Merge configurations (CLI > rapidkit.config.js > .rapidkitrc.json)
+      const mergedConfig = mergeConfigs(userConfig, rapidkitConfig, {
+        author: options.author,
+        pythonVersion: undefined, // Will be prompted
+        skipGit: options.skipGit,
+      });
+      logger.debug('Merged config', mergedConfig);
 
       // Check for updates (unless disabled)
       if (options.updateCheck !== false) {
@@ -879,7 +893,7 @@ program
           skipGit: options.skipGit,
           dryRun: options.dryRun,
           yes: options.yes,
-          userConfig,
+          userConfig: mergedConfig,
           installMethod: options.installMethod,
         });
       }
@@ -949,49 +963,40 @@ program
     const candidate = findActivationCandidate(cwd);
     // If we didn't find either context.json or an activation candidate, bail
     if (!ctxFile && !candidate) {
-      console.log(chalk.red('No RapidKit project found to activate'));
+      console.log(chalk.yellow('No RapidKit project found in this directory'));
       process.exit(1);
     }
 
-    // If we were able to find a valid activation place, print the snippet and exit.
-    // Guard: prefer the candidate activation even if ctxFile exists but is broken.
-    if (candidate) {
-      const snippet = `# RapidKit: activation snippet - eval "$(rapidkit shell activate)"\nVENV='.venv'\nif [ -f "$VENV/bin/activate" ]; then\n  . "$VENV/bin/activate"\nelif [ -f "$VENV/bin/activate.fish" ]; then\n  source "$VENV/bin/activate.fish"\nfi\nexport RAPIDKIT_PROJECT_ROOT="$(pwd)"\nexport PATH="$(pwd)/.rapidkit:$(pwd):$PATH"\n`;
-      console.log(
-        chalk.green.bold(
-          '\n✅ Activation snippet — run the following to activate this project in your current shell:\n'
-        )
-      );
-      console.log(snippet);
-      console.log(chalk.gray('\n💡 After activation you can run: rapidkit dev\n'));
-      process.exit(0);
+    // Default activation path if we have a context or venv
+    let activatePath: string;
+    if (candidate && fs.existsSync(candidate.activateFile)) {
+      activatePath = candidate.activateFile;
+    } else if (candidate && fs.existsSync(candidate.venv)) {
+      const isWindows = process.platform === 'win32';
+      activatePath = isWindows
+        ? path.join(candidate.venv, 'Scripts', 'activate')
+        : path.join(candidate.venv, 'bin', 'activate');
+    } else {
+      console.log(chalk.yellow('No virtual environment found'));
+      process.exit(1);
     }
 
-    // Fallback: we had a context file but couldn't find activation files — try to read it.
-    try {
-      const ctx = await fsExtra.readJson(ctxFile as string);
-      if (ctx.engine !== 'pip') {
-        console.log(chalk.yellow('This project is not a pip-based RapidKit project.'));
-        process.exit(1);
-      }
-
-      // Fall back to printing the standard snippet even if context.json said pip (keeps behavior)
-      const snippet = `# RapidKit: activation snippet - eval "$(rapidkit shell activate)"\nVENV='.venv'\nif [ -f "$VENV/bin/activate" ]; then\n  . "$VENV/bin/activate"\nelif [ -f "$VENV/bin/activate.fish" ]; then\n  source "$VENV/bin/activate.fish"\nfi\nexport RAPIDKIT_PROJECT_ROOT="$(pwd)"\nexport PATH="$(pwd)/.rapidkit:$(pwd):$PATH"\n`;
-      console.log(snippet);
-      process.exit(0);
-    } catch (_err) {
-      // If reading/context parsing failed, still try to be helpful — if there's no
-      // activation candidate we already would have exited above; this keeps the
-      // behavior forgiving instead of failing hard.
-      console.log(
-        chalk.yellow(
-          'Could not read project context but found a venv or activation file — printing activation snippet'
-        )
-      );
-      const snippet = `# RapidKit: activation snippet - eval "$(rapidkit shell activate)"\nVENV='.venv'\nif [ -f "$VENV/bin/activate" ]; then\n  . "$VENV/bin/activate"\nelif [ -f "$VENV/bin/activate.fish" ]; then\n  source "$VENV/bin/activate.fish"\nfi\nexport RAPIDKIT_PROJECT_ROOT="$(pwd)"\nexport PATH="$(pwd):$PATH"\n`;
-      console.log(snippet);
-      process.exit(0);
+    // Print the activation command
+    const isWindows = process.platform === 'win32';
+    if (isWindows) {
+      console.log(`call "${activatePath}"`);
+    } else {
+      console.log(`. "${activatePath}"`);
     }
+  });
+
+// Doctor command - health check for RapidKit environment
+program
+  .command('doctor')
+  .description('🩺 Check RapidKit environment health')
+  .option('--workspace', 'Check entire workspace (including all projects)')
+  .action(async (options) => {
+    await runDoctor(options);
   });
 
 // Workspace management command

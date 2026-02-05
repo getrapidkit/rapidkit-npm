@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.5] - 2026-02-05
+
+### Added
+
+- ⚙️ **Configuration System** - New `rapidkit.config.js` file support for workspace and project defaults
+  - Workspace settings: `defaultAuthor`, `pythonVersion`, `installMethod`
+  - Project settings: `defaultKit`, `addDefaultModules`, `skipGit`, `skipInstall`
+  - Priority: CLI args > rapidkit.config.js > .rapidkitrc.json > defaults
+  - Auto-discovery: searches current directory and parent directories
+  - Supports .js, .mjs, and .cjs formats
+- 🩺 **Doctor Command** - New `rapidkit doctor` command for system diagnostics
+  - Checks Python installation and version
+  - Validates pip, pipx, and Poetry installation
+  - Verifies RapidKit Core installation
+  - Provides troubleshooting recommendations
+  - Generates detailed JSON report
+
+### Improved
+
+- 📚 **Documentation** - Added comprehensive guides
+  - Configuration file usage guide (`docs/config-file-guide.md`)
+  - Doctor command documentation (`docs/doctor-command.md`)
+  - Configuration example file (`rapidkit.config.example.js`)
+- 🔧 **CLI Experience** - Enhanced help text and command structure
+  - Improved README with configuration examples
+  - Better error messages for config loading
+
 ## [0.16.4] - 2026-02-02
 
 ### Changed

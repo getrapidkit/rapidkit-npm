@@ -1,95 +1,46 @@
 # Release Notes
 
-## Latest Release: v0.16.4 (February 2, 2026)
+## Latest Release: v0.16.5 (February 5, 2026)
 
-### 📝 v0.16.4 — Documentation & Quality Polish (Patch)
+### ⚙️ v0.16.5 — Configuration & Diagnostics (Minor)
 
-This patch release focuses on documentation quality, test stability, and code quality improvements.
+This minor release adds powerful configuration management and system diagnostics capabilities.
 
-**What's Improved:**
+**What's New:**
 
-- 📝 **Documentation:** Standardized documentation language; workspace comparison guide and development runbooks reviewed and polished
-  - Enhanced clarity and consistency across all documentation
-  - Improved formatting and structure
-- 🧪 **Test Stability:** Enhanced robustness of workspace registration and marker tests
-  - Tests now more resilient to Python discovery side-effects
-  - Improved assertions for better maintainability
-- 📊 **Code Quality:** All quality metrics passing
-  - Bundle size remains lean at 116 KB
-  - Test coverage maintained above 80% threshold
-  - 488+ tests passing with improved reliability
+- ⚙️ **Configuration File:** New `rapidkit.config.js` support for workspace-wide defaults
+  - Set workspace preferences: author, Python version, install method
+  - Configure project defaults: kit, modules, skip flags
+  - Priority hierarchy: CLI args override config file, config file overrides .rapidkitrc.json
+  - Auto-discovery from current or parent directories
+  - Supports .js, .mjs, and .cjs formats
+- 🩺 **Doctor Command:** New `rapidkit doctor` for comprehensive system diagnostics
+  - Validates entire RapidKit toolchain (Python, pip, pipx, Poetry, Core)
+  - Provides actionable troubleshooting recommendations
+  - Generates detailed JSON reports for debugging
+  - Helps quickly identify and resolve setup issues
+- 📚 **Documentation:** Added comprehensive guides and examples
+  - Configuration file usage guide
+  - Doctor command documentation
+  - Example configuration file
 
 **No breaking changes.** Fully backward compatible.
 
 ### ⬆️ Upgrade
 
 ```bash
-npm install -g rapidkit@0.16.4
+npm install -g rapidkit@0.16.5
 # or
-npx rapidkit@0.16.4 create project fastapi.standard my-api --output .
+npx rapidkit@0.16.5 create project fastapi.standard my-api --output .
 ```
 
 ---
-
-## Previous Release: v0.16.3 (February 1, 2026)
-
-### 🔧 v0.16.3 — Template Fixes & Python Core 0.2.2 Compatibility (Patch)
-
-This patch release fixes template rendering issues and updates tests for compatibility with Python Core 0.2.2+.
-
-**What's Fixed:**
-
-- 🔧 **Template Compatibility:** Added `generate_secret` Nunjucks filter to match Python Core's Jinja2 implementation
-  - Fixes NestJS template rendering errors when generating secrets
-  - Uses crypto.randomBytes for cryptographically secure random strings
-- 🧪 **Test Suite Updates:** Updated for Python Core 0.2.2+ which no longer generates `.rapidkit/` project-local CLI files
-  - Skipped 5 tests related to `.rapidkit` folder (Core now uses global CLI)
-  - Fixed docker-compose.yml.j2 nested ternary syntax for Nunjucks compatibility
-  - Renamed env.example.j2 to .env.example.j2 for correct dotfile output
-  - All 488 tests passing, 11 skipped
-
-**Migration Note:** If you previously relied on `.rapidkit/cli.py` or `.rapidkit/rapidkit` launcher scripts in projects, Python Core 0.2.2+ now uses the global `rapidkit` CLI command instead. Update your workflows accordingly.
-
-### ⬆️ Upgrade
-
-```bash
-npm install -g rapidkit@0.16.3
-# or
-npx rapidkit@0.16.3 create project fastapi.standard my-api --output .
-```
-
-## Previous Releases
-
-### ✨ v0.16.0 — Workspace Registry & Cross-Tool Integration (Minor)
-
-This release introduces shared workspace registry for seamless integration between npm CLI and VS Code Extension, plus unified workspace signatures for better cross-tool compatibility.
-
-**What's New:**
-
-- 📋 **Workspace Registry:** Shared registry at `~/.rapidkit/workspaces.json` enables cross-tool workspace discovery between npm CLI and VS Code Extension
-  - `registerWorkspace()` function automatically registers workspaces
-  - `workspace list` command to view all registered workspaces (no Python dependency)
-  - VS Code Extension can discover npm-created workspaces and vice versa
-- 🏷️ **Unified Workspace Signature:** Changed marker from `RAPIDKIT_VSCODE_WORKSPACE` to `RAPIDKIT_WORKSPACE`
-  - Backward compatible: Both signatures recognized
-  - Workspace markers now identify creator: `createdBy: 'rapidkit-npm'`
-- 🔍 **Command Routing:** `workspace` command now handled by npm package only (not forwarded to Python Core)
-  - Enables workspace management without Python dependency
-  - Faster execution for workspace operations
-- 📝 **Documentation:** Comprehensive workspace registry and cross-tool compatibility docs added
-
-### ⬆️ Upgrade
-
-```bash
-npm install -g rapidkit@0.16.0
-# or
-npx rapidkit@0.16.0 create project fastapi.standard my-api --output .
-```
 
 ## Previous Releases
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.16.5](releases/RELEASE_NOTES_v0.16.5.md)              | Feb 5, 2026  | Configuration file support, doctor command, diagnostics              |
 | [v0.16.4](releases/RELEASE_NOTES_v0.16.4.md) | Feb 2, 2026  | Documentation quality, test stability, code polish                  |
 | [v0.16.3](releases/RELEASE_NOTES_v0.16.3.md) | Feb 1, 2026  | Template fixes, Python Core 0.2.2 compatibility, test updates       |
 | [v0.16.0](releases/RELEASE_NOTES_v0.16.0.md) | Feb 1, 2026  | Workspace registry, unified signatures, cross-tool integration       |

@@ -536,68 +536,103 @@ The registry stores workspace and project metadata:
 
 ## 📁 Project Structure
 
+### Workspace
+
+```
+my-workspace/
+├── my-api/              # FastAPI project
+│   ├── .rapidkit/       # Project config
+│   ├── src/             # Source code
+│   ├── config/          # Configuration
+│   ├── tests/           # Test suite
+│   ├── pyproject.toml   # Poetry config
+│   └── Dockerfile       # Docker setup
+├── my-service/          # NestJS project
+│   ├── .rapidkit/       # Project config
+│   ├── src/             # Source code
+│   ├── test/            # Test suite
+│   ├── package.json     # npm config
+│   └── Dockerfile       # Docker setup
+├── .venv/               # Workspace Python environment
+├── .rapidkit-workspace  # Workspace metadata
+├── poetry.lock          # Locked Python dependencies
+├── pyproject.toml       # Workspace Python config
+├── rapidkit             # CLI script (bash)
+├── rapidkit.cmd         # CLI script (Windows)
+├── README.md
+└── Makefile
+```
+
 ### FastAPI Project
 
 ```
 my-api/
-├── .rapidkit/
-│   ├── activate         # Environment activation script
-│   ├── cli.py           # Python CLI module
-│   ├── rapidkit         # Bash wrapper
-│   └── context.json     # Project metadata
-├── rapidkit             # Main CLI entry point
-├── src/
-│   ├── main.py          # FastAPI application
-│   ├── cli.py           # CLI commands
-│   ├── routing/         # API routes
+├── .rapidkit/               # RapidKit config
+│   ├── project.json         # Project metadata
+│   ├── context.json         # Project context
+│   ├── cli.py               # Local CLI module
+│   └── activate             # Environment activation
+├── src/                     # Source code
+│   ├── main.py              # FastAPI entry point
+│   ├── routing/             # API routes
 │   │   ├── __init__.py
 │   │   ├── health.py
 │   │   └── examples.py
-│   └── modules/         # Module system
+│   └── modules/             # Feature modules
 │       └── __init__.py
-├── tests/               # Test suite
+├── config/                  # Configuration
+├── tests/                   # Test suite
 │   ├── __init__.py
 │   ├── test_health.py
 │   └── test_examples.py
-├── pyproject.toml       # Poetry configuration
-├── Makefile             # Make commands
-├── Dockerfile           # Docker configuration
-├── docker-compose.yml   # Docker Compose
-├── .env.example         # Environment template
+├── .github/                 # GitHub workflows
+├── .env.example             # Environment template
 ├── .gitignore
+├── bootstrap.sh             # Setup script
+├── docker-compose.yml       # Docker Compose
+├── Dockerfile               # Docker configuration
+├── Makefile                 # Make commands
+├── poetry.lock              # Locked dependencies
+├── pyproject.toml           # Poetry configuration
+├── LICENSE
 └── README.md
 ```
 
 ### NestJS Project
 
 ```
-my-service/
-├── .rapidkit/
-│   ├── activate         # Environment activation script
-│   ├── rapidkit         # Bash CLI wrapper
-│   └── context.json     # Project metadata
-├── rapidkit             # Main CLI entry point
-├── src/
-│   ├── main.ts              # Application entry point
+my-app/
+├── .rapidkit/               # RapidKit config
+│   ├── project.json         # Project metadata
+│   ├── context.json         # Project context
+│   └── cli.js               # Local CLI module (optional)
+├── src/                     # Source code
+│   ├── main.ts              # NestJS entry point
 │   ├── app.module.ts        # Root module
 │   ├── app.controller.ts    # Root controller
 │   ├── app.service.ts       # Root service
-│   ├── config/              # Configuration
+│   ├── config/              # Configuration module
 │   │   ├── configuration.ts
 │   │   └── validation.ts
-│   └── examples/            # Example module
+│   └── examples/            # Example CRUD module
 │       ├── examples.module.ts
 │       ├── examples.controller.ts
 │       └── examples.service.ts
-├── test/                    # Test files
+├── test/                    # Test suite
 │   ├── app.e2e-spec.ts
 │   └── jest-e2e.json
-├── package.json             # Dependencies
-├── tsconfig.json            # TypeScript config
-├── nest-cli.json            # NestJS CLI config
-├── Dockerfile               # Docker configuration
-├── docker-compose.yml       # Docker Compose
+├── .github/                 # GitHub workflows
 ├── .env.example             # Environment template
+├── .gitignore
+├── bootstrap.sh             # Setup script
+├── docker-compose.yml       # Docker Compose
+├── Dockerfile               # Docker configuration
+├── eslint.config.cjs        # ESLint configuration
+├── jest.config.ts           # Jest configuration
+├── nest-cli.json            # NestJS CLI config
+├── package.json             # npm dependencies
+├── tsconfig.json            # TypeScript config
+├── LICENSE
 └── README.md
 ```
 

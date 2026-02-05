@@ -34,7 +34,7 @@ async function writeWorkspaceMarker(
   // Add Python version to marker if provided
   if (pythonVersion) {
     if (!markerObj.metadata) markerObj.metadata = {};
-    (markerObj.metadata as any).python = { version: pythonVersion };
+    (markerObj.metadata as Record<string, unknown>).python = { version: pythonVersion };
   }
 
   await writeWorkspaceMarkerToFile(workspacePath, markerObj);
@@ -461,9 +461,12 @@ export async function createProject(
           userConfig,
           yes
         );
-      } catch (poetryError: any) {
+      } catch (poetryError: unknown) {
         // If Poetry fails due to pyenv shim issues, try venv as fallback
-        const errorDetails = poetryError?.details || poetryError?.message || String(poetryError);
+        const errorDetails =
+          (poetryError as Error & { details?: string })?.details ||
+          (poetryError as Error)?.message ||
+          String(poetryError);
         const isShimError =
           errorDetails.includes('pyenv') ||
           errorDetails.includes('exit status 127') ||
@@ -767,7 +770,7 @@ async function installWithPoetry(
     spinner.text = 'Installing RapidKit from PyPI';
 
     let installSuccess = false;
-    let lastError: any = null;
+    let lastError: unknown = null;
 
     // Try up to 3 times with increasing timeouts
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -791,7 +794,10 @@ async function installWithPoetry(
 
     if (!installSuccess) {
       // All attempts failed - provide helpful error
-      const errorMsg = lastError?.stderr || lastError?.message || 'Unknown error';
+      const errorMsg =
+        (lastError as Error & { stderr?: string })?.stderr ||
+        (lastError as Error)?.message ||
+        'Unknown error';
       logger.debug(`All Poetry install attempts failed. Last error: ${errorMsg}`);
 
       // Check if it's a network/PyPI issue vs other issues
@@ -935,7 +941,7 @@ async function installWithVenv(
     spinner.text = 'Installing RapidKit from PyPI';
 
     let installSuccess = false;
-    let lastError: any = null;
+    let lastError: unknown = null;
 
     // Try up to 3 times with increasing timeouts
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -959,7 +965,10 @@ async function installWithVenv(
 
     if (!installSuccess) {
       // All attempts failed
-      const errorMsg = lastError?.stderr || lastError?.message || 'Unknown error';
+      const errorMsg =
+        (lastError as Error & { stderr?: string })?.stderr ||
+        (lastError as Error)?.message ||
+        'Unknown error';
       logger.debug(`All pip install attempts failed. Last error: ${errorMsg}`);
 
       if (errorMsg.includes('Could not find') || errorMsg.includes('No matching distribution')) {
