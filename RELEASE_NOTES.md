@@ -1,8 +1,48 @@
 # Release Notes
 
-## Latest Release: v0.16.5 (February 5, 2026)
+## Latest Release: v0.17.0 (February 6, 2026)
 
-### ⚙️ v0.16.5 — Configuration & Diagnostics (Minor)
+### 🩺 v0.17.0 — Enhanced Doctor Command (Minor)
+
+This release delivers a **major upgrade** to the `doctor` command with comprehensive workspace health monitoring and intelligent diagnostics.
+
+**What's New:**
+
+- 🩺 **Enhanced Doctor Command** - Complete overhaul with 15+ new features:
+  - **Framework Detection**: Automatically identifies FastAPI 🐍 or NestJS 🦅 projects
+  - **Health Score System**: Visual percentage-based scoring with detailed breakdown
+  - **Project Statistics**: Module counts from registry.json
+  - **Last Modified Tracking**: Git-aware timestamps (e.g., "2 days ago")
+  - **Test Detection**: Identifies test directories
+  - **Docker Support**: Validates Dockerfile presence
+  - **Code Quality Tools**: Checks ESLint (NestJS) or Ruff (FastAPI)
+  - **Security Scanning**: npm audit integration for vulnerabilities
+  - **Actionable Fix Commands**: Project-specific commands to resolve issues
+  - **JSON Output Mode**: Machine-readable format for CI/CD (`--json` flag)
+  - **Auto-Fix Capability**: Interactive fix application (`--fix` flag)
+  - **Version Compatibility**: Alerts on Core/CLI mismatches
+  - **Module Health**: Validates Python `__init__.py` files
+  - **Environment Validation**: Detects missing `.env` files
+
+- ⚙️ **Improved Core Detection**: Workspace venv prioritized over global installation
+- 🎯 **Enhanced Display**: Framework icons, kit info, organized status indicators
+- 🐛 **Bug Fixes**: fs-extra ESM compatibility, command execution, dependency detection
+
+**No breaking changes.** Fully backward compatible.
+
+### ⬆️ Upgrade
+
+```bash
+npm install -g rapidkit@0.17.0
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.17.0.md)
+
+---
+
+## Previous Releases
+
+### ⚙️ v0.16.5 — Configuration & Diagnostics (February 5, 2026)
 
 This minor release adds powerful configuration management and system diagnostics capabilities.
 

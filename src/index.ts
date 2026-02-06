@@ -995,6 +995,8 @@ program
   .command('doctor')
   .description('🩺 Check RapidKit environment health')
   .option('--workspace', 'Check entire workspace (including all projects)')
+  .option('--json', 'Output results in JSON format (for CI/CD pipelines)')
+  .option('--fix', 'Automatically fix common issues (with confirmation)')
   .action(async (options) => {
     await runDoctor(options);
   });

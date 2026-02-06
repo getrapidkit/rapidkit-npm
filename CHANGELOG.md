@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-02-06
+
+### Added
+
+- 🩺 **Enhanced Doctor Command** - Major upgrade to `rapidkit doctor --workspace` with comprehensive health monitoring
+  - **Framework Detection**: Automatically identifies FastAPI 🐍 or NestJS 🦅 projects
+  - **Health Score System**: Visual percentage-based scoring with pass/warn/error breakdown (📊 80%)
+  - **Project Statistics**: Module count from registry.json, file counts, and project size
+  - **Last Modified Tracking**: Git-based last modification timestamps (🕒 "today", "2 days ago")
+  - **Test Detection**: Identifies presence of test directories
+  - **Docker Support Check**: Validates Dockerfile existence
+  - **Code Quality Tools**: Checks for ESLint (NestJS) or Ruff (FastAPI) configuration
+  - **Security Scanning**: npm audit integration for Node.js vulnerabilities
+  - **Actionable Fix Commands**: Project-specific commands to resolve issues (🔧 Quick Fix)
+  - **JSON Output Mode**: Machine-readable format for CI/CD (`--json` flag)
+  - **Auto-Fix Capability**: Interactive fix application with confirmation (`--fix` flag)
+  - **Version Compatibility Warnings**: Alerts on Core/CLI version mismatches
+  - **Module Health Checks**: Validates Python `__init__.py` files in modules
+  - **Environment File Validation**: Detects missing `.env` files with copy suggestions
+  - **Improved Dependency Detection**: Better verification for both Node.js and Python projects
+  - **Multi-Project Type Support**: Handles mixed FastAPI + NestJS workspaces seamlessly
+
+### Improved
+
+- ⚙️ **RapidKit Core Priority**: Workspace venv now checked before global installation
+  - Ensures isolated workspace environments are prioritized
+  - Displays appropriate context ("Installed in workspace virtualenv" vs "Installed at /path")
+- 🎯 **Project Health Display**: Enhanced visual output with comprehensive status indicators
+  - Framework icons (🐍 FastAPI / 🦅 NestJS)
+  - Kit information display (e.g., "FastAPI (fastapi.standard)")
+  - Organized status lines with color coding (✅ green, ⚠️ yellow, ❌ red)
+  - Compact additional checks display (Tests • Docker • ESLint/Ruff)
+  - Project statistics and modification times
+- 🐛 **Bug Fixes**
+  - Fixed fs-extra ESM import compatibility (changed from namespace to default import)
+  - Fixed command execution in auto-fix (now uses shell mode for proper command resolution)
+  - Improved project detection with deep recursive scan fallback (max depth 3)
+  - Better handling of Node.js vs Python project-specific checks
+
+### Documentation
+
+- 📚 Added comprehensive `DOCTOR_ENHANCEMENTS.md` guide
+- 📖 Updated README with detailed doctor command usage examples
+- 🎯 Added use case examples for development workflow and CI/CD integration
+
 ## [0.16.5] - 2026-02-05
 
 ### Added

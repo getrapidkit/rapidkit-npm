@@ -313,12 +313,51 @@ npx rapidkit info module <name>                  # Module details
 
 # System
 npx rapidkit doctor                              # Diagnose environment
+npx rapidkit doctor --workspace                  # Check entire workspace
+npx rapidkit doctor --workspace --json           # JSON output (CI/CD)
+npx rapidkit doctor --workspace --fix            # Auto-fix issues
 npx rapidkit --version                           # Show version
 npx rapidkit --tui                               # Launch interactive TUI
 
 # Workspace management
 npx rapidkit workspace list                      # List workspaces
 npx rapidkit workspace sync                      # Sync projects
+```
+
+### Doctor Command (Health Check)
+
+The enhanced `doctor` command provides comprehensive health monitoring:
+
+```bash
+# System check (basic)
+rapidkit doctor
+
+# Workspace check (detailed)
+rapidkit doctor --workspace
+# ✅ Health score with visual progress bar
+# ✅ System tools validation (Python, Poetry, pipx, Core)
+# ✅ Project-level checks (venv, dependencies, modules)
+# ✅ Environment file validation (.env)
+# ✅ Module structure integrity
+# ✅ Version compatibility warnings
+# ✅ Actionable fix commands
+
+# JSON output for CI/CD pipelines
+rapidkit doctor --workspace --json
+
+# Auto-fix common issues
+rapidkit doctor --workspace --fix
+# Interactive confirmation before applying fixes
+```
+
+**Features:**
+- **Health Score**: Visual percentage with pass/warn/error breakdown
+- **Fix Commands**: Project-specific commands to resolve issues
+- **JSON Mode**: Machine-readable output for automation
+- **Auto-Fix**: Apply fixes automatically with confirmation
+- **Module Checks**: Validates `__init__.py` files
+- **Environment Checks**: Detects missing `.env` files
+- **Version Compatibility**: Warns about Core/CLI mismatches
 ```
 
 ### Workspace Commands
