@@ -1,6 +1,28 @@
 # Release Notes
 
-## Latest Release: v0.18.0 (February 9, 2026)
+## Latest Release: v0.18.1 (February 9, 2026)
+
+### 🐛 v0.18.1 — Bug Fixes (Patch)
+
+Minor bug fix release addressing Windows CI test failure.
+
+**Bug Fixes:**
+
+- 🐛 Fixed cross-platform path normalization test
+  - Updated path test to properly handle both Unix (/) and Windows (\\) path separators
+  - Resolves Windows CI failure in create-helpers.test.ts
+
+**No breaking changes.** Fully backward compatible.
+
+### ⬆️ Upgrade
+
+```bash
+npm install -g rapidkit@0.18.1
+```
+
+---
+
+## Previous Release: v0.18.0 (February 9, 2026)
 
 ### ✨ v0.18.0 — Core Bridge & Contract Infrastructure (Minor)
 

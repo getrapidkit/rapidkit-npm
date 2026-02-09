@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-02-09
+
+### Fixed
+
+- 🐛 Fixed cross-platform path normalization test for Windows CI
+  - Updated path test to use regex pattern accepting both Unix (/) and Windows (\\) path separators
+  - Resolves Windows CI failure in create-helpers.test.ts
+
 ## [0.18.0] - 2026-02-09
 
 ### Added
