@@ -431,7 +431,9 @@ describe('Create Module Helpers', () => {
       const { normalize } = await import('path');
 
       const normalized = normalize('/path//to///file');
-      expect(normalized).toBe('/path/to/file');
+      // On Windows, normalize converts to backslashes, on Unix keeps forward slashes
+      // Both are valid normalized paths
+      expect(normalized).toMatch(/[\/\\]path[\/\\]to[\/\\]file/);
     });
   });
 
