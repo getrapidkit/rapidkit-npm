@@ -141,7 +141,7 @@ Commands:
       });
 
       await expect(bridge.__test__.ensureBridgeVenv('python3')).rejects.toMatchObject({
-        code: 'BRIDGE_VENV_BOOTSTRAP_FAILED',
+        code: 'BRIDGE_VENV_CREATE_FAILED',
       });
     });
   });
@@ -312,6 +312,19 @@ describe('getCoreTopLevelCommands', () => {
     for (const cmd of res) {
       expect(typeof cmd).toBe('string');
     }
+  });
+
+  it('prefers commands JSON when available', async () => {
+    mockFs.pathExists.mockResolvedValue(false);
+    mockExeca.mockResolvedValue({
+      exitCode: 0,
+      stdout: JSON.stringify({ schema_version: 1, commands: ['create', 'list'] }),
+      stderr: '',
+    });
+
+    const res = await bridge.getCoreTopLevelCommands();
+    expect(res.has('create')).toBe(true);
+    expect(res.has('list')).toBe(true);
   });
 
   it('parses commands from --help output', async () => {

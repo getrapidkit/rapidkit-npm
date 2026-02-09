@@ -56,6 +56,18 @@ jobs:
             npm install @rollup/rollup-win32-x64-msvc --save-dev --no-audit || true
           fi
 
+      # Contract schema sync (monorepo only, opt-in via env)
+      - name: Check contracts sync
+        shell: bash
+        env:
+          RAPIDKIT_CORE_SCHEMA_PATH: ${{ env.RAPIDKIT_CORE_SCHEMA_PATH }}
+        run: |
+          if [[ -n "${RAPIDKIT_CORE_SCHEMA_PATH}" && -f "${RAPIDKIT_CORE_SCHEMA_PATH}" ]]; then
+            npm run check:contracts
+          else
+            echo "Skipping contract sync check (no RAPIDKIT_CORE_SCHEMA_PATH provided)"
+          fi
+
       # Build
       - name: Build project
         run: npm run build

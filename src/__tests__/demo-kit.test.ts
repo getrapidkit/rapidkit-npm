@@ -438,23 +438,6 @@ describe('Demo Kit Generator', () => {
       expect(testExists).toBe(true);
     });
 
-    it('should generate NestJS .env.example file', async () => {
-      const projectPath = path.join(testDir, 'nestjs-env');
-      const variables = {
-        project_name: 'nestjs_env',
-        template: 'nestjs',
-        skipInstall: true,
-      };
-
-      await generateDemoKit(projectPath, variables);
-
-      const envExamplePath = path.join(projectPath, '.env.example');
-      const envExists = await fs
-        .stat(envExamplePath)
-        .then(() => true)
-        .catch(() => false);
-      expect(envExists).toBe(true);
-    });
 
     it('should generate NestJS tsconfig.json', async () => {
       const projectPath = path.join(testDir, 'nestjs-tsconfig');

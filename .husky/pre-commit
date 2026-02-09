@@ -12,6 +12,20 @@ npx lint-staged || exit 1
 echo "💅 Checking code formatting..."
 npm run format:check || exit 1
 
+# Contracts sync check (only when Core schema is available)
+if [ -n "${RAPIDKIT_CORE_SCHEMA_PATH:-}" ] && [ -f "${RAPIDKIT_CORE_SCHEMA_PATH}" ]; then
+	echo "🔗 Checking Core ↔ NPM contracts..."
+	npm run check:contracts || exit 1
+elif [ -f "../core/docs/contracts/rapidkit-cli-contracts.json" ]; then
+	echo "🔗 Checking Core ↔ NPM contracts (monorepo)..."
+	RAPIDKIT_CORE_SCHEMA_PATH="../core/docs/contracts/rapidkit-cli-contracts.json" npm run check:contracts || exit 1
+elif [ -f "../../core/docs/contracts/rapidkit-cli-contracts.json" ]; then
+	echo "🔗 Checking Core ↔ NPM contracts (monorepo)..."
+	RAPIDKIT_CORE_SCHEMA_PATH="../../core/docs/contracts/rapidkit-cli-contracts.json" npm run check:contracts || exit 1
+else
+	echo "ℹ️ Skipping contracts check (core schema not found)"
+fi
+
 # Tests
 echo "🧪 Running tests..."
 npm test || exit 1

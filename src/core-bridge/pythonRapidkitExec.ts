@@ -1,7 +1,9 @@
+import crypto from 'crypto';
 import os from 'os';
 import path from 'path';
 import * as fsExtra from 'fs-extra';
 import { execa } from 'execa';
+import { BOOTSTRAP_CORE_COMMANDS_SET } from './bootstrapCoreCommands';
 
 export type PythonCommand = 'python3' | 'python';
 
@@ -16,7 +18,13 @@ type CaptureResult = {
   stderr: string;
 };
 
-type BridgeErrorCode = 'PYTHON_NOT_FOUND' | 'BRIDGE_VENV_BOOTSTRAP_FAILED';
+type BridgeErrorCode =
+  | 'PYTHON_NOT_FOUND'
+  | 'BRIDGE_VENV_CREATE_FAILED'
+  | 'BRIDGE_PIP_BOOTSTRAP_FAILED'
+  | 'BRIDGE_PIP_UPGRADE_FAILED'
+  | 'BRIDGE_PIP_INSTALL_FAILED'
+  | 'BRIDGE_VENV_BOOTSTRAP_FAILED';
 
 class BridgeError extends Error {
   public code: BridgeErrorCode;
@@ -28,14 +36,40 @@ class BridgeError extends Error {
 
 function formatBridgeError(err: unknown): string {
   if (err instanceof BridgeError) {
-    if (err.code === 'PYTHON_NOT_FOUND') {
-      return (
-        'RapidKit (npm) could not find Python (python3/python) on your PATH.\n' +
-        'Install Python 3.10+ and ensure `python3` is available, then retry.\n' +
-        'Tip: if you are inside a RapidKit project, use the local ./rapidkit launcher.'
-      );
+    switch (err.code) {
+      case 'PYTHON_NOT_FOUND':
+        return (
+          'RapidKit (npm) could not find Python (python3/python) on your PATH.\n' +
+          'Install Python 3.10+ and ensure `python3` is available, then retry.\n' +
+          'Tip: if you are inside a RapidKit project, use the local ./rapidkit launcher.'
+        );
+      case 'BRIDGE_VENV_CREATE_FAILED':
+        return (
+          'RapidKit (npm) failed to create its bridge virtual environment.\n' +
+          'Ensure Python venv support is installed (e.g., python3-venv).\n' +
+          `Details: ${err.message}`
+        );
+      case 'BRIDGE_PIP_BOOTSTRAP_FAILED':
+        return (
+          'RapidKit (npm) could not bootstrap pip inside the bridge virtual environment.\n' +
+          'Install python3-venv/python3-pip and retry.\n' +
+          `Details: ${err.message}`
+        );
+      case 'BRIDGE_PIP_UPGRADE_FAILED':
+        return (
+          'RapidKit (npm) could not upgrade pip in the bridge virtual environment.\n' +
+          'Check your network/proxy or disable RAPIDKIT_BRIDGE_UPGRADE_PIP.\n' +
+          `Details: ${err.message}`
+        );
+      case 'BRIDGE_PIP_INSTALL_FAILED':
+        return (
+          'RapidKit (npm) could not install rapidkit-core in the bridge virtual environment.\n' +
+          'Check your network/proxy, or install manually with: pipx install rapidkit-core.\n' +
+          `Details: ${err.message}`
+        );
+      default:
+        return `RapidKit (npm) bridge error: ${err.message}`;
     }
-    return `RapidKit (npm) bridge error: ${err.message}`;
   }
 
   const msg = err instanceof Error ? err.message : String(err);
@@ -48,14 +82,26 @@ function coreInstallTarget(): string {
   return 'rapidkit-core';
 }
 
+function coreInstallTargetId(): string {
+  const spec = coreInstallTarget();
+  const extra = process.env.RAPIDKIT_CORE_PYTHON_PACKAGE_ID;
+  const raw = extra && extra.trim() ? `${spec}|${extra.trim()}` : spec;
+  return crypto.createHash('sha256').update(raw).digest('hex').slice(0, 12);
+}
+
 function cacheRoot(): string {
   const xdg = process.env.XDG_CACHE_HOME;
   if (xdg && xdg.trim()) return xdg;
   return path.join(os.homedir(), '.cache');
 }
 
-function bridgeVenvDir(): string {
+function legacyBridgeVenvDir(): string {
   return path.join(cacheRoot(), 'rapidkit', 'npm-bridge', 'venv');
+}
+
+function bridgeVenvDir(): string {
+  const id = coreInstallTargetId();
+  return path.join(cacheRoot(), 'rapidkit', 'npm-bridge', `venv-${id}`);
 }
 
 function bridgePython(venvDir: string): string {
@@ -68,6 +114,14 @@ function bridgeRapidkitCli(venvDir: string): string {
   return isWin
     ? path.join(venvDir, 'Scripts', 'rapidkit.exe')
     : path.join(venvDir, 'bin', 'rapidkit');
+}
+
+function isPinnedSpec(spec: string): boolean {
+  return /[<>=!~]=|@|\.whl$|\.tar\.gz$|\.zip$|git\+|https?:\/\//.test(spec);
+}
+
+function venvDirFromPythonPath(pythonPath: string): string {
+  return path.dirname(path.dirname(pythonPath));
 }
 
 function commandsCachePath(): string {
@@ -348,7 +402,7 @@ async function resolveRapidkitRunner(cwd?: string): Promise<RapidkitRunner> {
   const resolved = await resolveRapidkitPython();
 
   if (resolved.kind === 'venv') {
-    const venvDir = bridgeVenvDir();
+    const venvDir = venvDirFromPythonPath(resolved.pythonPath);
     const cli = bridgeRapidkitCli(venvDir);
     if (await fsExtra.pathExists(cli)) {
       return { cmd: cli, baseArgs: [] };
@@ -616,11 +670,21 @@ async function checkRapidkitCoreAvailable(): Promise<boolean> {
 }
 
 async function ensureBridgeVenv(pythonCmd: PythonCommand): Promise<string> {
-  const venvDir = bridgeVenvDir();
-  const py = bridgePython(venvDir);
+  const desiredDir = bridgeVenvDir();
+  const legacyDir = legacyBridgeVenvDir();
+  const spec = coreInstallTarget();
+  const candidates = [desiredDir];
 
-  if (await fsExtra.pathExists(py)) {
-    // Validate that rapidkit-core is actually installed in this venv
+  if (!isPinnedSpec(spec) && !(await fsExtra.pathExists(desiredDir))) {
+    if (await fsExtra.pathExists(legacyDir)) {
+      candidates.push(legacyDir);
+    }
+  }
+
+  for (const venvDir of candidates) {
+    const py = bridgePython(venvDir);
+    if (!(await fsExtra.pathExists(py))) continue;
+
     try {
       const probeResult = await execa(
         py,
@@ -634,13 +698,13 @@ async function ensureBridgeVenv(pythonCmd: PythonCommand): Promise<string> {
       if (probeResult.exitCode === 0 && (probeResult.stdout ?? '').toString().trim() === '1') {
         return py;
       }
-      // rapidkit not found in venv, remove it and rebuild
       await fsExtra.remove(venvDir);
     } catch {
-      // probe error, remove and rebuild
       await fsExtra.remove(venvDir);
     }
   }
+
+  const venvDir = desiredDir;
 
   const bootstrapEnv: NodeJS.ProcessEnv = {
     ...process.env,
@@ -650,12 +714,29 @@ async function ensureBridgeVenv(pythonCmd: PythonCommand): Promise<string> {
     PIP_NO_PYTHON_VERSION_WARNING: '1',
   };
 
-  const runBootstrap = async (cmd: string, cmdArgs: string[]): Promise<void> => {
+  const retryCount = Math.max(0, Number(process.env.RAPIDKIT_BRIDGE_PIP_RETRY ?? '2'));
+  const baseDelayMs = Math.max(
+    200,
+    Number(process.env.RAPIDKIT_BRIDGE_PIP_RETRY_DELAY_MS ?? '800')
+  );
+  const pipTimeoutMs = Math.max(
+    10_000,
+    Number(process.env.RAPIDKIT_BRIDGE_PIP_TIMEOUT_MS ?? '120000')
+  );
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  const runBootstrap = async (
+    cmd: string,
+    cmdArgs: string[],
+    timeoutMs?: number
+  ): Promise<void> => {
     const res = await execa(cmd, cmdArgs, {
       reject: false,
       // Keep stdout captured (avoid polluting JSON), but stream stderr so users see progress.
       stdio: ['ignore', 'pipe', 'inherit'],
       env: bootstrapEnv,
+      timeout: timeoutMs,
     });
 
     if (res.exitCode === 0) return;
@@ -667,9 +748,35 @@ async function ensureBridgeVenv(pythonCmd: PythonCommand): Promise<string> {
     throw new Error(msg);
   };
 
+  const runBootstrapWithRetry = async (
+    cmd: string,
+    cmdArgs: string[],
+    timeoutMs?: number
+  ): Promise<void> => {
+    let attempt = 0;
+    // total attempts = retryCount + 1
+    while (true) {
+      try {
+        await runBootstrap(cmd, cmdArgs, timeoutMs);
+        return;
+      } catch (err) {
+        if (attempt >= retryCount) throw err;
+        const jitter = Math.floor(Math.random() * 200);
+        const delay = baseDelayMs * Math.pow(2, attempt) + jitter;
+        attempt += 1;
+        await sleep(delay);
+      }
+    }
+  };
+
   try {
     await fsExtra.ensureDir(path.dirname(venvDir));
-    await runBootstrap(pythonCmd, ['-m', 'venv', venvDir]);
+    try {
+      await runBootstrap(pythonCmd, ['-m', 'venv', venvDir], 60_000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new BridgeError('BRIDGE_VENV_CREATE_FAILED', msg);
+    }
 
     const vpy = bridgePython(venvDir);
 
@@ -686,29 +793,44 @@ async function ensureBridgeVenv(pythonCmd: PythonCommand): Promise<string> {
         reject: false,
         stdio: ['ignore', 'pipe', 'inherit'],
         env: bootstrapEnv,
+        timeout: 60_000,
       });
 
       if (ensurePipResult.exitCode !== 0) {
-        // ensurepip also failed, throw error with helpful message
-        throw new Error(
-          'Failed to install pip in virtual environment.\n' +
-            'Your Python installation may be missing the ensurepip module.\n' +
-            'On Debian/Ubuntu, install: sudo apt install python3-venv python3-pip'
+        throw new BridgeError(
+          'BRIDGE_PIP_BOOTSTRAP_FAILED',
+          'ensurepip failed; install python3-venv/python3-pip and retry.'
         );
       }
     }
 
     if (process.env.RAPIDKIT_BRIDGE_UPGRADE_PIP === '1') {
-      await runBootstrap(vpy, ['-m', 'pip', 'install', '-U', 'pip']);
+      try {
+        await runBootstrapWithRetry(vpy, ['-m', 'pip', 'install', '-U', 'pip'], pipTimeoutMs);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new BridgeError('BRIDGE_PIP_UPGRADE_FAILED', msg);
+      }
     }
 
     // IMPORTANT: never inherit stdout here.
     // Bootstrap output must not pollute stdout because core commands like `rapidkit list --json`
     // rely on stdout being valid JSON.
-    await runBootstrap(vpy, ['-m', 'pip', 'install', '-U', coreInstallTarget()]);
+    try {
+      await runBootstrapWithRetry(
+        vpy,
+        ['-m', 'pip', 'install', '-U', coreInstallTarget()],
+        pipTimeoutMs
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new BridgeError('BRIDGE_PIP_INSTALL_FAILED', msg);
+    }
     return vpy;
   } catch (e) {
-    throw new BridgeError('BRIDGE_VENV_BOOTSTRAP_FAILED', formatBridgeError(e));
+    if (e instanceof BridgeError) throw e;
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new BridgeError('BRIDGE_VENV_BOOTSTRAP_FAILED', msg);
   }
 }
 
@@ -872,6 +994,22 @@ async function getCoreVersion(): Promise<string | undefined> {
   }
 }
 
+async function getCoreCommandsJson(): Promise<string[] | null> {
+  const res = await runCoreRapidkitCapture(['commands', '--json'], { cwd: process.cwd() });
+  if (res.exitCode !== 0) return null;
+  try {
+    const payload = JSON.parse(res.stdout) as {
+      schema_version?: number;
+      commands?: unknown;
+    };
+    if (payload?.schema_version !== 1 || !Array.isArray(payload.commands)) return null;
+    const list = payload.commands.filter((c): c is string => typeof c === 'string');
+    return list.length ? list : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getCoreTopLevelCommands(): Promise<Set<string>> {
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
   const now = Date.now();
@@ -891,11 +1029,23 @@ export async function getCoreTopLevelCommands(): Promise<Set<string>> {
     return new Set(cached.commands);
   }
 
+  const jsonCommands = await getCoreCommandsJson();
+  if (jsonCommands?.length) {
+    const list = Array.from(new Set(jsonCommands)).sort();
+    await writeCommandsCache({
+      schema_version: 1,
+      fetched_at: now,
+      rapidkit_version: currentVersion,
+      commands: list,
+    });
+    return new Set(list);
+  }
+
   const help = await runCoreRapidkitCapture(['--help'], { cwd: process.cwd() });
   if (help.exitCode !== 0) {
     // Fall back to the cached set if available.
     if (cachedHasCommands && cached?.commands) return new Set(cached.commands);
-    return new Set();
+    return new Set(BOOTSTRAP_CORE_COMMANDS_SET);
   }
 
   const cmds = parseCoreCommandsFromHelp(help.stdout);
@@ -903,7 +1053,7 @@ export async function getCoreTopLevelCommands(): Promise<Set<string>> {
     // If we can't parse help output, don't poison the cache.
     // Fall back to an empty set here; shouldForwardToCore() will still forward
     // well-known commands via BOOTSTRAP_CORE_COMMANDS_SET.
-    return new Set();
+    return new Set(BOOTSTRAP_CORE_COMMANDS_SET);
   }
   const list = Array.from(cmds).sort();
 
@@ -926,6 +1076,130 @@ export async function getCachedCoreTopLevelCommands(): Promise<Set<string> | nul
   if (now - cached.fetched_at >= ONE_DAY_MS) return null;
   if (!cached.commands?.length) return null;
   return new Set(cached.commands);
+}
+
+export type ModulesCatalog = {
+  schema_version: 1;
+  generated_at?: string;
+  etag?: string;
+  filters?: {
+    category?: string | null;
+    tag?: string | null;
+    detailed?: boolean;
+    [key: string]: unknown;
+  };
+  stats?: {
+    total?: number;
+    returned?: number;
+    invalid?: number;
+    [key: string]: unknown;
+  };
+  modules: Array<Record<string, unknown>>;
+  invalid_modules?: Array<{ slug: string; messages?: string[] }>;
+  warnings?: string[];
+  errors?: string[];
+  source?: string;
+  fetched_at?: number;
+};
+
+type ModulesCatalogOptions = {
+  category?: string;
+  tag?: string;
+  detailed?: boolean;
+  ttlMs?: number;
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+};
+
+function modulesCatalogCachePath(): string {
+  return path.join(cacheRoot(), 'rapidkit', 'npm-bridge', 'modules-catalog.json');
+}
+
+async function tryReadModulesCatalogCache(): Promise<ModulesCatalog | null> {
+  const p = modulesCatalogCachePath();
+  if (!(await fsExtra.pathExists(p))) return null;
+  try {
+    const data = await fsExtra.readJson(p);
+    if (data && data.schema_version === 1 && Array.isArray(data.modules)) {
+      return data as ModulesCatalog;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+async function writeModulesCatalogCache(cache: ModulesCatalog): Promise<void> {
+  const p = modulesCatalogCachePath();
+  await fsExtra.ensureDir(path.dirname(p));
+  await fsExtra.writeJson(p, cache, { spaces: 2 });
+}
+
+function safeJsonParse(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+export async function getModulesCatalog(
+  opts: ModulesCatalogOptions = {}
+): Promise<ModulesCatalog | null> {
+  const ttlMs = typeof opts.ttlMs === 'number' ? opts.ttlMs : 30 * 60 * 1000;
+  const now = Date.now();
+
+  const cached = await tryReadModulesCatalogCache();
+  if (cached?.fetched_at && now - cached.fetched_at < ttlMs) {
+    return cached;
+  }
+
+  const args = ['modules', 'list', '--json-schema', '1'];
+  if (opts.category) args.push('--category', opts.category);
+  if (opts.tag) args.push('--tag', opts.tag);
+  if (opts.detailed) args.push('--detailed');
+
+  const res = await runCoreRapidkitCapture(args, { cwd: opts.cwd, env: opts.env });
+  if (res.exitCode === 0) {
+    const payload = safeJsonParse(res.stdout) as ModulesCatalog | null;
+    if (payload && payload.schema_version === 1 && Array.isArray(payload.modules)) {
+      const enriched = { ...payload, fetched_at: now };
+      await writeModulesCatalogCache(enriched);
+      return enriched;
+    }
+  }
+
+  const legacy = await runCoreRapidkitCapture(['modules', 'list', '--json'], {
+    cwd: opts.cwd,
+    env: opts.env,
+  });
+  if (legacy.exitCode === 0) {
+    const data = safeJsonParse(legacy.stdout);
+    if (Array.isArray(data)) {
+      const legacyPayload: ModulesCatalog = {
+        schema_version: 1,
+        generated_at: new Date().toISOString(),
+        filters: {
+          category: opts.category ?? null,
+          tag: opts.tag ?? null,
+          detailed: !!opts.detailed,
+        },
+        stats: {
+          total: data.length,
+          returned: data.length,
+          invalid: 0,
+        },
+        modules: data as Array<Record<string, unknown>>,
+        source: 'legacy-json',
+        fetched_at: now,
+      };
+      await writeModulesCatalogCache(legacyPayload);
+      return legacyPayload;
+    }
+  }
+
+  if (cached) return cached;
+  return null;
 }
 // --- internal/private functions for testing ---
 export const __test__ = {

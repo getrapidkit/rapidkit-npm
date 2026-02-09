@@ -9,7 +9,7 @@ services:
       - .env
     environment:
       NODE_ENV: development
-    command: {% if package_manager == 'pnpm' %}pnpm{% elif package_manager in ['npm', 'yarn'] %}{{ package_manager }}{% else %}npm{% endif %} run start:dev
+    command: {{ ('pnpm' if package_manager == 'pnpm' else (package_manager if package_manager in ['npm', 'yarn'] else 'npm')) }} run start:dev
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules

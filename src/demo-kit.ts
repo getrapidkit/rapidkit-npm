@@ -23,6 +23,9 @@ interface KitVariables {
   skipGit?: boolean;
   skipInstall?: boolean;
   engine?: 'poetry' | 'venv' | 'pipx' | 'pip';
+  node_version?: string;
+  database_type?: string;
+  include_caching?: boolean;
 }
 
 /**
@@ -74,6 +77,9 @@ export async function generateDemoKit(projectPath: string, variables: KitVariabl
       app_version: variables.app_version || '0.1.0',
       license: variables.license || 'MIT',
       package_manager: variables.package_manager || 'npm',
+      node_version: variables.node_version || '20.0.0',
+      database_type: variables.database_type || 'postgresql',
+      include_caching: variables.include_caching || false,
       created_at: new Date().toISOString(),
       rapidkit_version: getVersion(),
     };
@@ -152,7 +158,13 @@ export async function generateDemoKit(projectPath: string, variables: KitVariabl
       }
 
       const templateContent = await fs.readFile(templatePath, 'utf-8');
-      const rendered = env.renderString(templateContent, context);
+      let rendered: string;
+      try {
+        rendered = env.renderString(templateContent, context);
+      } catch (e) {
+        console.error(`Failed to render template: ${templateFile}`);
+        throw e;
+      }
 
       // Output path is the same but without .j2
       const outputFile = templateFile.replace(/\.j2$/, '');

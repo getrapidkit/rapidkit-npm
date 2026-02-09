@@ -1,8 +1,62 @@
 # Release Notes
 
-## Latest Release: v0.17.0 (February 6, 2026)
+## Latest Release: v0.18.0 (February 9, 2026)
 
-### 🩺 v0.17.0 — Enhanced Doctor Command (Minor)
+### ✨ v0.18.0 — Core Bridge & Contract Infrastructure (Minor)
+
+This minor release introduces **new features and infrastructure** improvements, including contract synchronization, modules catalog API, enhanced Python bridge reliability, and template fixes.
+
+**What's New:**
+
+- 🔗 **Contract Sync Infrastructure**: Automated Core ↔ NPM contract validation
+  - New npm scripts: `sync:contracts` and `check:contracts`
+  - Integrated into CI workflow and pre-commit hooks
+  - Ensures API compatibility between Core Python and NPM packages
+  
+- 📊 **Modules Catalog API**: New `getModulesCatalog()` function for fetching modules
+  - Supports filtering by category, tag, and detail level
+  - 30-minute cache with automatic fallback to legacy format
+  
+- 🔧 **Enhanced Python Bridge**: Major reliability improvements
+  - **Multi-venv Support**: Isolated environments per Core package spec
+  - **Smart Retry Logic**: Exponential backoff for pip operations (2 retries by default)
+  - **Better Error Messages**: Granular error codes with actionable guidance
+  - **Timeout Protection**: Configurable timeouts for all operations
+  - **Legacy Migration**: Automatic reuse of existing venvs where appropriate
+
+**Improvements:**
+
+- 👀 **Doctor Command**: Now displays multiple RapidKit Core installations with versions
+- 🧪 **Test Coverage**: Enhanced contract validation in drift guard tests
+- 📦 **Demo Kit**: Added missing template variables (node_version, database_type, include_caching)
+
+**Bug Fixes:**
+
+- 🐛 Fixed NestJS docker-compose.yml nunjucks ternary operator syntax error
+- 🗑️ Removed redundant `.env.example.j2` from NestJS template
+
+**New Environment Variables:**
+
+- `RAPIDKIT_BRIDGE_PIP_RETRY`: Retry count for pip (default: 2)
+- `RAPIDKIT_BRIDGE_PIP_RETRY_DELAY_MS`: Backoff delay (default: 800ms)
+- `RAPIDKIT_BRIDGE_PIP_TIMEOUT_MS`: Pip timeout (default: 120000ms)
+- `RAPIDKIT_CORE_PYTHON_PACKAGE_ID`: Custom venv identifier
+
+**No breaking changes.** Fully backward compatible.
+
+### ⬆️ Upgrade
+
+```bash
+npm install -g rapidkit@0.18.0
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.18.0.md)
+
+---
+
+## Previous Releases
+
+### 🩺 v0.17.0 — Enhanced Doctor Command (February 6, 2026)
 
 This release delivers a **major upgrade** to the `doctor` command with comprehensive workspace health monitoring and intelligent diagnostics.
 
@@ -42,45 +96,10 @@ npm install -g rapidkit@0.17.0
 
 ## Previous Releases
 
-### ⚙️ v0.16.5 — Configuration & Diagnostics (February 5, 2026)
-
-This minor release adds powerful configuration management and system diagnostics capabilities.
-
-**What's New:**
-
-- ⚙️ **Configuration File:** New `rapidkit.config.js` support for workspace-wide defaults
-  - Set workspace preferences: author, Python version, install method
-  - Configure project defaults: kit, modules, skip flags
-  - Priority hierarchy: CLI args override config file, config file overrides .rapidkitrc.json
-  - Auto-discovery from current or parent directories
-  - Supports .js, .mjs, and .cjs formats
-- 🩺 **Doctor Command:** New `rapidkit doctor` for comprehensive system diagnostics
-  - Validates entire RapidKit toolchain (Python, pip, pipx, Poetry, Core)
-  - Provides actionable troubleshooting recommendations
-  - Generates detailed JSON reports for debugging
-  - Helps quickly identify and resolve setup issues
-- 📚 **Documentation:** Added comprehensive guides and examples
-  - Configuration file usage guide
-  - Doctor command documentation
-  - Example configuration file
-
-**No breaking changes.** Fully backward compatible.
-
-### ⬆️ Upgrade
-
-```bash
-npm install -g rapidkit@0.16.5
-# or
-npx rapidkit@0.16.5 create project fastapi.standard my-api --output .
-```
-
----
-
-## Previous Releases
-
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
-| [v0.16.5](releases/RELEASE_NOTES_v0.16.5.md)              | Feb 5, 2026  | Configuration file support, doctor command, diagnostics              |
+| [v0.17.0](releases/RELEASE_NOTES_v0.17.0.md) | Feb 6, 2026  | Enhanced doctor command, workspace health monitoring, auto-fix       |
+| [v0.16.5](releases/RELEASE_NOTES_v0.16.5.md) | Feb 5, 2026  | Configuration file support, doctor command, diagnostics              |
 | [v0.16.4](releases/RELEASE_NOTES_v0.16.4.md) | Feb 2, 2026  | Documentation quality, test stability, code polish                  |
 | [v0.16.3](releases/RELEASE_NOTES_v0.16.3.md) | Feb 1, 2026  | Template fixes, Python Core 0.2.2 compatibility, test updates       |
 | [v0.16.0](releases/RELEASE_NOTES_v0.16.0.md) | Feb 1, 2026  | Workspace registry, unified signatures, cross-tool integration       |

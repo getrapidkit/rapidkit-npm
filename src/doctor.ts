@@ -9,6 +9,7 @@ interface HealthCheckResult {
   status: 'ok' | 'warn' | 'error';
   message: string;
   details?: string;
+  paths?: { location: string; path: string; version?: string }[]; // Multiple installation paths
 }
 
 interface ProjectHealth {
@@ -135,20 +136,66 @@ async function checkPipx(): Promise<HealthCheckResult> {
 }
 
 async function checkRapidKitCore(): Promise<HealthCheckResult> {
-  const pythonCommands =
-    process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'];
   const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+  const foundPaths: { location: string; path: string; version: string }[] = [];
 
-  // Common paths where rapidkit might be installed
-  const commonPaths = [
-    path.join(homeDir, '.local', 'bin', 'rapidkit'), // pipx default (Linux/Mac)
-    path.join(homeDir, 'AppData', 'Roaming', 'Python', 'Scripts', 'rapidkit.exe'), // Windows
-    path.join(homeDir, '.pyenv', 'shims', 'rapidkit'), // pyenv
-    '/usr/local/bin/rapidkit', // system install
-    '/usr/bin/rapidkit', // system install
+  // Global installation paths
+  const globalPaths = [
+    { location: 'Global (pipx)', path: path.join(homeDir, '.local', 'bin', 'rapidkit') },
+    {
+      location: 'Global (pipx)',
+      path: path.join(homeDir, 'AppData', 'Roaming', 'Python', 'Scripts', 'rapidkit.exe'),
+    },
+    { location: 'Global (pyenv)', path: path.join(homeDir, '.pyenv', 'shims', 'rapidkit') },
+    { location: 'Global (system)', path: '/usr/local/bin/rapidkit' },
+    { location: 'Global (system)', path: '/usr/bin/rapidkit' },
   ];
 
-  // Try direct rapidkit command first (works if in PATH)
+  // Workspace installation paths
+  const workspacePaths = [
+    { location: 'Workspace (.venv)', path: path.join(process.cwd(), '.venv', 'bin', 'rapidkit') },
+    {
+      location: 'Workspace (.venv)',
+      path: path.join(process.cwd(), '.venv', 'Scripts', 'rapidkit.exe'),
+    },
+  ];
+
+  // Check all paths
+  for (const { location, path: rapidkitPath } of [...globalPaths, ...workspacePaths]) {
+    try {
+      if (await fsExtra.pathExists(rapidkitPath)) {
+        const { stdout, exitCode } = await execa(rapidkitPath, ['--version'], {
+          timeout: 3000,
+          reject: false,
+        });
+
+        if (
+          exitCode === 0 &&
+          (stdout.includes('RapidKit Version') || stdout.includes('RapidKit'))
+        ) {
+          const versionMatch = stdout.match(/v?([\d.]+(?:rc\d+)?(?:a\d+)?(?:b\d+)?)/);
+          if (versionMatch) {
+            foundPaths.push({ location, path: rapidkitPath, version: versionMatch[1] });
+          }
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // If found installations, return them
+  if (foundPaths.length > 0) {
+    // Use first found version for message
+    const primaryVersion = foundPaths[0].version;
+    return {
+      status: 'ok',
+      message: `RapidKit Core ${primaryVersion}`,
+      paths: foundPaths.map((f) => ({ location: f.location, path: f.path, version: f.version })),
+    };
+  }
+
+  // Try checking via PATH
   try {
     const { stdout, exitCode } = await execa('rapidkit', ['--version'], {
       timeout: 3000,
@@ -166,62 +213,10 @@ async function checkRapidKitCore(): Promise<HealthCheckResult> {
       }
     }
   } catch {
-    // Not in PATH, try common locations
+    // Not in PATH
   }
 
-  // Try common installation paths directly
-  for (const rapidkitPath of commonPaths) {
-    try {
-      if (await fsExtra.pathExists(rapidkitPath)) {
-        const { stdout, exitCode } = await execa(rapidkitPath, ['--version'], {
-          timeout: 3000,
-          reject: false,
-        });
-
-        if (
-          exitCode === 0 &&
-          (stdout.includes('RapidKit Version') || stdout.includes('RapidKit'))
-        ) {
-          const versionMatch = stdout.match(/v?([\d.]+(?:rc\d+)?(?:a\d+)?(?:b\d+)?)/);
-          if (versionMatch) {
-            return {
-              status: 'ok',
-              message: `RapidKit Core ${versionMatch[1]}`,
-              details: `Installed at ${rapidkitPath}`,
-            };
-          }
-        }
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  // Try checking workspace .venv (if we're in a workspace)
-  try {
-    const venvRapidkit = path.join(process.cwd(), '.venv', 'bin', 'rapidkit');
-    if (await fsExtra.pathExists(venvRapidkit)) {
-      const { stdout, exitCode } = await execa(venvRapidkit, ['--version'], {
-        timeout: 3000,
-        reject: false,
-      });
-
-      if (exitCode === 0 && (stdout.includes('RapidKit Version') || stdout.includes('RapidKit'))) {
-        const versionMatch = stdout.match(/v?([\d.]+(?:rc\d+)?(?:a\d+)?(?:b\d+)?)/);
-        if (versionMatch) {
-          return {
-            status: 'ok',
-            message: `RapidKit Core ${versionMatch[1]}`,
-            details: 'Installed in workspace virtualenv',
-          };
-        }
-      }
-    }
-  } catch {
-    // Not in workspace venv
-  }
-
-  // Try Poetry environment (if in a workspace)
+  // Try Poetry environment
   try {
     const { stdout, exitCode } = await execa('poetry', ['run', 'rapidkit', '--version'], {
       timeout: 3000,
@@ -242,7 +237,9 @@ async function checkRapidKitCore(): Promise<HealthCheckResult> {
     // Poetry not available
   }
 
-  // Try Python module import (last resort - checks if rapidkit_core is importable)
+  // Try Python module import (last resort)
+  const pythonCommands =
+    process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'];
   for (const cmd of pythonCommands) {
     try {
       const { stdout, exitCode } = await execa(
@@ -864,7 +861,16 @@ function renderHealthCheck(check: HealthCheckResult, label: string): void {
     check.status === 'ok' ? chalk.green : check.status === 'warn' ? chalk.yellow : chalk.red;
 
   console.log(`${icon} ${chalk.bold(label)}: ${color(check.message)}`);
-  if (check.details) {
+
+  // Show multiple paths if available
+  if (check.paths && check.paths.length > 0) {
+    check.paths.forEach((p) => {
+      const versionSuffix = p.version ? chalk.cyan(` -> ${p.version}`) : '';
+      console.log(
+        `   ${chalk.cyan('•')} ${chalk.gray(p.location)}: ${chalk.dim(p.path)}${versionSuffix}`
+      );
+    });
+  } else if (check.details) {
     console.log(`   ${chalk.gray(check.details)}`);
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "rapidkit",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "type": "module",
   "description": "Create RapidKit projects with a single command - The official CLI for RapidKit framework",
   "keywords": [
@@ -54,6 +54,8 @@
     "security": "npm audit --audit-level=moderate",
     "security:fix": "npm audit fix",
     "metrics": "npx tsx scripts/metrics.ts",
+    "sync:contracts": "node scripts/sync-contracts.mjs",
+    "check:contracts": "node scripts/sync-contracts.mjs --check",
     "bundle-size": "npm run build && du -sh dist/ && ls -lh dist/",
     "quality": "npm run validate && npm run security && npm run metrics",
     "act-matrix": "act -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-22.04 -P macos-latest=ghcr.io/catthehacker/ubuntu:act-22.04 -P windows-latest=ghcr.io/catthehacker/ubuntu:act-22.04 --pull=false -j build-test-matrix"

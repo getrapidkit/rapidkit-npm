@@ -1,7 +1,11 @@
+import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { describe, expect, test } from 'vitest';
-import { getCoreTopLevelCommands } from '../core-bridge/pythonRapidkitExec.js';
+import {
+  getCoreTopLevelCommands,
+  runCoreRapidkitCapture,
+} from '../core-bridge/pythonRapidkitExec.js';
 import { BOOTSTRAP_CORE_COMMANDS_SET } from '../core-bridge/bootstrapCoreCommands.js';
 
 const enabled = process.env.RAPIDKIT_DRIFT_GUARD === '1';
@@ -96,6 +100,64 @@ describe('Core command drift guard', () => {
       }
 
       const coreCommands = await getCoreTopLevelCommands();
+
+      const schemaPath = path.resolve(
+        __dirname,
+        '..',
+        '..',
+        'docs',
+        'contracts',
+        'rapidkit-cli-contracts.json'
+      );
+      if (!fs.existsSync(schemaPath)) {
+        throw new Error(`Contract schema missing at ${schemaPath}`);
+      }
+      const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8')) as {
+        definitions?: Record<string, unknown>;
+      };
+      const defs = schema.definitions || {};
+      if (!defs.VersionResponse || !defs.CommandsResponse || !defs.ProjectDetectResponse) {
+        throw new Error('Contract schema missing required definitions');
+      }
+
+      const parseJson = (label: string, raw: string) => {
+        try {
+          return JSON.parse(raw);
+        } catch (err) {
+          throw new Error(`${label} returned invalid JSON: ${String(err)}\nRaw: ${raw}`);
+        }
+      };
+
+      const versionRes = await runCoreRapidkitCapture(['version', '--json']);
+      expect(versionRes.exitCode).toBe(0);
+      const versionPayload = parseJson('version --json', versionRes.stdout);
+      expect(versionPayload.schema_version).toBe(1);
+      expect(typeof versionPayload.version).toBe('string');
+
+      const commandsRes = await runCoreRapidkitCapture(['commands', '--json']);
+      expect(commandsRes.exitCode).toBe(0);
+      const commandsPayload = parseJson('commands --json', commandsRes.stdout);
+      expect(commandsPayload.schema_version).toBe(1);
+      expect(Array.isArray(commandsPayload.commands)).toBe(true);
+      expect(commandsPayload.commands).toEqual(
+        [...commandsPayload.commands].filter((c) => typeof c === 'string')
+      );
+
+      const tmpRoot = path.join(os.tmpdir(), `rapidkit-contract-${Date.now()}`);
+      const projectRes = await runCoreRapidkitCapture([
+        'project',
+        'detect',
+        '--path',
+        tmpRoot,
+        '--json',
+      ]);
+      expect(projectRes.exitCode).toBe(0);
+      const projectPayload = parseJson('project detect --json', projectRes.stdout);
+      expect(projectPayload.schema_version).toBe(1);
+      expect(typeof projectPayload.input).toBe('string');
+      expect(['strong', 'weak', 'none']).toContain(projectPayload.confidence);
+      expect(typeof projectPayload.isRapidkitProject).toBe('boolean');
+      expect('projectRoot' in projectPayload).toBe(true);
 
       // The npm wrapper intentionally owns some UX commands.
       // The drift guard focuses on the cold-start forwarding contract.

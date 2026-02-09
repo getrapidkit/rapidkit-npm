@@ -20,6 +20,7 @@ export const BOOTSTRAP_CORE_COMMANDS = [
   'diff',
   'doctor',
   'license',
+  'commands',
   'reconcile',
   'rollback',
   'uninstall',

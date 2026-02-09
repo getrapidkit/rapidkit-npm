@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-02-09
+
+### Added
+
+- 🔗 **Contract Sync Infrastructure** - Added contract schema synchronization between Core and NPM package
+  - Added `sync:contracts` and `check:contracts` npm scripts
+  - Integrated contract validation into CI workflow and pre-commit hooks
+  - Automatically checks Core ↔ NPM contracts when Core schema is available
+  - Gracefully skips when Core schema is not found (supports standalone usage)
+- 📊 **Modules Catalog Support** - Added `getModulesCatalog()` API to fetch modules list from Core
+  - Supports JSON schema v1 with filters (category, tag, detailed)
+  - 30-minute TTL caching for better performance
+  - Backward compatible with legacy `modules list --json` format
+- 🎯 **Commands JSON API** - Core bridge now prefers `rapidkit commands --json` for faster command discovery
+  - Falls back to `--help` parsing if JSON API unavailable
+  - Improved bootstrapped command set with `commands` included
+
+### Improved
+
+- 🔧 **Python Bridge Robustness** - Major enhancements to Core installation and error handling
+  - **Multi-venv Support**: Each Core package spec gets isolated venv (`venv-<hash>` pattern)
+  - **Smart Legacy Migration**: Automatically reuses legacy venv for unpinned specs
+  - **Retry Logic**: 2 retries with exponential backoff for pip operations (configurable via env vars)
+  - **Better Error Messages**: Granular error codes (VENV_CREATE_FAILED, PIP_BOOTSTRAP_FAILED, etc.)
+  - **Timeout Protection**: Configurable timeouts for venv creation (60s) and pip operations (120s)
+  - **Enhanced Validation**: Validates rapidkit-core installation before reusing cached venvs
+- 👀 **Doctor Command** - Enhanced to display multiple RapidKit Core installations
+  - Shows all found installations (Global pipx, pyenv, system, workspace .venv)
+  - Displays version number for each installation path
+  - Color-coded version display with arrow format (`-> v0.3.0`)
+- 🧪 **Test Coverage** - Enhanced drift guard tests with contract validation
+  - Tests `version --json`, `commands --json`, and `project detect --json` schemas
+  - Validates JSON payloads against contract schema definitions
+  - Ensures schema_version compatibility across Core APIs
+- 📦 **Demo Kit** - Added missing template context variables
+  - Added `node_version` (default: '20.0.0')
+  - Added `database_type` (default: 'postgresql')
+  - Added `include_caching` (default: false)
+  - Better error logging for template rendering failures
+
+### Fixed
+
+- 🐛 **NestJS Template** - Fixed nunjucks ternary operator syntax in docker-compose.yml
+  - Fixed nested ternary without parentheses causing parser error
+  - Changed from `{{ 'pnpm' if ... else package_manager if ... else 'npm' }}`
+  - Changed to `{{ ('pnpm' if ... else (package_manager if ... else 'npm')) }}`
+  - Resolves "expected variable end" error at Line 12, Column 74
+- 🗑️ **Template Cleanup** - Removed redundant `.env.example.j2` template from NestJS standard kit
+- 🔄 **Bootstrap Commands** - Added `commands` to BOOTSTRAP_CORE_COMMANDS_SET for cold-start support
+
+### Environment Variables
+
+New environment variables for Python bridge configuration:
+
+- `RAPIDKIT_BRIDGE_PIP_RETRY`: Retry count for pip operations (default: 2)
+- `RAPIDKIT_BRIDGE_PIP_RETRY_DELAY_MS`: Base delay for exponential backoff (default: 800ms)
+- `RAPIDKIT_BRIDGE_PIP_TIMEOUT_MS`: Timeout for pip operations (default: 120000ms)
+- `RAPIDKIT_CORE_PYTHON_PACKAGE_ID`: Additional identifier for venv isolation
+
 ## [0.17.0] - 2026-02-06
 
 ### Added
