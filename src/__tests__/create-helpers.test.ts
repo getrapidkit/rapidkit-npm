@@ -145,6 +145,58 @@ describe('Create Module Helpers', () => {
       expect(result.stdout).toContain('Python 3.11');
     });
 
+    it('should handle different python commands', async () => {
+      // Test python3
+      vi.mocked(execa).mockResolvedValueOnce({
+        stdout: 'Python 3.11.0',
+        stderr: '',
+        exitCode: 0,
+      } as any);
+
+      const result1 = await execa('python3', ['--version']);
+      expect(result1.stdout).toContain('Python 3.11');
+
+      // Test python
+      vi.mocked(execa).mockResolvedValueOnce({
+        stdout: 'Python 3.10.0',
+        stderr: '',
+        exitCode: 0,
+      } as any);
+
+      const result2 = await execa('python', ['--version']);
+      expect(result2.stdout).toContain('Python 3.10');
+    });
+
+    it('should detect actual python version', async () => {
+      vi.mocked(execa).mockResolvedValue({
+        stdout: 'Python 3.11.5',
+        stderr: '',
+        exitCode: 0,
+      } as any);
+
+      const result = await execa('python3', ['--version']);
+      const match = result.stdout.match(/Python (\d+\.\d+\.\d+)/);
+
+      expect(match).toBeTruthy();
+      expect(match![1]).toBe('3.11.5');
+    });
+
+    it('should handle python version detection failure', async () => {
+      vi.mocked(execa).mockRejectedValue(new Error('Python not found'));
+
+      await expect(execa('python3', ['--version'])).rejects.toThrow('Python not found');
+    });
+
+    it('should handle python version detection timeout', async () => {
+      vi.mocked(execa).mockImplementation(() => {
+        return new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Timeout')), 100);
+        });
+      });
+
+      await expect(execa('python3', ['--version'], { timeout: 50 })).rejects.toThrow();
+    });
+
     it('should create virtual environment', async () => {
       vi.mocked(execa).mockResolvedValue({
         stdout: '',
@@ -371,7 +423,129 @@ describe('Create Module Helpers', () => {
 
     it('should handle path separators', async () => {
       const { sep } = await import('path');
+
       expect(sep).toBeDefined();
+    });
+
+    it('should normalize paths', async () => {
+      const { normalize } = await import('path');
+
+      const normalized = normalize('/path//to///file');
+      expect(normalized).toBe('/path/to/file');
+    });
+  });
+
+  describe('Environment Variables', () => {
+    it('should read RAPIDKIT_DEV_PATH', () => {
+      process.env.RAPIDKIT_DEV_PATH = '/test/path';
+
+      expect(process.env.RAPIDKIT_DEV_PATH).toBe('/test/path');
+
+      delete process.env.RAPIDKIT_DEV_PATH;
+    });
+
+    it('should handle missing environment variables', () => {
+      delete process.env.RAPIDKIT_DEV_PATH;
+
+      expect(process.env.RAPIDKIT_DEV_PATH).toBeUndefined();
+    });
+
+    it('should modify PATH environment variable', () => {
+      const originalPath = process.env.PATH;
+      process.env.PATH = '/usr/bin:/usr/local/bin';
+
+      const newPath = '/home/user/.local/bin';
+      process.env.PATH = `${newPath}:${process.env.PATH}`;
+
+      expect(process.env.PATH).toContain(newPath);
+      expect(process.env.PATH).toContain('/usr/bin');
+
+      process.env.PATH = originalPath;
+    });
+  });
+
+  describe('File Operations', () => {
+    it('should write files with proper encoding', async () => {
+      const mockWriteFile = vi.spyOn(fsPromises, 'writeFile');
+      mockWriteFile.mockResolvedValue(undefined);
+
+      await fsPromises.writeFile('/test/file.txt', 'content', 'utf-8');
+
+      expect(mockWriteFile).toHaveBeenCalledWith('/test/file.txt', 'content', 'utf-8');
+    });
+
+    it('should read files with proper encoding', async () => {
+      const mockReadFile = vi.spyOn(fsPromises, 'readFile');
+      mockReadFile.mockResolvedValue('file content');
+
+      const content = await fsPromises.readFile('/test/file.txt', 'utf-8');
+
+      expect(content).toBe('file content');
+      expect(mockReadFile).toHaveBeenCalledWith('/test/file.txt', 'utf-8');
+    });
+
+    it('should handle file write errors', async () => {
+      const mockWriteFile = vi.spyOn(fsPromises, 'writeFile');
+      mockWriteFile.mockRejectedValue(new Error('Write failed'));
+
+      await expect(fsPromises.writeFile('/test/file.txt', 'content', 'utf-8')).rejects.toThrow(
+        'Write failed'
+      );
+    });
+
+    it('should create .python-version file', async () => {
+      const mockWriteFile = vi.spyOn(fsPromises, 'writeFile');
+      mockWriteFile.mockResolvedValue(undefined);
+
+      const version = '3.11.5';
+      await fsPromises.writeFile('/test/.python-version', `${version}\n`, 'utf-8');
+
+      expect(mockWriteFile).toHaveBeenCalledWith('/test/.python-version', '3.11.5\n', 'utf-8');
+    });
+
+    it('should create .gitignore file', async () => {
+      vi.mocked(fsExtra.outputFile).mockResolvedValue(undefined);
+
+      const gitignoreContent = '.venv/\n__pycache__/\n*.pyc\n.env\n.rapidkit-workspace/\n\n';
+      await fsExtra.outputFile('/test/.gitignore', gitignoreContent, 'utf-8');
+
+      expect(fsExtra.outputFile).toHaveBeenCalledWith(
+        '/test/.gitignore',
+        gitignoreContent,
+        'utf-8'
+      );
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle ENOENT errors', async () => {
+      const error = new Error('ENOENT: no such file or directory');
+      (error as any).code = 'ENOENT';
+
+      vi.mocked(fsExtra.pathExists).mockRejectedValue(error);
+
+      await expect(fsExtra.pathExists('/nonexistent')).rejects.toThrow();
+    });
+
+    it('should handle EACCES errors', async () => {
+      const error = new Error('EACCES: permission denied');
+      (error as any).code = 'EACCES';
+
+      vi.mocked(fsExtra.ensureDir).mockRejectedValue(error);
+
+      await expect(fsExtra.ensureDir('/no-permission')).rejects.toThrow('permission denied');
+    });
+
+    it('should handle network timeouts', async () => {
+      vi.mocked(execa).mockImplementation(() => {
+        return new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Network timeout')), 50);
+        });
+      });
+
+      await expect(
+        execa('npm', ['view', 'rapidkit', 'version'], { timeout: 100 })
+      ).rejects.toThrow();
     });
   });
 

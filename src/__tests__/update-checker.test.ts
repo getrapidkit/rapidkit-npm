@@ -86,6 +86,31 @@ describe('Update Checker', () => {
       expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining('Update available'));
     });
 
+    it('should not notify when remote version is older', async () => {
+      const olderVersion = '0.1.0';
+
+      vi.mocked(execa).mockResolvedValue({
+        stdout: olderVersion,
+        stderr: '',
+        exitCode: 0,
+        command: '',
+        failed: false,
+        killed: false,
+        signal: undefined,
+        signalDescription: undefined,
+        cwd: '',
+        durationMs: 0,
+        isCanceled: false,
+        escapedCommand: '',
+        pipedFrom: [],
+        all: undefined,
+      });
+
+      await checkForUpdates();
+
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining('Update available'));
+    });
+
     it('should handle network errors gracefully', async () => {
       vi.mocked(execa).mockRejectedValue(new Error('Network error'));
 
@@ -127,6 +152,282 @@ describe('Update Checker', () => {
       });
 
       await expect(checkForUpdates()).resolves.not.toThrow();
+    });
+
+    it('should handle prerelease versions correctly - alpha', async () => {
+      const alphaVersion = '1.0.0-alpha.1';
+
+      vi.mocked(execa).mockResolvedValue({
+        stdout: alphaVersion,
+        stderr: '',
+        exitCode: 0,
+        command: '',
+        failed: false,
+        killed: false,
+        signal: undefined,
+        signalDescription: undefined,
+        cwd: '',
+        durationMs: 0,
+        isCanceled: false,
+        escapedCommand: '',
+        pipedFrom: [],
+        all: undefined,
+      });
+
+      await checkForUpdates();
+
+      // Alpha version 1.0.0-alpha.1 should be considered older than stable 0.18.0
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Update available'));
+    });
+
+    it('should handle prerelease versions correctly - beta', async () => {
+      const betaVersion = '1.0.0-beta.2';
+
+      vi.mocked(execa).mockResolvedValue({
+        stdout: betaVersion,
+        stderr: '',
+        exitCode: 0,
+        command: '',
+        failed: false,
+        killed: false,
+        signal: undefined,
+        signalDescription: undefined,
+        cwd: '',
+        durationMs: 0,
+        isCanceled: false,
+        escapedCommand: '',
+        pipedFrom: [],
+        all: undefined,
+      });
+
+      await checkForUpdates();
+
+      // Beta version should be newer
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Update available'));
+    });
+
+    it('should handle prerelease versions correctly - rc', async () => {
+      const rcVersion = '1.0.0-rc.1';
+
+      vi.mocked(execa).mockResolvedValue({
+        stdout: rcVersion,
+        stderr: '',
+        exitCode: 0,
+        command: '',
+        failed: false,
+        killed: false,
+        signal: undefined,
+        signalDescription: undefined,
+        cwd: '',
+        durationMs: 0,
+        isCanceled: false,
+        escapedCommand: '',
+        pipedFrom: [],
+        all: undefined,
+      });
+
+      await checkForUpdates();
+
+      // RC version should be newer
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Update available'));
+    });
+
+    it('should notify when newer prerelease version is available', async () => {
+      const newerRc = '99.0.0-rc.5';
+
+      vi.mocked(execa).mockResolvedValue({
+        stdout: newerRc,
+        stderr: '',
+        exitCode: 0,
+        command: '',
+        failed: false,
+        killed: false,
+        signal: undefined,
+        signalDescription: undefined,
+        cwd: '',
+        durationMs: 0,
+        isCanceled: false,
+        escapedCommand: '',
+        pipedFrom: [],
+        all: undefined,
+      });
+
+      await checkForUpdates();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Update available'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(newerRc));
+    });
+
+    it('should compare prerelease with different lengths correctly', async () => {
+      const longerPrerelease = '1.0.0-alpha.beta.gamma.1';
+
+      vi.mocked(execa).mockResolvedValue({
+        stdout: longerPrerelease,
+        stderr: '',
+        exitCode: 0,
+        command: '',
+        failed: false,
+        killed: false,
+        signal: undefined,
+        signalDescription: undefined,
+        cwd: '',
+        durationMs: 0,
+        isCanceled: false,
+        escapedCommand: '',
+        pipedFrom: [],
+        all: undefined,
+      });
+
+      await checkForUpdates();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Update available'));
+    });
+
+    it('should compare numeric prerelease identifiers correctly', async () => {
+      const numericPrerelease = '1.0.0-alpha.2';
+
+      vi.mocked(execa).mockResolvedValue({
+        stdout: numericPrerelease,
+        stderr: '',
+        exitCode: 0,
+        command: '',
+        failed: false,
+        killed: false,
+        signal: undefined,
+        signalDescription: undefined,
+        cwd: '',
+        durationMs: 0,
+        isCanceled: false,
+        escapedCommand: '',
+        pipedFrom: [],
+        all: undefined,
+      });
+
+      await checkForUpdates();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Update available'));
+    });
+
+    it('should compare string prerelease identifiers correctly', async () => {
+      const stringPrerelease = '1.0.0-beta';
+
+      vi.mocked(execa).mockResolvedValue({
+        stdout: stringPrerelease,
+        stderr: '',
+        exitCode: 0,
+        command: '',
+        failed: false,
+        killed: false,
+        signal: undefined,
+        signalDescription: undefined,
+        cwd: '',
+        durationMs: 0,
+        isCanceled: false,
+        escapedCommand: '',
+        pipedFrom: [],
+        all: undefined,
+      });
+
+      await checkForUpdates();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Update available'));
+    });
+
+    it('should handle invalid version format gracefully', async () => {
+      const invalidVersion = 'not-a-version';
+
+      vi.mocked(execa).mockResolvedValue({
+        stdout: invalidVersion,
+        stderr: '',
+        exitCode: 0,
+        command: '',
+        failed: false,
+        killed: false,
+        signal: undefined,
+        signalDescription: undefined,
+        cwd: '',
+        durationMs: 0,
+        isCanceled: false,
+        escapedCommand: '',
+        pipedFrom: [],
+        all: undefined,
+      });
+
+      await expect(checkForUpdates()).resolves.not.toThrow();
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining('Update available'));
+    });
+
+    it('should handle version with build metadata', async () => {
+      const versionWithBuild = '0.18.0+build.123';
+
+      vi.mocked(execa).mockResolvedValue({
+        stdout: versionWithBuild,
+        stderr: '',
+        exitCode: 0,
+        command: '',
+        failed: false,
+        killed: false,
+        signal: undefined,
+        signalDescription: undefined,
+        cwd: '',
+        durationMs: 0,
+        isCanceled: false,
+        escapedCommand: '',
+        pipedFrom: [],
+        all: undefined,
+      });
+
+      await expect(checkForUpdates()).resolves.not.toThrow();
+    });
+
+    it('should compare prerelease identifiers with mixed types', async () => {
+      const mixedPrerelease = '99.0.0-alpha.beta.1';
+
+      vi.mocked(execa).mockResolvedValue({
+        stdout: mixedPrerelease,
+        stderr: '',
+        exitCode: 0,
+        command: '',
+        failed: false,
+        killed: false,
+        signal: undefined,
+        signalDescription: undefined,
+        cwd: '',
+        durationMs: 0,
+        isCanceled: false,
+        escapedCommand: '',
+        pipedFrom: [],
+        all: undefined,
+      });
+
+      await checkForUpdates();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Update available'));
+    });
+
+    it('should handle whitespace in version response', async () => {
+      const versionWithWhitespace = '  99.99.99  \n';
+
+      vi.mocked(execa).mockResolvedValue({
+        stdout: versionWithWhitespace,
+        stderr: '',
+        exitCode: 0,
+        command: '',
+        failed: false,
+        killed: false,
+        signal: undefined,
+        signalDescription: undefined,
+        cwd: '',
+        durationMs: 0,
+        isCanceled: false,
+        escapedCommand: '',
+        pipedFrom: [],
+        all: undefined,
+      });
+
+      await checkForUpdates();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Update available'));
     });
   });
 });

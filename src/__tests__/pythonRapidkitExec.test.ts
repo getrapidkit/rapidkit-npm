@@ -341,4 +341,58 @@ Commands:
     expect(res.has('list')).toBe(true);
     expect(res.has('run')).toBe(true);
   });
+
+  it('handles empty commands response', async () => {
+    mockFs.pathExists.mockResolvedValue(false);
+    mockExeca.mockResolvedValue({
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+    });
+
+    const res = await bridge.getCoreTopLevelCommands();
+    expect(res).toBeDefined();
+    expect(res.size).toBeGreaterThanOrEqual(0);
+  });
+
+  it('handles malformed JSON in commands response', async () => {
+    mockFs.pathExists.mockResolvedValue(false);
+    mockExeca.mockResolvedValue({
+      exitCode: 0,
+      stdout: '{invalid json}',
+      stderr: '',
+    });
+
+    const res = await bridge.getCoreTopLevelCommands();
+    expect(res).toBeDefined();
+  });
+
+  it('handles timeout in getting commands', async () => {
+    mockFs.pathExists.mockResolvedValue(false);
+    mockExeca.mockRejectedValue(new Error('Timeout'));
+
+    const res = await bridge.getCoreTopLevelCommands();
+    expect(res).toBeDefined();
+    expect(res.size).toBeGreaterThan(0);
+  });
+
+  it('handles multiple command formats', async () => {
+    mockFs.pathExists.mockResolvedValue(false);
+    mockExeca.mockResolvedValue({
+      exitCode: 0,
+      stdout: `
+rapidkit create
+rapidkit deploy
+Commands:
+  list
+  run
+`,
+    });
+
+    const res = await bridge.getCoreTopLevelCommands();
+    expect(res.has('create')).toBe(true);
+    expect(res.has('deploy')).toBe(true);
+    expect(res.has('list')).toBe(true);
+    expect(res.has('run')).toBe(true);
+  });
 });

@@ -438,7 +438,6 @@ describe('Demo Kit Generator', () => {
       expect(testExists).toBe(true);
     });
 
-
     it('should generate NestJS tsconfig.json', async () => {
       const projectPath = path.join(testDir, 'nestjs-tsconfig');
       const variables = {

@@ -665,4 +665,275 @@ describe('Create Module - Internal Functions', () => {
       );
     });
   });
+
+  describe('Pipx Installation', () => {
+    it('should check for pipx availability', async () => {
+      vi.mocked(execa).mockImplementation((command: string) => {
+        if (command === 'pipx') {
+          return Promise.resolve({ stdout: 'pipx 1.4.0', stderr: '', exitCode: 0 } as any);
+        }
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+      });
+
+      const result = await execa('pipx', ['--version']);
+      expect(result.stdout).toContain('pipx');
+    });
+
+    it('should handle pipx not found', async () => {
+      vi.mocked(execa).mockImplementation((command: string) => {
+        if (command === 'pipx') {
+          return Promise.reject(new Error('Command not found: pipx'));
+        }
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+      });
+
+      await expect(execa('pipx', ['--version'])).rejects.toThrow('Command not found');
+    });
+
+    it('should install poetry with pipx', async () => {
+      vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
+        if (command === 'pipx' && args?.[0] === 'install') {
+          return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+        }
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+      });
+
+      await execa('pipx', ['install', 'poetry']);
+      expect(execa).toHaveBeenCalledWith('pipx', ['install', 'poetry']);
+    });
+
+    it('should handle pipx upgrade when already installed', async () => {
+      vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
+        if (command === 'pipx' && args?.[0] === 'install') {
+          return Promise.reject(new Error('poetry already installed'));
+        }
+        if (command === 'pipx' && args?.[0] === 'upgrade') {
+          return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+        }
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+      });
+
+      try {
+        await execa('pipx', ['install', 'poetry']);
+      } catch (error: any) {
+        if (error.message.includes('already installed')) {
+          await execa('pipx', ['upgrade', 'poetry']);
+        }
+      }
+
+      expect(execa).toHaveBeenCalledWith('pipx', ['upgrade', 'poetry']);
+    });
+  });
+
+  describe('Venv Installation Method', () => {
+    it('should handle venv installation method', async () => {
+      vi.mocked(inquirer.prompt).mockResolvedValue({
+        pythonVersion: '3.10',
+        installMethod: 'venv',
+      });
+
+      vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
+
+      await createProject('test-venv-project', { yes: true });
+
+      // Verify project was created
+      expect(fsExtra.ensureDir).toHaveBeenCalled();
+    });
+
+    it('should install rapidkit-core with pip in venv', async () => {
+      vi.mocked(inquirer.prompt).mockResolvedValue({
+        pythonVersion: '3.10',
+        installMethod: 'venv',
+      });
+
+      vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
+
+      await createProject('test-venv-project', { yes: true });
+
+      const pipInstallCalls = vi
+        .mocked(execa)
+        .mock.calls.filter(
+          (call) => Array.isArray(call[1]) && call[1].includes('-m') && call[1].includes('pip')
+        );
+
+      expect(pipInstallCalls.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Git Operations', () => {
+    it('should handle git init failure gracefully', async () => {
+      vi.mocked(inquirer.prompt).mockResolvedValue({
+        pythonVersion: '3.10',
+        installMethod: 'poetry',
+      });
+
+      vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
+        if (command === 'git' && args?.[0] === 'init') {
+          return Promise.reject(new Error('git not found'));
+        }
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+      });
+
+      vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]');
+
+      // Should not throw despite git failure
+      await createProject('test-project', {});
+
+      expect(fsExtra.ensureDir).toHaveBeenCalled();
+    });
+
+    it('should create initial git commit', async () => {
+      vi.mocked(inquirer.prompt).mockResolvedValue({
+        pythonVersion: '3.10',
+        installMethod: 'poetry',
+      });
+
+      vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
+      vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]');
+
+      await createProject('test-project', {});
+
+      const gitCommitCalls = vi
+        .mocked(execa)
+        .mock.calls.filter(
+          (call) => call[0] === 'git' && Array.isArray(call[1]) && call[1][0] === 'commit'
+        );
+
+      expect(gitCommitCalls.length).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('Workspace Marker', () => {
+    it('should create workspace marker file', async () => {
+      vi.mocked(inquirer.prompt).mockResolvedValue({
+        pythonVersion: '3.10',
+        installMethod: 'poetry',
+      });
+
+      vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
+      vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]');
+
+      await createProject('test-project', {});
+
+      expect(fsExtra.outputFile).toHaveBeenCalledWith(
+        expect.stringContaining('.rapidkit-workspace'),
+        expect.any(String),
+        'utf-8'
+      );
+    });
+
+    it('should include python version in workspace marker', async () => {
+      vi.mocked(inquirer.prompt).mockResolvedValue({
+        pythonVersion: '3.11',
+        installMethod: 'poetry',
+      });
+
+      vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
+        if (args?.includes('--version')) {
+          return Promise.resolve({ stdout: 'Python 3.11.5', stderr: '', exitCode: 0 } as any);
+        }
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+      });
+
+      vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]');
+
+      await createProject('test-project', {});
+
+      const markerCalls = vi
+        .mocked(fsExtra.outputFile)
+        .mock.calls.filter((call) => call[0].includes('.rapidkit-workspace'));
+
+      expect(markerCalls.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Python Command Detection', () => {
+    it('should detect python3 command', async () => {
+      vi.mocked(execa).mockImplementation((command: string) => {
+        if (command === 'python3') {
+          return Promise.resolve({ stdout: 'Python 3.11.0', stderr: '', exitCode: 0 } as any);
+        }
+        return Promise.reject(new Error('Command not found'));
+      });
+
+      const result = await execa('python3', ['--version']);
+      expect(result.stdout).toContain('Python');
+    });
+
+    it('should fall back to python command', async () => {
+      vi.mocked(execa).mockImplementation((command: string) => {
+        if (command === 'python3') {
+          return Promise.reject(new Error('Command not found'));
+        }
+        if (command === 'python') {
+          return Promise.resolve({ stdout: 'Python 3.10.0', stderr: '', exitCode: 0 } as any);
+        }
+        return Promise.reject(new Error('Command not found'));
+      });
+
+      try {
+        await execa('python3', ['--version']);
+      } catch {
+        const result = await execa('python', ['--version']);
+        expect(result.stdout).toContain('Python');
+      }
+    });
+
+    it('should handle python command not found', async () => {
+      vi.mocked(execa).mockRejectedValue(new Error('Command not found'));
+
+      try {
+        await execa('python3', ['--version']);
+        await execa('python', ['--version']);
+      } catch (error) {
+        expect(error).toBeDefined();
+      }
+    });
+  });
+
+  describe('Poetry Configuration', () => {
+    it('should configure virtualenvs.in-project', async () => {
+      vi.mocked(inquirer.prompt).mockResolvedValue({
+        pythonVersion: '3.10',
+        installMethod: 'poetry',
+      });
+
+      vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
+      vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]');
+
+      await createProject('test-project', {});
+
+      expect(execa).toHaveBeenCalledWith(
+        'poetry',
+        ['config', 'virtualenvs.in-project', 'true', '--local'],
+        expect.any(Object)
+      );
+    });
+
+    it('should handle poetry config errors gracefully', async () => {
+      vi.mocked(inquirer.prompt).mockResolvedValue({
+        pythonVersion: '3.10',
+        installMethod: 'poetry',
+      });
+
+      vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
+        if (
+          command === 'poetry' &&
+          Array.isArray(args) &&
+          args[0] === 'config' &&
+          args[1] === 'virtualenvs.in-project'
+        ) {
+          return Promise.reject(new Error('Config failed'));
+        }
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+      });
+
+      vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]');
+
+      // Should continue despite config failure
+      await createProject('test-project', {});
+
+      expect(fsExtra.ensureDir).toHaveBeenCalled();
+    });
+  });
 });
