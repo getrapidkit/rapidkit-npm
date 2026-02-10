@@ -58,7 +58,7 @@ async function runCreateFallback(args: string[], reasonCode: BridgeFailureCode):
   if (hasJson) {
     process.stderr.write(
       'RapidKit (npm) offline fallback does not support --json for `create` commands.\n' +
-      'Install Python 3.10+ and retry the same command.\n'
+        'Install Python 3.10+ and retry the same command.\n'
     );
     return 1;
   }
@@ -69,8 +69,8 @@ async function runCreateFallback(args: string[], reasonCode: BridgeFailureCode):
   if (sub !== 'project') {
     process.stderr.write(
       'RapidKit (npm) could not run the Python core engine for `create`.\n' +
-      `Reason: ${reasonCode}.\n` +
-      'Install Python 3.10+ to use the interactive wizard and full kit catalog.\n'
+        `Reason: ${reasonCode}.\n` +
+        'Install Python 3.10+ to use the interactive wizard and full kit catalog.\n'
     );
     return 1;
   }
@@ -80,7 +80,7 @@ async function runCreateFallback(args: string[], reasonCode: BridgeFailureCode):
   if (!kit || !name) {
     process.stderr.write(
       'Usage: rapidkit create project <kit> <name> [--output <dir>]\n' +
-      'Tip: offline fallback supports only fastapi* and nestjs* kits.\n'
+        'Tip: offline fallback supports only fastapi* and nestjs* kits.\n'
     );
     return 1;
   }
@@ -89,10 +89,10 @@ async function runCreateFallback(args: string[], reasonCode: BridgeFailureCode):
   if (!template) {
     process.stderr.write(
       'RapidKit (npm) could not run the Python core engine to create this kit.\n' +
-      `Reason: ${reasonCode}.\n` +
-      `Requested kit: ${kit}\n` +
-      'Offline fallback only supports: fastapi.standard, nestjs.standard (and their shorthands).\n' +
-      'Install Python 3.10+ to access all kits.\n'
+        `Reason: ${reasonCode}.\n` +
+        `Requested kit: ${kit}\n` +
+        'Offline fallback only supports: fastapi.standard, nestjs.standard (and their shorthands).\n' +
+        'Install Python 3.10+ to access all kits.\n'
     );
     return 1;
   }
@@ -433,11 +433,11 @@ async function delegateToLocalCLI(): Promise<boolean> {
   const isWindows = process.platform === 'win32';
   const localScriptCandidates = isWindows
     ? [
-      path.join(cwd, 'rapidkit.cmd'),
-      path.join(cwd, 'rapidkit'),
-      path.join(cwd, '.rapidkit', 'rapidkit.cmd'),
-      path.join(cwd, '.rapidkit', 'rapidkit'),
-    ]
+        path.join(cwd, 'rapidkit.cmd'),
+        path.join(cwd, 'rapidkit'),
+        path.join(cwd, '.rapidkit', 'rapidkit.cmd'),
+        path.join(cwd, '.rapidkit', 'rapidkit'),
+      ]
     : [path.join(cwd, 'rapidkit'), path.join(cwd, '.rapidkit', 'rapidkit')];
 
   let localScript: string | null = null;
@@ -489,11 +489,11 @@ async function delegateToLocalCLI(): Promise<boolean> {
         const isWin = process.platform === 'win32';
         const localScriptCandidatesEarly = isWin
           ? [
-            path.join(cwd, 'rapidkit.cmd'),
-            path.join(cwd, 'rapidkit'),
-            path.join(cwd, '.rapidkit', 'rapidkit.cmd'),
-            path.join(cwd, '.rapidkit', 'rapidkit'),
-          ]
+              path.join(cwd, 'rapidkit.cmd'),
+              path.join(cwd, 'rapidkit'),
+              path.join(cwd, '.rapidkit', 'rapidkit.cmd'),
+              path.join(cwd, '.rapidkit', 'rapidkit'),
+            ]
           : [path.join(cwd, 'rapidkit'), path.join(cwd, '.rapidkit', 'rapidkit')];
         let localScriptEarly: string | null = null;
         for (const c of localScriptCandidatesEarly) {
@@ -564,6 +564,8 @@ async function shouldForwardToCore(args: string[]): Promise<boolean> {
   if (first === 'shell' && second === 'activate') return false;
   if (first === 'workspace') return false; // workspace management is npm-only
   if (first === 'doctor') return false; // doctor is npm-only health check
+  if (first === 'ai') return false; // AI commands are npm-only
+  if (first === 'config') return false; // config commands are npm-only
 
   // core global flag
   if (args.includes('--tui')) return true;

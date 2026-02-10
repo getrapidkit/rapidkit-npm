@@ -32,6 +32,7 @@ export default defineConfig({
     'fs-extra',
     'inquirer',
     'nunjucks',
+    'openai',
     'ora',
     'validate-npm-package-name',
   ],

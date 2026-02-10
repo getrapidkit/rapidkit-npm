@@ -287,9 +287,9 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
  * Convert Python CLI output to ModuleMetadata
  */
 function parsePythonModule(pyModule: any): ModuleMetadata {
-  // Generate id from name or slug
-  const id =
-    pyModule.id || pyModule.module_id || pyModule.name?.toLowerCase().replace(/_/g, '-') || '';
+  // Use 'name' field directly (with underscores, not dashes)
+  // Python Core returns: ai_assistant, api_keys, auth_core, etc.
+  const id = pyModule.name || pyModule.id || pyModule.module_id || '';
 
   return {
     id,
@@ -336,16 +336,21 @@ function mapPythonFramework(framework: any): 'fastapi' | 'nestjs' | 'both' {
 }
 
 /**
- * Fetch modules from Python Core (rapidkit modules list --json)
+ * Fetch modules from Python Core (rapidkit modules list --json-schema 1)
  */
 async function fetchModulesFromPythonCore(): Promise<ModuleMetadata[]> {
   try {
-    const { stdout } = await execAsync('rapidkit modules list --json', {
+    // Use the new JSON schema format (v1) introduced in newer Core versions
+    const { stdout } = await execAsync('rapidkit modules list --json-schema 1', {
       timeout: 10000, // 10 seconds timeout
       maxBuffer: 10 * 1024 * 1024, // 10MB
     });
 
-    const result = JSON.parse(stdout);
+    // Python Core may output emojis/colors before JSON, extract only JSON part
+    const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : stdout;
+
+    const result = JSON.parse(jsonStr);
 
     // Handle different response formats
     let modules: any[] = [];
