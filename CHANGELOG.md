@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-02-10
+
 ### Added
 - 🤖 **AI Module Recommender** - Intelligent module suggestions using OpenAI embeddings
   - 🧠 Semantic search for modules (understands intent, not just keywords)
@@ -77,6 +79,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build size: 58.57 KB (ESM bundle)
 - 5-minute cache TTL for module list
 - Automatic fallback to hardcoded catalog (11 modules)
+
+### Fixed
+
+- 🐛 **AI Module Name Format** - Fixed critical module ID format mismatch
+  - Module IDs now preserve underscores (ai_assistant, auth_core, db_postgres) matching Python Core format
+  - Previously converted underscores to dashes (ai-assistant), breaking module lookups
+  - Updated to JSON Schema v1 API: `rapidkit modules list --json-schema 1`
+  - Added JSON extraction to handle emoji output from Python Core
+  - Fixed command routing: AI and config commands now handled by npm CLI (not forwarded to Python Core)
+  - Externalized openai package (prevents bundling 10MB SDK)
+  - **Impact:** AI recommendations now correctly match Python Core module registry
 
 ## [0.18.1] - 2026-02-09
 

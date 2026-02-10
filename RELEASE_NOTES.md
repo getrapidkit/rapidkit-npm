@@ -1,6 +1,64 @@
 # Release Notes
 
-## Latest Release: v0.18.1 (February 9, 2026)
+## Latest Release: v0.19.0 (February 10, 2026)
+
+### ✨ v0.19.0 — AI-Powered Module Recommender (Minor)
+
+This minor release introduces the **AI-powered module recommender** feature with intelligent module suggestions using OpenAI embeddings and semantic search.
+
+**What's New:**
+
+- 🤖 **AI Module Recommender** - Intelligent module suggestions using OpenAI embeddings
+  - 🧠 Semantic search for modules (understands intent, not just keywords)
+  - 🔄 Dynamic module fetching from Python Core (27+ production modules)
+  - 🤖 Auto-generate embeddings with interactive prompts
+  - ✅ Mock mode for testing without API key
+  - 🎯 Cosine similarity algorithm (92%+ match scores)
+  - 💰 Ultra-cheap: ~$0.0002 per query (practically free)
+  - ⚡ 5-minute cache for optimal performance
+  - 🛡️ Graceful fallback to 11 hardcoded modules
+
+- 🛠️ **New CLI Commands**:
+  - `rapidkit ai recommend [query]` - Get module recommendations
+  - `rapidkit ai recommend [query] -n <N>` - Top N recommendations
+  - `rapidkit ai recommend [query] --json` - JSON output
+  - `rapidkit ai generate-embeddings` - Generate embeddings
+  - `rapidkit ai info` - Show AI features guide
+  - `rapidkit config set-api-key` - Configure OpenAI API key
+  - `rapidkit config show` - View configuration
+
+**Bug Fixes:**
+
+- 🐛 **AI Module Name Format** - Fixed critical module ID format mismatch
+  - Module IDs now preserve underscores (ai_assistant, auth_core) matching Python Core
+  - Updated to JSON Schema v1 API
+  - Fixed command routing for AI and config commands
+  - Externalized openai package (prevents bundling 10MB SDK)
+
+**Documentation:**
+
+- 📚 Complete AI features guide, quickstart, examples, and integration docs
+- Updated README with comprehensive AI section
+
+**Security:**
+
+- 🔒 API keys stored securely in ~/.rapidkit/config.json (600 permissions)
+- Environment variable support (OPENAI_API_KEY)
+
+**Testing:**
+
+- ✅ 691 tests passing (76 new AI tests)
+- Mock mode tests (no API key needed)
+
+### ⬆️ Upgrade
+
+```bash
+npm install -g rapidkit@0.19.0
+```
+
+---
+
+## Previous Release: v0.18.1 (February 9, 2026)
 
 ### 🐛 v0.18.1 — Bug Fixes (Patch)
 
