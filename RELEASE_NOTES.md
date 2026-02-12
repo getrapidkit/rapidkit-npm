@@ -1,6 +1,35 @@
 # Release Notes
 
-## Latest Release: v0.19.0 (February 10, 2026)
+## Latest Release: v0.19.1 (February 12, 2026)
+
+### 🛠️ v0.19.1 — Dependency Refresh & Compatibility (Patch)
+
+This patch release focuses on dependency freshness, compatibility improvements, and release hardening.
+
+**What Changed:**
+
+- ⬆️ Upgraded `inquirer` to `^13.2.2`.
+- 🔄 Updated lockfiles (`package-lock.json`, `yarn.lock`) to match the new dependency tree.
+- 🧩 Updated generated demo Poetry template to use `python = "^3.10"` instead of patch-pinned `^3.10.14`.
+
+**Security & Quality:**
+
+- ✅ `npm audit --audit-level=high` reports zero vulnerabilities.
+- ✅ `npm test` passes after the update.
+
+**No breaking changes.** Fully backward compatible.
+
+### ⬆️ Upgrade
+
+```bash
+npm install -g rapidkit@0.19.1
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.19.1.md)
+
+---
+
+## Previous Release: v0.19.0 (February 10, 2026)
 
 ### ✨ v0.19.0 — AI-Powered Module Recommender (Minor)
 
@@ -56,128 +85,14 @@ This minor release introduces the **AI-powered module recommender** feature with
 npm install -g rapidkit@0.19.0
 ```
 
----
-
-## Previous Release: v0.18.1 (February 9, 2026)
-
-### 🐛 v0.18.1 — Bug Fixes (Patch)
-
-Minor bug fix release addressing Windows CI test failure.
-
-**Bug Fixes:**
-
-- 🐛 Fixed cross-platform path normalization test
-  - Updated path test to properly handle both Unix (/) and Windows (\\) path separators
-  - Resolves Windows CI failure in create-helpers.test.ts
-
-**No breaking changes.** Fully backward compatible.
-
-### ⬆️ Upgrade
-
-```bash
-npm install -g rapidkit@0.18.1
-```
-
----
-
-## Previous Release: v0.18.0 (February 9, 2026)
-
-### ✨ v0.18.0 — Core Bridge & Contract Infrastructure (Minor)
-
-This minor release introduces **new features and infrastructure** improvements, including contract synchronization, modules catalog API, enhanced Python bridge reliability, and template fixes.
-
-**What's New:**
-
-- 🔗 **Contract Sync Infrastructure**: Automated Core ↔ NPM contract validation
-  - New npm scripts: `sync:contracts` and `check:contracts`
-  - Integrated into CI workflow and pre-commit hooks
-  - Ensures API compatibility between Core Python and NPM packages
-  
-- 📊 **Modules Catalog API**: New `getModulesCatalog()` function for fetching modules
-  - Supports filtering by category, tag, and detail level
-  - 30-minute cache with automatic fallback to legacy format
-  
-- 🔧 **Enhanced Python Bridge**: Major reliability improvements
-  - **Multi-venv Support**: Isolated environments per Core package spec
-  - **Smart Retry Logic**: Exponential backoff for pip operations (2 retries by default)
-  - **Better Error Messages**: Granular error codes with actionable guidance
-  - **Timeout Protection**: Configurable timeouts for all operations
-  - **Legacy Migration**: Automatic reuse of existing venvs where appropriate
-
-**Improvements:**
-
-- 👀 **Doctor Command**: Now displays multiple RapidKit Core installations with versions
-- 🧪 **Test Coverage**: Enhanced contract validation in drift guard tests
-- 📦 **Demo Kit**: Added missing template variables (node_version, database_type, include_caching)
-
-**Bug Fixes:**
-
-- 🐛 Fixed NestJS docker-compose.yml nunjucks ternary operator syntax error
-- 🗑️ Removed redundant `.env.example.j2` from NestJS template
-
-**New Environment Variables:**
-
-- `RAPIDKIT_BRIDGE_PIP_RETRY`: Retry count for pip (default: 2)
-- `RAPIDKIT_BRIDGE_PIP_RETRY_DELAY_MS`: Backoff delay (default: 800ms)
-- `RAPIDKIT_BRIDGE_PIP_TIMEOUT_MS`: Pip timeout (default: 120000ms)
-- `RAPIDKIT_CORE_PYTHON_PACKAGE_ID`: Custom venv identifier
-
-**No breaking changes.** Fully backward compatible.
-
-### ⬆️ Upgrade
-
-```bash
-npm install -g rapidkit@0.18.0
-```
-
-[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.18.0.md)
-
----
-
-## Previous Releases
-
-### 🩺 v0.17.0 — Enhanced Doctor Command (February 6, 2026)
-
-This release delivers a **major upgrade** to the `doctor` command with comprehensive workspace health monitoring and intelligent diagnostics.
-
-**What's New:**
-
-- 🩺 **Enhanced Doctor Command** - Complete overhaul with 15+ new features:
-  - **Framework Detection**: Automatically identifies FastAPI 🐍 or NestJS 🦅 projects
-  - **Health Score System**: Visual percentage-based scoring with detailed breakdown
-  - **Project Statistics**: Module counts from registry.json
-  - **Last Modified Tracking**: Git-aware timestamps (e.g., "2 days ago")
-  - **Test Detection**: Identifies test directories
-  - **Docker Support**: Validates Dockerfile presence
-  - **Code Quality Tools**: Checks ESLint (NestJS) or Ruff (FastAPI)
-  - **Security Scanning**: npm audit integration for vulnerabilities
-  - **Actionable Fix Commands**: Project-specific commands to resolve issues
-  - **JSON Output Mode**: Machine-readable format for CI/CD (`--json` flag)
-  - **Auto-Fix Capability**: Interactive fix application (`--fix` flag)
-  - **Version Compatibility**: Alerts on Core/CLI mismatches
-  - **Module Health**: Validates Python `__init__.py` files
-  - **Environment Validation**: Detects missing `.env` files
-
-- ⚙️ **Improved Core Detection**: Workspace venv prioritized over global installation
-- 🎯 **Enhanced Display**: Framework icons, kit info, organized status indicators
-- 🐛 **Bug Fixes**: fs-extra ESM compatibility, command execution, dependency detection
-
-**No breaking changes.** Fully backward compatible.
-
-### ⬆️ Upgrade
-
-```bash
-npm install -g rapidkit@0.17.0
-```
-
-[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.17.0.md)
-
----
-
 ## Previous Releases
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.19.1](releases/RELEASE_NOTES_v0.19.1.md) | Feb 12, 2026 | Dependency refresh, lockfile sync, Python template compatibility     |
+| [v0.19.0](releases/RELEASE_NOTES_v0.19.0.md) | Feb 10, 2026 | AI module recommender, semantic search, config commands             |
+| [v0.18.1](releases/RELEASE_NOTES_v0.18.1.md) | Feb 9, 2026  | Windows CI path normalization fix                                   |
+| [v0.18.0](releases/RELEASE_NOTES_v0.18.0.md) | Feb 9, 2026  | Contract sync, modules catalog API, Python bridge reliability       |
 | [v0.17.0](releases/RELEASE_NOTES_v0.17.0.md) | Feb 6, 2026  | Enhanced doctor command, workspace health monitoring, auto-fix       |
 | [v0.16.5](releases/RELEASE_NOTES_v0.16.5.md) | Feb 5, 2026  | Configuration file support, doctor command, diagnostics              |
 | [v0.16.4](releases/RELEASE_NOTES_v0.16.4.md) | Feb 2, 2026  | Documentation quality, test stability, code polish                  |

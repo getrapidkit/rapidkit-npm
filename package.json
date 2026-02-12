@@ -1,6 +1,6 @@
 {
   "name": "rapidkit",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "type": "module",
   "description": "Create RapidKit projects with a single command - The official CLI for RapidKit framework",
   "keywords": [
@@ -66,7 +66,7 @@
     "commander": "^12.1.0",
     "execa": "^9.3.1",
     "fs-extra": "^11.2.0",
-    "inquirer": "^9.2.23",
+    "inquirer": "^13.2.2",
     "nunjucks": "^3.2.4",
     "openai": "^4.80.0",
     "ora": "^8.0.1",

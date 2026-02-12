@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-02-12
+
+### Changed
+- ⬆️ Upgraded `inquirer` from `^9.2.23` to `^13.2.2` to modernize prompt stack and reduce dependency noise.
+- 🔄 Refreshed lockfiles (`package-lock.json`, `yarn.lock`) to align transitive dependency graph with the upgrade.
+- 🧩 Updated generated demo Poetry template in `src/create.ts` from `python = "^3.10.14"` to `python = "^3.10"` for wider Python 3.10 patch compatibility.
+
+### Security
+- ✅ Verified `npm audit --audit-level=high` reports zero known vulnerabilities after dependency update.
+
+### Testing
+- ✅ Verified `npm test` passes after the upgrade (no regressions observed).
+
 ## [0.19.0] - 2026-02-10
 
 ### Added
