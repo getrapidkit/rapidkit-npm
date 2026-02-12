@@ -85,6 +85,10 @@ jobs:
         if: runner.os != 'Windows'
         run: npm run format:check
 
+      # Ensure embeddings file exists for AI recommender tests
+      - name: Generate mock embeddings for tests
+        run: npm run test:prepare-embeddings
+
       # Tests + coverage
       - name: Run tests with coverage
         run: npm run test:coverage

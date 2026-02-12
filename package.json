@@ -41,6 +41,7 @@
     "test:drift": "RAPIDKIT_DRIFT_GUARD=1 vitest run src/__tests__/drift-guard.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:prepare-embeddings": "npx tsx scripts/generate-mock-embeddings.ts",
     "test:e2e": "vitest run src/__tests__/e2e.test.ts",
     "test:scenarios": "bash scripts/scenario-matrix-local.sh",
     "test:scenarios:full": "RAPIDKIT_SCENARIO_FULL_BOOTSTRAP=1 bash scripts/scenario-matrix-local.sh",
