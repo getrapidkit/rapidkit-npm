@@ -134,6 +134,7 @@ async function runCreateFallback(args: string[], reasonCode: BridgeFailureCode):
     await generateDemoKit(projectPath, {
       project_name: name,
       template,
+      kit_name: kit, // Pass full kit name (e.g., 'fastapi.ddd')
       skipGit,
       skipInstall,
       engine,

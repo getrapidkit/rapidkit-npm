@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-02-14
+
+### Added
+- 📦 **FastAPI DDD Kit** - Domain-Driven Design template with clean architecture
+  - 🏗️ Complete DDD structure (Domain, Application, Infrastructure layers)
+  - 🎯 39 production-ready template files
+  - 🔄 Synced from Python Core (`fastapi.ddd` kit)
+  - 📚 Full offline fallback support (236KB compressed)
+  - ✨ Same quality as `fastapi.standard` with advanced patterns
+
+### Changed
+- 🔧 Updated `sync-kits.sh` to include all 3 kits (fastapi-standard, fastapi-ddd, nestjs-standard)
+- 🗺️ Enhanced `demo-kit.ts` mapping for proper kit name resolution
+- ⚡ Improved kit generation logic in `index.ts` and `workspace.ts`
+- 🛠️ Updated FastAPI standard CLI template with enhanced commands
+
+### Technical
+- 📊 Total npm package size: ~512KB (all 3 kits included)
+- 🎁 Complete offline experience with full kit templates
+- 🔄 Seamless fallback when Python Core unavailable
+
 ## [0.19.1] - 2026-02-12
 
 ### Changed

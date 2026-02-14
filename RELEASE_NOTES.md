@@ -1,6 +1,45 @@
 # Release Notes
 
-## Latest Release: v0.19.1 (February 12, 2026)
+## Latest Release: v0.20.0 (February 14, 2026)
+
+### 📦 v0.20.0 — FastAPI DDD Kit & Complete Offline Support (Minor)
+
+This minor release adds the **FastAPI DDD (Domain-Driven Design)** kit template and completes the offline experience with all three production kits bundled in the npm package.
+
+**What's New:**
+
+- 📦 **FastAPI DDD Kit** - Advanced Domain-Driven Design template
+  - 🏗️ Clean Architecture with DDD patterns (Domain/Application/Infrastructure layers)
+  - 🎯 39 production-ready template files
+  - 🔄 Synced from Python Core's `fastapi.ddd` kit
+  - ✨ Enterprise-grade patterns for complex business logic
+  
+- 🎁 **Complete Offline Fallback** - All 3 kits now bundled (~512KB total)
+  - ✅ `fastapi-standard` (80KB) - Standard FastAPI template
+  - ✅ `fastapi-ddd` (236KB) - DDD architecture template  
+  - ✅ `nestjs-standard` (176KB) - Standard NestJS template
+  - 🚀 Works perfectly without Python Core or internet
+  
+- 🔧 **Improved Kit Infrastructure**
+  - Enhanced sync script for all 3 kits
+  - Better kit name mapping and resolution
+  - Seamless Python Core integration with fallback
+
+**Technical Details:**
+
+This release ensures users always have access to production-ready templates, even in offline environments or when Python Core is unavailable.
+
+**Upgrade:**
+
+```bash
+npm install -g rapidkit@0.20.0
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.20.0.md)
+
+---
+
+## Previous Release: v0.19.1 (February 12, 2026)
 
 ### 🛠️ v0.19.1 — Dependency Refresh & Compatibility (Patch)
 

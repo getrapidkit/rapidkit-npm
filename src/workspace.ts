@@ -602,7 +602,7 @@ cmd_project() {
     cd "$project_root"
 
     case "$kit_name" in
-        fastapi.standard|python)
+        fastapi.standard|fastapi.ddd|python)
             # Python/FastAPI project
             case "$cmd" in
                 init)

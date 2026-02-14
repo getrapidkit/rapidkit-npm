@@ -29,13 +29,27 @@ if [ -d "$FASTAPI_SRC" ]; then
   rm -rf "$FASTAPI_DEST"
   mkdir -p "$FASTAPI_DEST"
   cp -r "$FASTAPI_SRC"/* "$FASTAPI_DEST/"
-  echo "✅ FastAPI kit synced"
+  echo "✅ FastAPI Standard kit synced"
 else
-  echo "⚠️  FastAPI kit not found in Python Core"
+  echo "⚠️  FastAPI Standard kit not found in Python Core"
+fi
+
+# FastAPI DDD Kit
+echo "📦 Syncing fastapi.ddd..."
+FASTAPI_DDD_SRC="$CORE_ROOT/src/kits/fastapi/ddd/templates"
+FASTAPI_DDD_DEST="$NPM_ROOT/templates/kits/fastapi-ddd"
+
+if [ -d "$FASTAPI_DDD_SRC" ]; then
+  rm -rf "$FASTAPI_DDD_DEST"
+  mkdir -p "$FASTAPI_DDD_DEST"
+  cp -r "$FASTAPI_DDD_SRC"/* "$FASTAPI_DDD_DEST/"
+  echo "✅ FastAPI DDD kit synced"
+else
+  echo "⚠️  FastAPI DDD kit not found in Python Core"
 fi
 
 # NestJS Standard Kit (if exists in Python Core)
-echo "📦 Checking nestjs.standard..."
+echo "📦 Syncing nestjs.standard..."
 NESTJS_SRC="$CORE_ROOT/src/kits/nestjs/standard/templates"
 NESTJS_DEST="$NPM_ROOT/templates/kits/nestjs-standard"
 

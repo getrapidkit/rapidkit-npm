@@ -19,6 +19,7 @@ interface KitVariables {
   app_version?: string;
   license?: string;
   template?: string;
+  kit_name?: string; // Full kit name (e.g., 'fastapi.standard', 'fastapi.ddd', 'nestjs.standard')
   package_manager?: string;
   skipGit?: boolean;
   skipInstall?: boolean;
@@ -51,7 +52,19 @@ export async function generateDemoKit(projectPath: string, variables: KitVariabl
   try {
     // When running from dist/demo-kit.js, we need to go up to package root
     const packageRoot = path.resolve(__dirname, '..');
-    const templateDir = isFastAPI ? 'fastapi-standard' : 'nestjs-standard';
+
+    // Map kit_name to template directory
+    const kitName = variables.kit_name || `${template}.standard`;
+    let templateDir: string;
+
+    if (kitName === 'fastapi.ddd') {
+      templateDir = 'fastapi-ddd';
+    } else if (kitName.startsWith('fastapi')) {
+      templateDir = 'fastapi-standard';
+    } else {
+      templateDir = 'nestjs-standard';
+    }
+
     const templatesPath = path.join(packageRoot, 'templates', 'kits', templateDir);
 
     const env = nunjucks.configure(templatesPath, {
