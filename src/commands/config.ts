@@ -1,7 +1,16 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import inquirer from 'inquirer';
+// Dynamic import for inquirer to reduce initial bundle size
+import type Inquirer from 'inquirer';
 import { setUserConfig, getUserConfig, getConfigPath } from '../config/user-config.js';
+
+/**
+ * Lazy load inquirer module
+ */
+async function loadInquirer(): Promise<typeof Inquirer> {
+  const module = await import('inquirer');
+  return module.default;
+}
 
 export function registerConfigCommands(program: Command): void {
   const config = program.command('config').description('Configure RapidKit settings');
@@ -16,6 +25,7 @@ export function registerConfigCommands(program: Command): void {
 
       // If not provided via option, prompt for it
       if (!apiKey) {
+        const inquirer = await loadInquirer();
         const answers = await inquirer.prompt([
           {
             type: 'password',
@@ -95,6 +105,7 @@ export function registerConfigCommands(program: Command): void {
       }
 
       // Confirm removal
+      const inquirer = await loadInquirer();
       const answers = await inquirer.prompt([
         {
           type: 'confirm',

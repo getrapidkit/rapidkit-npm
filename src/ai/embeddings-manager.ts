@@ -8,12 +8,21 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import ora from 'ora';
-import inquirer from 'inquirer';
+// Dynamic import for inquirer to reduce initial bundle size
+import type Inquirer from 'inquirer';
 import { getModuleCatalog } from './module-catalog.js';
 import { generateEmbeddings, isInitialized, isMockMode } from './openai-client.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * Lazy load inquirer module
+ */
+async function loadInquirer(): Promise<typeof Inquirer> {
+  const module = await import('inquirer');
+  return module.default;
+}
 
 export interface EmbeddingsInfo {
   exists: boolean;
@@ -96,6 +105,7 @@ export async function generateModuleEmbeddings(
 
     // Confirm if interactive
     if (interactive) {
+      const inquirer = await loadInquirer();
       const { confirm } = await inquirer.prompt([
         {
           type: 'confirm',
@@ -198,6 +208,7 @@ export async function ensureEmbeddings(interactive: boolean = true): Promise<boo
     return false;
   }
 
+  const inquirer = await loadInquirer();
   const { action } = await inquirer.prompt([
     {
       type: 'list',

@@ -19,8 +19,7 @@ const optionalModules: Array<ModuleRef | null> = [
 	registerOptionalModule(() => require('../config/logging.module').LoggingModule as ModuleRef),
 	registerOptionalModule(() => require('../config/settings.module').SettingsModule as ModuleRef),
 	registerOptionalModule(() => require('../deployment/deployment.module').DeploymentModule as ModuleRef),
+	// <<<inject:module-exports>>>
 ];
 
 export const rapidkitModules: ModuleRef[] = optionalModules.filter(Boolean) as ModuleRef[];
-
-// <<<inject:module-exports>>>

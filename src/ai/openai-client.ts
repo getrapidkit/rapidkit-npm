@@ -1,7 +1,21 @@
-import OpenAI from 'openai';
+// Dynamic import for OpenAI to reduce initial bundle load
+// Only loaded when AI features are actually used
+import type OpenAI from 'openai';
 
 let openaiClient: OpenAI | null = null;
 let mockMode = false;
+let OpenAIConstructor: typeof OpenAI | null = null;
+
+/**
+ * Lazy load OpenAI module
+ */
+async function loadOpenAI(): Promise<typeof OpenAI> {
+  if (!OpenAIConstructor) {
+    const module = await import('openai');
+    OpenAIConstructor = module.default;
+  }
+  return OpenAIConstructor;
+}
 
 /**
  * Enable mock mode for testing without OpenAI API
@@ -39,7 +53,8 @@ function generateMockEmbedding(text: string): number[] {
 /**
  * Initialize OpenAI client with API key
  */
-export function initOpenAI(apiKey: string): void {
+export async function initOpenAI(apiKey: string): Promise<void> {
+  const OpenAI = await loadOpenAI();
   openaiClient = new OpenAI({
     apiKey: apiKey,
   });

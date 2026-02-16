@@ -1,133 +1,59 @@
 # Release Notes
 
-## Latest Release: v0.20.0 (February 14, 2026)
+## Latest Release: v0.21.0 (February 16, 2026)
 
-### 📦 v0.20.0 — FastAPI DDD Kit & Complete Offline Support (Minor)
+### ⚡ v0.21.0 — Performance Optimizations & Documentation Reorganization (Minor)
 
-This minor release adds the **FastAPI DDD (Domain-Driven Design)** kit template and completes the offline experience with all three production kits bundled in the npm package.
+This minor release focuses on **significant performance improvements** through dynamic imports and bundle optimization, plus comprehensive **documentation reorganization** to separate public and internal docs.
 
 **What's New:**
 
-- 📦 **FastAPI DDD Kit** - Advanced Domain-Driven Design template
-  - 🏗️ Clean Architecture with DDD patterns (Domain/Application/Infrastructure layers)
-  - 🎯 39 production-ready template files
-  - 🔄 Synced from Python Core's `fastapi.ddd` kit
-  - ✨ Enterprise-grade patterns for complex business logic
-  
-- 🎁 **Complete Offline Fallback** - All 3 kits now bundled (~512KB total)
-  - ✅ `fastapi-standard` (80KB) - Standard FastAPI template
-  - ✅ `fastapi-ddd` (236KB) - DDD architecture template  
-  - ✅ `nestjs-standard` (176KB) - Standard NestJS template
-  - 🚀 Works perfectly without Python Core or internet
-  
-- 🔧 **Improved Kit Infrastructure**
-  - Enhanced sync script for all 3 kits
-  - Better kit name mapping and resolution
-  - Seamless Python Core integration with fallback
+- ⚡ **Phase 1 Performance Optimizations** - 50-60% faster startup
+  - 🚀 Dynamic imports for OpenAI (~30-40KB) and Inquirer (~25-30KB)
+  - 📦 Bundle size: **27.8 KB** compressed (well under 200KB limit)
+  - 🎯 Code splitting enabled (7 chunks)
+  - 🌲 Aggressive tree shaking
+  - 📊 Performance monitoring tools (bench, size-check, analyze)
+  - ⚡ Common commands now 50-60% faster:
+    - `rapidkit --help`: 323ms
+    - `rapidkit --version`: 390ms
+    - `rapidkit workspace list --help`: 331ms
+
+- 📚 **Documentation Organization**
+  - ✅ Separated public docs from internal development docs
+  - 📁 Moved 9 internal docs to `/Front/Docs/npm/develop/`
+  - 📖 Updated docs index with proper categorization
+  - 🎯 Clear distinction for open source community
+
+- 🛠️ **New Developer Tools**
+  - `npm run bench` - Performance benchmarking
+  - `npm run size-check` - Bundle size validation (200KB limit)
+  - `npm run analyze` - Visual bundle analyzer
+  - `npm run quality` - Comprehensive quality check
 
 **Technical Details:**
 
-This release ensures users always have access to production-ready templates, even in offline environments or when Python Core is unavailable.
+- Bundle optimized from ~40KB to 27.8 KB compressed
+- Heavy dependencies load only when needed (pay-as-you-go model)
+- 7 chunks for better caching and faster loads
+- Automated size monitoring prevents regressions
 
 **Upgrade:**
 
 ```bash
-npm install -g rapidkit@0.20.0
+npm install -g rapidkit@0.21.0
 ```
 
-[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.20.0.md)
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.21.0.md)
 
 ---
 
-## Previous Release: v0.19.1 (February 12, 2026)
-
-### 🛠️ v0.19.1 — Dependency Refresh & Compatibility (Patch)
-
-This patch release focuses on dependency freshness, compatibility improvements, and release hardening.
-
-**What Changed:**
-
-- ⬆️ Upgraded `inquirer` to `^13.2.2`.
-- 🔄 Updated lockfiles (`package-lock.json`, `yarn.lock`) to match the new dependency tree.
-- 🧩 Updated generated demo Poetry template to use `python = "^3.10"` instead of patch-pinned `^3.10.14`.
-
-**Security & Quality:**
-
-- ✅ `npm audit --audit-level=high` reports zero vulnerabilities.
-- ✅ `npm test` passes after the update.
-
-**No breaking changes.** Fully backward compatible.
-
-### ⬆️ Upgrade
-
-```bash
-npm install -g rapidkit@0.19.1
-```
-
-[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.19.1.md)
-
----
-
-## Previous Release: v0.19.0 (February 10, 2026)
-
-### ✨ v0.19.0 — AI-Powered Module Recommender (Minor)
-
-This minor release introduces the **AI-powered module recommender** feature with intelligent module suggestions using OpenAI embeddings and semantic search.
-
-**What's New:**
-
-- 🤖 **AI Module Recommender** - Intelligent module suggestions using OpenAI embeddings
-  - 🧠 Semantic search for modules (understands intent, not just keywords)
-  - 🔄 Dynamic module fetching from Python Core (27+ production modules)
-  - 🤖 Auto-generate embeddings with interactive prompts
-  - ✅ Mock mode for testing without API key
-  - 🎯 Cosine similarity algorithm (92%+ match scores)
-  - 💰 Ultra-cheap: ~$0.0002 per query (practically free)
-  - ⚡ 5-minute cache for optimal performance
-  - 🛡️ Graceful fallback to 11 hardcoded modules
-
-- 🛠️ **New CLI Commands**:
-  - `rapidkit ai recommend [query]` - Get module recommendations
-  - `rapidkit ai recommend [query] -n <N>` - Top N recommendations
-  - `rapidkit ai recommend [query] --json` - JSON output
-  - `rapidkit ai generate-embeddings` - Generate embeddings
-  - `rapidkit ai info` - Show AI features guide
-  - `rapidkit config set-api-key` - Configure OpenAI API key
-  - `rapidkit config show` - View configuration
-
-**Bug Fixes:**
-
-- 🐛 **AI Module Name Format** - Fixed critical module ID format mismatch
-  - Module IDs now preserve underscores (ai_assistant, auth_core) matching Python Core
-  - Updated to JSON Schema v1 API
-  - Fixed command routing for AI and config commands
-  - Externalized openai package (prevents bundling 10MB SDK)
-
-**Documentation:**
-
-- 📚 Complete AI features guide, quickstart, examples, and integration docs
-- Updated README with comprehensive AI section
-
-**Security:**
-
-- 🔒 API keys stored securely in ~/.rapidkit/config.json (600 permissions)
-- Environment variable support (OPENAI_API_KEY)
-
-**Testing:**
-
-- ✅ 691 tests passing (76 new AI tests)
-- Mock mode tests (no API key needed)
-
-### ⬆️ Upgrade
-
-```bash
-npm install -g rapidkit@0.19.0
-```
 
 ## Previous Releases
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.20.0](releases/RELEASE_NOTES_v0.20.0.md) | Feb 14, 2026 | FastAPI DDD Kit, Domain-Driven Design template, offline support      |
 | [v0.19.1](releases/RELEASE_NOTES_v0.19.1.md) | Feb 12, 2026 | Dependency refresh, lockfile sync, Python template compatibility     |
 | [v0.19.0](releases/RELEASE_NOTES_v0.19.0.md) | Feb 10, 2026 | AI module recommender, semantic search, config commands             |
 | [v0.18.1](releases/RELEASE_NOTES_v0.18.1.md) | Feb 9, 2026  | Windows CI path normalization fix                                   |

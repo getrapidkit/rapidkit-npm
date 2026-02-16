@@ -418,7 +418,7 @@ export async function createProject(
     if (realPython) {
       actualPythonVersion = await detectActualPythonVersion(realPython);
       if (actualPythonVersion) {
-        logger.info(`Detected Python ${actualPythonVersion}`);
+        logger.info(` Detected Python ${actualPythonVersion}`);
         spinner.succeed(`Python ${actualPythonVersion} detected`);
       } else {
         spinner.warn('Could not detect exact Python version');

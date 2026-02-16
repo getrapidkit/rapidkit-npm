@@ -1,6 +1,6 @@
 {
   "name": "rapidkit",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "type": "module",
   "description": "Create RapidKit projects with a single command - The official CLI for RapidKit framework",
   "keywords": [
@@ -58,7 +58,10 @@
     "sync:contracts": "node scripts/sync-contracts.mjs",
     "check:contracts": "node scripts/sync-contracts.mjs --check",
     "bundle-size": "npm run build && du -sh dist/ && ls -lh dist/",
-    "quality": "npm run validate && npm run security && npm run metrics",
+    "analyze": "npm run build && npx vite-bundle-visualizer dist/index.js --open",
+    "size-check": "npm run build && size-limit",
+    "bench": "npx tsx scripts/benchmarks.ts",
+    "quality": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run size-check",
     "act-matrix": "act -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-22.04 -P macos-latest=ghcr.io/catthehacker/ubuntu:act-22.04 -P windows-latest=ghcr.io/catthehacker/ubuntu:act-22.04 --pull=false -j build-test-matrix"
   },
   "dependencies": {
@@ -75,6 +78,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",
+    "@size-limit/preset-big-lib": "^12.0.0",
     "@types/cli-progress": "^3.11.6",
     "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^9.0.7",
@@ -90,8 +94,10 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
     "prettier": "^3.6.2",
+    "size-limit": "^12.0.0",
     "tsup": "^8.5.0",
     "typescript": "^5.5.0",
+    "vite-bundle-visualizer": "^1.2.1",
     "vitest": "^4.0.15"
   },
   "engines": {

@@ -4,7 +4,7 @@ import { copyFileSync } from 'fs';
 export default defineConfig({
   entry: ['src/index.ts'],
   format: ['esm'],
-  target: 'node18',
+  target: 'node20',
 
   // Output settings
   outDir: 'dist',
@@ -12,19 +12,23 @@ export default defineConfig({
 
   // Minification and optimization
   minify: true,
-  treeshake: true,
+  treeshake: {
+    preset: 'smallest', // Aggressive tree shaking
+    moduleSideEffects: false, // Assume no side effects
+  },
 
   // Source maps only in development
   sourcemap: false,
 
   // Bundle settings
-  splitting: false,
+  splitting: true, // Enable code splitting for better caching
   bundle: true,
 
   // Keep shebang for CLI
   shims: true,
 
   // External dependencies (don't bundle them)
+  // Heavy dependencies should stay external
   external: [
     'chalk',
     'commander',
@@ -34,6 +38,7 @@ export default defineConfig({
     'nunjucks',
     'openai',
     'ora',
+    'cli-progress',
     'validate-npm-package-name',
   ],
 

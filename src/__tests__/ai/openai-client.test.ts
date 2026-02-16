@@ -14,10 +14,10 @@ describe('OpenAI Client', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with API key', () => {
+    it('should initialize with API key', async () => {
       const apiKey = 'test-api-key';
 
-      expect(() => initOpenAI(apiKey)).not.toThrow();
+      await expect(initOpenAI(apiKey)).resolves.not.toThrow();
       expect(isInitialized()).toBe(true);
     });
 
@@ -29,8 +29,8 @@ describe('OpenAI Client', () => {
       expect(true).toBe(true);
     });
 
-    it('should return client after initialization', () => {
-      initOpenAI('test-key');
+    it('should return client after initialization', async () => {
+      await initOpenAI('test-key');
 
       const client = getOpenAI();
 
@@ -211,13 +211,13 @@ describe('OpenAI Client', () => {
   });
 
   describe('Error Handling', () => {
-    it('should handle initialization with empty key', () => {
-      expect(() => initOpenAI('')).not.toThrow();
+    it('should handle initialization with empty key', async () => {
+      await expect(initOpenAI('')).resolves.not.toThrow();
     });
 
-    it('should be resilient to multiple initializations', () => {
-      initOpenAI('key1');
-      initOpenAI('key2');
+    it('should be resilient to multiple initializations', async () => {
+      await initOpenAI('key1');
+      await initOpenAI('key2');
 
       expect(isInitialized()).toBe(true);
     });

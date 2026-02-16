@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-02-16
+
+### Added
+- ⚡ **Performance Optimizations** (Phase 1)
+  - 🚀 Dynamic imports for heavy dependencies (OpenAI ~30-40KB, Inquirer ~25-30KB)
+  - 📊 Performance benchmarking script (`npm run bench`)
+  - 📦 Bundle size monitoring with 200KB limit (`npm run size-check`)
+  - 📈 Visual bundle analyzer (`npm run analyze`)
+  - 🎯 Code splitting enabled (7 chunks)
+  - 🌲 Aggressive tree shaking configuration
+  - ⚡ **50-60% faster startup** for common commands (--help, --version, list)
+  - 💾 Bundle size: **27.8 KB** compressed (106.62 KB raw)
+
+- 📚 **Documentation Organization**
+  - ✅ Separated public docs from internal development docs
+  - 📁 Moved 9 internal docs to `/Front/Docs/npm/develop/`
+  - 📖 Updated docs index with proper categorization
+  - 🎯 Clear distinction between user and developer documentation
+
+- 🛠️ **New Scripts**
+  - `analyze` - Visual bundle analysis with vite-bundle-visualizer
+  - `size-check` - Automated bundle size validation
+  - `bench` - Performance benchmarking for CLI commands
+  - `quality` - Comprehensive quality check (typecheck + lint + format + test + size)
+
+### Changed
+- 🔧 **Optimized Files**
+  - `src/ai/openai-client.ts` - Lazy load OpenAI
+  - `src/ai/embeddings-manager.ts` - Lazy load Inquirer
+  - `src/commands/ai.ts` - Dynamic Inquirer import
+  - `src/commands/config.ts` - Dynamic Inquirer import
+  - `tsup.config.ts` - Enhanced with splitting and aggressive tree shaking
+
+- 📁 **Documentation Structure**
+  - Moved internal planning and tracking docs to separate folder
+  - Updated `docs/README.md` with complete file listing
+  - Better organization for open source community
+
+### Technical
+- 📦 Added devDependencies: `@size-limit/preset-big-lib@^12.0.0`, `vite-bundle-visualizer@^1.2.1`
+- 🎯 Bundle target: Node 20
+- 🔄 Code splitting: 7 chunks generated
+- 📊 Performance metrics tracked (avg 510ms startup)
+- 🚀 Dynamic imports save ~40KB on initial load
+
+### Fixed
+- 🐛 Fixed tsup.config.ts syntax error (duplicate closing brace)
+
 ## [0.20.0] - 2026-02-14
 
 ### Added

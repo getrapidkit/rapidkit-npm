@@ -1,7 +1,16 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import inquirer from 'inquirer';
+// Dynamic import for inquirer to reduce initial bundle size
+import type Inquirer from 'inquirer';
 import { getOpenAIKey, isAIEnabled } from '../config/user-config.js';
+
+/**
+ * Lazy load inquirer module
+ */
+async function loadInquirer(): Promise<typeof Inquirer> {
+  const module = await import('inquirer');
+  return module.default;
+}
 import { initOpenAI, enableMockMode } from '../ai/openai-client.js';
 import { recommendModules } from '../ai/recommender.js';
 import {
@@ -47,12 +56,13 @@ export function registerAICommands(program: Command): void {
           enableMockMode();
         } else {
           // Initialize OpenAI with real API key
-          initOpenAI(apiKey);
+          await initOpenAI(apiKey);
         }
 
         // Get query from user if not provided
         let userQuery = query;
         if (!userQuery) {
+          const inquirer = await loadInquirer();
           const answers = await inquirer.prompt([
             {
               type: 'input',
@@ -143,7 +153,8 @@ export function registerAICommands(program: Command): void {
         console.log(chalk.white(`   rapidkit add module ${topModules.join(' ')}\n`));
 
         // Ask if user wants to install
-        const { shouldInstall } = await inquirer.prompt([
+        const inquirerModule = await loadInquirer();
+        const { shouldInstall } = await inquirerModule.prompt([
           {
             type: 'confirm',
             name: 'shouldInstall',
@@ -153,7 +164,7 @@ export function registerAICommands(program: Command): void {
         ]);
 
         if (shouldInstall) {
-          const { selectedModules } = await inquirer.prompt([
+          const { selectedModules } = await inquirerModule.prompt([
             {
               type: 'checkbox',
               name: 'selectedModules',
