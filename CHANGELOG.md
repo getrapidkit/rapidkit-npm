@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-02-18
+
+### Added
+- ✨ Added `create workspace` command mode in npm wrapper:
+  - `npx rapidkit create workspace` (interactive naming)
+  - `npx rapidkit create workspace <name>` (direct named creation)
+- 🧠 Added context-aware `init` orchestration in wrapper:
+  - In plain folder: auto-creates default workspace (`my-workspace`, with numeric fallback)
+  - In workspace root: installs workspace dependencies and then initializes detected child projects
+  - In project inside workspace: initializes only that project
+
+### Changed
+- 🔄 Unified workspace creation UX between legacy and new command paths.
+- 🗂️ Updated README quick-start and command docs for:
+  - Fastest onboarding via `npx rapidkit init`
+  - Legacy + explicit workspace creation flows
+  - Interactive prompt behavior for `create workspace`
+
+### Fixed
+- 🩺 Doctor workspace scan now avoids counting workspace-root `.rapidkit` as a project unless project markers exist.
+- ✅ Added doctor test coverage for workspace root filtering behavior.
+
 ## [0.21.0] - 2026-02-16
 
 ### Added

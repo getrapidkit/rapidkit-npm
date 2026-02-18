@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 RapidKit
+# 🚀 RapidKit CLI
 
 ### Build Production-Ready APIs in Seconds
 
@@ -13,10 +13,23 @@ Clean architecture • Zero boilerplate • Instant deployment.
 [![GitHub Stars](https://img.shields.io/github/stars/getrapidkit/rapidkit-npm.svg?style=flat-square)](https://github.com/getrapidkit/rapidkit-npm/stargazers)
 
 ```bash
-npx rapidkit create project fastapi.standard my-api
-cd my-api 
+npx rapidkit init
+cd my-workspace
+npx rapidkit create project
+cd <project-name>
 npx rapidkit init && npx rapidkit dev
 # ✅ Production-ready API running at http://localhost:8000
+```
+
+Using Node.js/NestJS? Use this direct kit command (inside or outside a workspace):
+
+```bash
+npx rapidkit create project nestjs.standard my-service # standard kit
+```
+Using Python/FastAPI? Use these direct kit commands (inside or outside a workspace):
+```bash
+npx rapidkit create project fastapi.standard my-service # standard kit
+npx rapidkit create project fastapi.ddd my-service      # DDD kit
 ```
 
 [Quick Start](#-quick-start) • [Docs](https://getrapidkit.com) • [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=rapidkit.rapidkit-vscode) • [Examples](https://github.com/getrapidkit/rapidkit-examples)
@@ -88,6 +101,30 @@ cd my-api && npx rapidkit init && npx rapidkit dev
 
 ## 🚀 Quick Start
 
+### Option 0: Fastest Start (`npx rapidkit init`)
+
+Use this when you want the quickest complete flow (workspace + project + run):
+
+```bash
+cd ~/my-empty-folder
+npx rapidkit init
+cd my-workspace
+npx rapidkit create project
+cd <project-name>
+npx rapidkit init && npx rapidkit dev
+```
+
+This is the recommended quickest onboarding path for most users.
+`npx rapidkit init` is context-aware and auto-detects plain folders, workspace roots, and project directories.
+
+Prefer direct kit selection (works both inside and outside a workspace):
+
+```bash
+npx rapidkit create project fastapi.standard my-service
+npx rapidkit create project fastapi.ddd my-service
+npx rapidkit create project nestjs.standard my-service
+```
+
 ### Option 1: Single Project (Fastest)
 
 Perfect for trying out RapidKit or building a standalone service:
@@ -129,6 +166,10 @@ Organize multiple microservices with a shared environment:
 ```bash
 # 1. Create workspace
 npx rapidkit my-workspace
+# Or with explicit command mode
+npx rapidkit create workspace my-workspace
+# Or interactive naming
+npx rapidkit create workspace
 cd my-workspace
 
 # 2. Activate environment (choose one):
@@ -461,6 +502,11 @@ rapidkit add module auth api_keys db_postgres redis rate_limiting observability
 ### Global Commands (Run Anywhere)
 
 ```bash
+# Workspace creation
+npx rapidkit <name>                      # Legacy stable workspace creation
+npx rapidkit create workspace            # Interactive workspace creation
+npx rapidkit create workspace <name>     # Create workspace with name
+
 # Project creation
 npx rapidkit create project               # Interactive wizard
 npx rapidkit create project <kit> <name> # Direct creation
@@ -486,16 +532,39 @@ npx rapidkit --version                    # Show version
 npx rapidkit --help                       # Show help
 ```
 
-### Project Commands (Run Inside Project)
+`npx rapidkit create workspace` interactive prompts:
+- Without a name: asks workspace name, author name, Python version, and install method.
+- With a name: asks author name, Python version, and install method.
+- With `--yes`: skips prompts and uses defaults.
+
+### Init & Project Commands
 
 ```bash
-npx rapidkit init      # Install dependencies (auto-activates venv)
+npx rapidkit init      # Context-aware init (see behavior below)
 npx rapidkit dev       # Start dev server with hot reload
 npx rapidkit start     # Start production server
 npx rapidkit build     # Build for production
 npx rapidkit test      # Run tests with coverage
 npx rapidkit lint      # Run linting
 npx rapidkit format    # Format code
+```
+
+`npx rapidkit init` behavior:
+- In a plain folder: creates `my-workspace` (or `my-workspace-<n>` if needed) and initializes it.
+- In a workspace root: initializes workspace dependencies, then initializes all detected child projects.
+- In a project inside a workspace: initializes only that project.
+
+Quick examples:
+
+```bash
+# Plain folder
+cd ~/new-folder && npx rapidkit init
+
+# Workspace root
+cd ~/my-workspace && npx rapidkit init
+
+# Project inside workspace
+cd ~/my-workspace/my-api && npx rapidkit init
 ```
 
 ### Module Commands
@@ -515,6 +584,8 @@ npx rapidkit <name> --yes                 # Skip prompts
 npx rapidkit <name> --skip-git            # Skip git init
 npx rapidkit <name> --dry-run             # Preview only
 npx rapidkit <name> --debug               # Verbose logging
+npx rapidkit create workspace --yes       # Create default my-workspace non-interactive
+npx rapidkit create workspace <name> --yes # Create named workspace non-interactive
 
 # Project creation
 npx rapidkit create --output <dir>        # Custom location
@@ -525,8 +596,9 @@ npx rapidkit create --no-update-check     # Skip version check
 
 | Command | Description | Context |
 |---------|-------------|---------|
+| `create workspace` | Create workspace | Anywhere |
 | `create project` | Create project | Anywhere |
-| `init` | Install dependencies | Inside project |
+| `init` | Context-aware dependency setup | Folder / workspace / project |
 | `dev` | Start dev server | Inside project |
 | `test` | Run tests | Inside project |
 | `add module` | Add module to project | Inside project |

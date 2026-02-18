@@ -1,5 +1,41 @@
 # Release Notes
 
+## Latest Release: v0.21.1 (February 18, 2026)
+
+### 🚀 v0.21.1 — Context-Aware Init, Workspace Command Mode, and Doctor Scan Fix (Patch)
+
+This patch release improves day-1 CLI onboarding and workspace reliability with a context-aware `init` flow, explicit `create workspace` command mode, and a doctor scan correctness fix.
+
+**What's New:**
+
+- ✨ **New workspace command mode**
+  - `npx rapidkit create workspace`
+  - `npx rapidkit create workspace <name>`
+  - Legacy `npx rapidkit <name>` continues to work.
+
+- 🧠 **Context-aware `npx rapidkit init`**
+  - Plain folder: auto-creates default workspace (`my-workspace`, `my-workspace-2`, ...)
+  - Workspace root: installs workspace dependencies and initializes detected child projects
+  - Project inside workspace: initializes only that project
+
+- 🩺 **Doctor workspace scan fix**
+  - Workspace root `.rapidkit` is no longer counted as a project unless real project markers exist.
+  - Added regression coverage for this case.
+
+- 📚 **Documentation updates**
+  - New “Fastest Start” guidance based on `npx rapidkit init`
+  - Clarified prompt behavior for `create workspace`
+
+**Upgrade:**
+
+```bash
+npm install -g rapidkit@0.21.1
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.21.1.md)
+
+---
+
 ## Latest Release: v0.21.0 (February 16, 2026)
 
 ### ⚡ v0.21.0 — Performance Optimizations & Documentation Reorganization (Minor)
@@ -53,6 +89,7 @@ npm install -g rapidkit@0.21.0
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.21.1](releases/RELEASE_NOTES_v0.21.1.md) | Feb 18, 2026 | Context-aware init, create workspace mode, doctor workspace scan fix |
 | [v0.20.0](releases/RELEASE_NOTES_v0.20.0.md) | Feb 14, 2026 | FastAPI DDD Kit, Domain-Driven Design template, offline support      |
 | [v0.19.1](releases/RELEASE_NOTES_v0.19.1.md) | Feb 12, 2026 | Dependency refresh, lockfile sync, Python template compatibility     |
 | [v0.19.0](releases/RELEASE_NOTES_v0.19.0.md) | Feb 10, 2026 | AI module recommender, semantic search, config commands             |

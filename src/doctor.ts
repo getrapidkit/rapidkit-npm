@@ -653,6 +653,22 @@ async function listDirectories(basePath: string): Promise<string[]> {
   }
 }
 
+async function hasRapidkitProjectMarkers(projectPath: string): Promise<boolean> {
+  const rapidkitDir = path.join(projectPath, '.rapidkit');
+  if (!(await fsExtra.pathExists(rapidkitDir))) {
+    return false;
+  }
+
+  const markerFiles = ['project.json', 'context.json', 'file-hashes.json'];
+  for (const markerFile of markerFiles) {
+    if (await fsExtra.pathExists(path.join(rapidkitDir, markerFile))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 async function findRapidkitProjectsDeep(
   workspacePath: string,
   maxDepth: number,
@@ -680,8 +696,7 @@ async function findRapidkitProjectsDeep(
 
         if (!stat.isDirectory()) continue;
 
-        const rapidkitDir = path.join(fullPath, '.rapidkit');
-        if (await fsExtra.pathExists(rapidkitDir)) {
+        if (await hasRapidkitProjectMarkers(fullPath)) {
           results.add(fullPath);
           continue;
         }
@@ -795,8 +810,7 @@ async function getWorkspaceHealth(workspacePath: string): Promise<WorkspaceHealt
     ]);
     const projectPaths = new Set<string>();
 
-    const workspaceRapidkit = path.join(workspacePath, '.rapidkit');
-    if (await fsExtra.pathExists(workspaceRapidkit)) {
+    if (await hasRapidkitProjectMarkers(workspacePath)) {
       projectPaths.add(workspacePath);
     }
 
@@ -806,9 +820,7 @@ async function getWorkspaceHealth(workspacePath: string): Promise<WorkspaceHealt
       for (const dirName of dirNames) {
         if (ignoredDirs.has(dirName)) continue;
         const dirPath = path.join(basePath, dirName);
-        const rapidkitDir = path.join(dirPath, '.rapidkit');
-
-        if (await fsExtra.pathExists(rapidkitDir)) {
+        if (await hasRapidkitProjectMarkers(dirPath)) {
           projectPaths.add(dirPath);
           continue;
         }

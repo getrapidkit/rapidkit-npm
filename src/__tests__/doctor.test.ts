@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { execa } from 'execa';
+import fsExtra from 'fs-extra';
+import os from 'os';
+import path from 'path';
 
 // Mock modules
 vi.mock('execa');
@@ -284,5 +287,88 @@ describe('Doctor Command', () => {
 
     const { runDoctor } = await import('../doctor.js');
     await expect(runDoctor({ json: false })).resolves.not.toThrow();
+  });
+
+  it('should not count workspace root .rapidkit as a project', async () => {
+    const tempRoot = await fsExtra.mkdtemp(path.join(os.tmpdir(), 'rapidkit-doctor-'));
+    const workspacePath = path.join(tempRoot, 'workspace');
+    const apiPath = path.join(workspacePath, 'saas-api');
+    const adminPath = path.join(workspacePath, 'saas-admin');
+
+    await fsExtra.ensureDir(path.join(workspacePath, '.rapidkit'));
+    await fsExtra.writeFile(path.join(workspacePath, '.rapidkit', 'users_core.db'), '');
+    await fsExtra.writeJSON(path.join(workspacePath, '.rapidkit-workspace'), {
+      name: 'workspace',
+      version: '1.0',
+    });
+
+    await fsExtra.ensureDir(path.join(apiPath, '.rapidkit'));
+    await fsExtra.ensureDir(path.join(adminPath, '.rapidkit'));
+    await fsExtra.writeJSON(path.join(apiPath, '.rapidkit', 'project.json'), {
+      name: 'saas-api',
+      framework: 'fastapi',
+    });
+    await fsExtra.writeJSON(path.join(adminPath, '.rapidkit', 'project.json'), {
+      name: 'saas-admin',
+      framework: 'fastapi',
+    });
+    await fsExtra.writeFile(
+      path.join(apiPath, 'pyproject.toml'),
+      '[tool.poetry]\nname = "saas-api"\n'
+    );
+    await fsExtra.writeFile(
+      path.join(adminPath, 'pyproject.toml'),
+      '[tool.poetry]\nname = "saas-admin"\n'
+    );
+    await fsExtra.ensureDir(path.join(apiPath, '.venv'));
+    await fsExtra.ensureDir(path.join(adminPath, '.venv'));
+
+    vi.mocked(execa).mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd === 'python3' || cmd === 'python') {
+        if (args?.[0] === '--version') {
+          return { stdout: 'Python 3.11.0', stderr: '', exitCode: 0 } as any;
+        }
+        if (args?.[0] === '-m' && args?.[1] === 'rapidkit') {
+          return { stdout: 'RapidKit Version: 0.3.8', stderr: '', exitCode: 0 } as any;
+        }
+      }
+      if (cmd === 'poetry') {
+        return { stdout: 'Poetry version 2.3.2', stderr: '', exitCode: 0 } as any;
+      }
+      if (cmd === 'pipx') {
+        if (args?.[0] === '--version') {
+          return { stdout: '1.8.0', stderr: '', exitCode: 0 } as any;
+        }
+      }
+      if (cmd === 'rapidkit') {
+        return { stdout: 'RapidKit Version: 0.3.8', stderr: '', exitCode: 0 } as any;
+      }
+      return { stdout: '', stderr: '', exitCode: 0 } as any;
+    });
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const originalCwd = process.cwd();
+
+    try {
+      process.chdir(workspacePath);
+      const { runDoctor } = await import('../doctor.js');
+      await runDoctor({ workspace: true, json: true });
+
+      const jsonLine = logSpy.mock.calls
+        .map((call) => call[0])
+        .find((msg) => typeof msg === 'string' && msg.trim().startsWith('{')) as string | undefined;
+
+      expect(jsonLine).toBeDefined();
+      const payload = JSON.parse(jsonLine as string);
+      expect(payload.summary.totalProjects).toBe(2);
+      expect(payload.projects.map((p: { name: string }) => p.name).sort()).toEqual([
+        'saas-admin',
+        'saas-api',
+      ]);
+    } finally {
+      process.chdir(originalCwd);
+      logSpy.mockRestore();
+      await fsExtra.remove(tempRoot);
+    }
   });
 });

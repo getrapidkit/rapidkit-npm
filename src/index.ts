@@ -172,6 +172,89 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
     '--no-workspace',
   ]);
 
+  if (args[0] === 'create' && args[1] === 'workspace') {
+    try {
+      const hasYes = args.includes('--yes') || args.includes('-y');
+      const skipGit = args.includes('--skip-git') || args.includes('--no-git');
+      const providedName = args[2] && !args[2].startsWith('-') ? args[2] : undefined;
+      const installMethodRaw = readFlagValue(args, '--install-method');
+      const installMethod =
+        installMethodRaw === 'poetry' || installMethodRaw === 'venv' || installMethodRaw === 'pipx'
+          ? installMethodRaw
+          : undefined;
+
+      const workspaceName = providedName
+        ? providedName
+        : hasYes
+          ? 'my-workspace'
+          : (
+              (await inquirer.prompt([
+                {
+                  type: 'input',
+                  name: 'workspaceName',
+                  message: 'Workspace name:',
+                  default: 'my-workspace',
+                } as Question<{ workspaceName: string }>,
+              ])) as { workspaceName: string }
+            ).workspaceName;
+
+      if (!workspaceName || !workspaceName.trim()) {
+        process.stderr.write('Workspace name is required.\n');
+        return 1;
+      }
+
+      try {
+        validateProjectName(workspaceName);
+      } catch (error) {
+        if (error instanceof RapidKitError) {
+          process.stderr.write(`${error.message}\n`);
+          return 1;
+        }
+        throw error;
+      }
+
+      const targetPath = path.resolve(process.cwd(), workspaceName);
+      if (await fsExtra.pathExists(targetPath)) {
+        process.stderr.write(`❌ Directory "${workspaceName}" already exists\n`);
+        return 1;
+      }
+
+      const userConfig = await loadUserConfig();
+      let author = userConfig.author || process.env.USER || 'RapidKit User';
+
+      if (!hasYes) {
+        const answers = (await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'author',
+            message: 'Author name:',
+            default: author,
+          } as Question<{ author: string }>,
+        ])) as { author: string };
+
+        if (answers.author?.trim()) {
+          author = answers.author.trim();
+        }
+      }
+
+      await createPythonEnvironment(workspaceName, {
+        skipGit,
+        yes: hasYes,
+        userConfig: {
+          ...userConfig,
+          author,
+        },
+        installMethod,
+      });
+      return 0;
+    } catch (e) {
+      process.stderr.write(
+        `RapidKit (npm) failed to create workspace: ${(e as Error)?.message ?? e}\n`
+      );
+      return 1;
+    }
+  }
+
   try {
     // If this is a create project invocation, handle workspace registration
     if (args[0] === 'create' && args[1] === 'project') {
@@ -316,7 +399,6 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
 
 // Local project commands that should be delegated to ./rapidkit
 const LOCAL_COMMANDS = [
-  'init',
   'dev',
   'start',
   'build',
@@ -377,6 +459,137 @@ function findWorkspaceUp(start: string): string | null {
     p = parent;
   }
   return null;
+}
+
+async function runCommandInCwd(
+  command: string,
+  commandArgs: string[],
+  cwd: string
+): Promise<number> {
+  return await new Promise<number>((resolve) => {
+    const child = spawn(command, commandArgs, {
+      stdio: 'inherit',
+      cwd,
+      shell: process.platform === 'win32',
+    });
+
+    child.on('close', (code) => resolve(code ?? 1));
+    child.on('error', () => resolve(1));
+  });
+}
+
+async function installWorkspaceDependencies(workspacePath: string): Promise<number> {
+  let installMethod: 'poetry' | 'venv' | 'pipx' | 'pip' = 'poetry';
+
+  try {
+    const { readWorkspaceMarker } = await import('./workspace-marker.js');
+    const marker = await readWorkspaceMarker(workspacePath);
+    const detected = marker?.metadata?.npm?.installMethod;
+    if (detected === 'poetry' || detected === 'venv' || detected === 'pipx' || detected === 'pip') {
+      installMethod = detected;
+    }
+  } catch {
+    // Keep default method.
+  }
+
+  if (installMethod === 'poetry') {
+    return await runCommandInCwd('poetry', ['install', '--no-root'], workspacePath);
+  }
+
+  if (installMethod === 'venv') {
+    const venvPython = path.join(
+      workspacePath,
+      '.venv',
+      process.platform === 'win32' ? 'Scripts' : 'bin',
+      process.platform === 'win32' ? 'python.exe' : 'python'
+    );
+    if (!(await fsExtra.pathExists(venvPython))) {
+      process.stderr.write('Workspace virtualenv not found (.venv).\n');
+      return 1;
+    }
+    return await runCommandInCwd(
+      venvPython,
+      ['-m', 'pip', 'install', '--upgrade', 'rapidkit-core'],
+      workspacePath
+    );
+  }
+
+  return 0;
+}
+
+async function collectWorkspaceProjects(workspacePath: string): Promise<string[]> {
+  const entries = await fs.promises.readdir(workspacePath, { withFileTypes: true });
+  const projects: string[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+    const candidate = path.join(workspacePath, entry.name);
+    const contextFile = path.join(candidate, '.rapidkit', 'context.json');
+    const projectFile = path.join(candidate, '.rapidkit', 'project.json');
+    if ((await fsExtra.pathExists(contextFile)) || (await fsExtra.pathExists(projectFile))) {
+      projects.push(candidate);
+    }
+  }
+
+  return projects;
+}
+
+function resolveDefaultWorkspacePath(basePath: string): { name: string; targetPath: string } {
+  const baseName = 'my-workspace';
+  let index = 1;
+
+  while (true) {
+    const name = index === 1 ? baseName : `${baseName}-${index}`;
+    const targetPath = path.join(basePath, name);
+    if (!fs.existsSync(targetPath)) {
+      return { name, targetPath };
+    }
+    index += 1;
+  }
+}
+
+async function handleInitCommand(args: string[]): Promise<number> {
+  const cwd = process.cwd();
+
+  if (args.length > 1) {
+    return await runCoreRapidkit(args, { cwd });
+  }
+
+  const workspacePath = findWorkspaceUp(cwd);
+  const contextFile = findContextFileUp(cwd);
+  const projectRoot = contextFile ? path.dirname(path.dirname(contextFile)) : null;
+
+  if (projectRoot && projectRoot !== workspacePath) {
+    return await runCoreRapidkit(['init'], { cwd: projectRoot });
+  }
+
+  if (workspacePath && cwd === workspacePath) {
+    const workspaceInitCode = await installWorkspaceDependencies(workspacePath);
+    if (workspaceInitCode !== 0) return workspaceInitCode;
+
+    const projectPaths = await collectWorkspaceProjects(workspacePath);
+    for (const projectPath of projectPaths) {
+      const projectInitCode = await runCoreRapidkit(['init'], { cwd: projectPath });
+      if (projectInitCode !== 0) return projectInitCode;
+    }
+
+    return 0;
+  }
+
+  if (!workspacePath) {
+    const userConfig = await loadUserConfig();
+    const { name } = resolveDefaultWorkspacePath(cwd);
+
+    await createPythonEnvironment(name, {
+      yes: true,
+      userConfig,
+    });
+
+    const createdWorkspacePath = path.join(cwd, name);
+    return await installWorkspaceDependencies(createdWorkspacePath);
+  }
+
+  return await runCoreRapidkit(args, { cwd });
 }
 
 async function delegateToLocalCLI(): Promise<boolean> {
@@ -1135,6 +1348,11 @@ delegateToLocalCLI().then(async (delegated) => {
     // cannot run.
     if (args[0] === 'create') {
       const code = await handleCreateOrFallback(args);
+      process.exit(code);
+    }
+
+    if (args[0] === 'init') {
+      const code = await handleInitCommand(args);
       process.exit(code);
     }
 
