@@ -4,8 +4,10 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
-| < 1.0   | :x:                |
+| 0.21.x (latest minor) | :white_check_mark: |
+| < 0.21.0 | :x: |
+
+During the `0.x` phase, only the latest minor line receives security fixes.
 
 ## Known Security Considerations
 
@@ -55,7 +57,7 @@ We use:
 
 ## Updates
 
-Security updates are released as patch versions (1.0.x) and announced in:
+Security updates are released as patch versions on the latest `0.x` minor line and announced in:
 - GitHub Releases
 - CHANGELOG.md
 - npm package updates

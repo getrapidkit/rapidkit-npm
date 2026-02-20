@@ -85,11 +85,7 @@ if [[ -z "$TARBALL" ]]; then
 
     # Ensure dependencies exist before build.
     if [[ ! -d node_modules ]]; then
-      if command -v yarn >/dev/null 2>&1; then
-        step "yarn install" yarn -s install --frozen-lockfile
-      else
-        step "npm install" "$NPM_BIN" install
-      fi
+      step "npm ci" "$NPM_BIN" ci
     fi
 
     step "build npm package" "$NPM_BIN" run -s build

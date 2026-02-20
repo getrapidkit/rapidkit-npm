@@ -3,9 +3,11 @@
 ## Development Workflow
 
 ### Prerequisites
-- Node.js 18+ and npm
+- Node.js 20.19.6+ and npm
 - Python 3.10+ (optional, for full testing)
 - Git
+
+See package-manager policy: `docs/PACKAGE_MANAGER_POLICY.md`.
 
 ### Setup
 ```bash
@@ -81,7 +83,7 @@ npm run uninstall:local # Uninstall after testing
 ### Publishing
 
 ```bash
-npm publish
+bash scripts/release.sh patch
 ```
 
 ### Post-Release

@@ -377,7 +377,7 @@ my-service/
 ├── Dockerfile               # Production container
 ├── Makefile                 # Quick commands
 ├── package.json             # npm dependencies
-├── yarn.lock / package-lock.json  # Locked dependencies
+├── package-lock.json            # Locked dependencies
 ├── nest-cli.json            # NestJS CLI config
 ├── tsconfig.json            # TypeScript config
 ├── tsconfig.build.json      # Build config
@@ -625,7 +625,7 @@ npx rapidkit create --no-update-check     # Skip version check
 
 **NestJS Projects:**
 - Node.js 20.19.6+
-- npm/yarn/pnpm
+- npm
 
 ### Optional but Recommended
 

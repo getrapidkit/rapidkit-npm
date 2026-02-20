@@ -5,7 +5,7 @@ This package is the RapidKit npm CLI (Node/TypeScript) that bootstraps and invok
 ## Prereqs
 
 - Node.js `>=20`
-- npm (or yarn/pnpm)
+- npm (official and only supported package manager for this repository)
 
 ## Install
 

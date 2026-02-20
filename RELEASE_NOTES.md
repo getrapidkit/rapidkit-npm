@@ -1,5 +1,46 @@
 # Release Notes
 
+## Latest Release: v0.21.2 (February 20, 2026)
+
+### 🔒 v0.21.2 — Trust & Publishability Hardening (Patch)
+
+This patch focuses on release reliability and contributor consistency with a modernized release flow, npm-only policy enforcement, and security/doc alignment.
+
+**What's New:**
+
+- 🔁 **Modern release flow (no hardcoded versioning)**
+  - Dynamic release script with semantic bump support (`patch|minor|major|x.y.z`)
+  - Safer release controls: `--no-publish`, `--yes`, `--allow-dirty`
+  - Dynamic tag/release handling based on `package.json` version
+
+- 📦 **One-command release shortcuts**
+  - `npm run release:dry`
+  - `npm run release:patch`
+  - `npm run release:minor`
+  - `npm run release:major`
+
+- 📏 **Official npm-only policy**
+  - Enforced in install path via preinstall guard
+  - Dedicated policy doc: `docs/PACKAGE_MANAGER_POLICY.md`
+  - Contributor + setup docs aligned to npm-first workflow
+
+- 🛡️ **Security policy alignment**
+  - `docs/SECURITY.md` now reflects active support on latest `0.x` minor line
+
+- 🩺 **Doctor workspace scan hardening**
+  - Workspace scanning now ignores common build artifact directories (`dist*`, `build*`)
+  - Prevents false-positive project discovery from packaged output folders
+
+**Upgrade:**
+
+```bash
+npm install -g rapidkit@0.21.2
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.21.2.md)
+
+---
+
 ## Latest Release: v0.21.1 (February 18, 2026)
 
 ### 🚀 v0.21.1 — Context-Aware Init, Workspace Command Mode, and Doctor Scan Fix (Patch)
@@ -89,6 +130,7 @@ npm install -g rapidkit@0.21.0
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.21.2](releases/RELEASE_NOTES_v0.21.2.md) | Feb 20, 2026 | Release flow modernization, npm-only policy, security/doc alignment |
 | [v0.21.1](releases/RELEASE_NOTES_v0.21.1.md) | Feb 18, 2026 | Context-aware init, create workspace mode, doctor workspace scan fix |
 | [v0.20.0](releases/RELEASE_NOTES_v0.20.0.md) | Feb 14, 2026 | FastAPI DDD Kit, Domain-Driven Design template, offline support      |
 | [v0.19.1](releases/RELEASE_NOTES_v0.19.1.md) | Feb 12, 2026 | Dependency refresh, lockfile sync, Python template compatibility     |

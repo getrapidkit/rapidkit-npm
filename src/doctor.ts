@@ -669,6 +669,23 @@ async function hasRapidkitProjectMarkers(projectPath: string): Promise<boolean> 
   return false;
 }
 
+function shouldIgnoreWorkspaceDir(dirName: string, ignoredDirs: Set<string>): boolean {
+  if (ignoredDirs.has(dirName)) {
+    return true;
+  }
+
+  const lowerName = dirName.toLowerCase();
+  if (lowerName === 'dist' || lowerName.startsWith('dist-') || lowerName.startsWith('dist_')) {
+    return true;
+  }
+
+  if (lowerName === 'build' || lowerName.startsWith('build-') || lowerName.startsWith('build_')) {
+    return true;
+  }
+
+  return false;
+}
+
 async function findRapidkitProjectsDeep(
   workspacePath: string,
   maxDepth: number,
@@ -684,7 +701,7 @@ async function findRapidkitProjectsDeep(
     try {
       const entries = await fsExtra.readdir(current.dir);
       for (const name of entries) {
-        if (ignoredDirs.has(name)) continue;
+        if (shouldIgnoreWorkspaceDir(name, ignoredDirs)) continue;
 
         const fullPath = path.join(current.dir, name);
         let stat;
@@ -818,7 +835,7 @@ async function getWorkspaceHealth(workspacePath: string): Promise<WorkspaceHealt
       if (depth < 0) return;
       const dirNames = await listDirectories(basePath);
       for (const dirName of dirNames) {
-        if (ignoredDirs.has(dirName)) continue;
+        if (shouldIgnoreWorkspaceDir(dirName, ignoredDirs)) continue;
         const dirPath = path.join(basePath, dirName);
         if (await hasRapidkitProjectMarkers(dirPath)) {
           projectPaths.add(dirPath);

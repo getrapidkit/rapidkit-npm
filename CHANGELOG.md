@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-02-20
+
+### Added
+- 📦 Added npm release shortcut scripts:
+  - `npm run release:dry`
+  - `npm run release:patch`
+  - `npm run release:minor`
+  - `npm run release:major`
+- 📘 Added explicit package manager policy doc: `docs/PACKAGE_MANAGER_POLICY.md`.
+
+### Changed
+- 🔧 Modernized `scripts/release.sh` to remove hardcoded versions and support:
+  - semantic bump args (`patch|minor|major|x.y.z`)
+  - `--no-publish`, `--yes`, and `--allow-dirty`
+  - dynamic tag/release handling (`v<package.json version>`)
+- 🧰 Standardized repo contributor workflow to npm-only:
+  - updated contributor docs and setup docs
+  - updated E2E scripts to use npm paths
+
+### Fixed
+- 🛡️ Enforced npm-only installs via `preinstall` guard (`scripts/enforce-package-manager.cjs`).
+- 📄 Aligned `docs/SECURITY.md` supported-version policy with the current `0.x` release line.
+- ✅ `release:dry` now supports local preflight checks on dirty working trees via `--allow-dirty` while keeping publish flow strict.
+- 🩺 Doctor workspace scan now ignores common build artifact directories (`dist*`, `build*`) to avoid false-positive project detection.
+
 ## [0.21.1] - 2026-02-18
 
 ### Added

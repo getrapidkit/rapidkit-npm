@@ -1,6 +1,6 @@
 {
   "name": "rapidkit",
-  "version": "0.21.1",
+  "version": "0.21.2",
   "type": "module",
   "description": "Create RapidKit projects with a single command - The official CLI for RapidKit framework",
   "keywords": [
@@ -27,6 +27,7 @@
     "dist"
   ],
   "scripts": {
+    "preinstall": "node scripts/enforce-package-manager.cjs",
     "sync-kits": "bash scripts/sync-kits.sh",
     "build": "tsup",
     "build:watch": "tsup --watch",
@@ -62,7 +63,11 @@
     "size-check": "npm run build && size-limit",
     "bench": "npx tsx scripts/benchmarks.ts",
     "quality": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run size-check",
-    "act-matrix": "act -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-22.04 -P macos-latest=ghcr.io/catthehacker/ubuntu:act-22.04 -P windows-latest=ghcr.io/catthehacker/ubuntu:act-22.04 --pull=false -j build-test-matrix"
+    "act-matrix": "act -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-22.04 -P macos-latest=ghcr.io/catthehacker/ubuntu:act-22.04 -P windows-latest=ghcr.io/catthehacker/ubuntu:act-22.04 --pull=false -j build-test-matrix",
+    "release:dry": "bash scripts/release.sh --no-publish --yes --allow-dirty",
+    "release:patch": "bash scripts/release.sh patch",
+    "release:minor": "bash scripts/release.sh minor",
+    "release:major": "bash scripts/release.sh major"
   },
   "dependencies": {
     "chalk": "^5.3.0",
@@ -109,5 +114,5 @@
       "prettier --write"
     ]
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "npm@10.8.2"
 }

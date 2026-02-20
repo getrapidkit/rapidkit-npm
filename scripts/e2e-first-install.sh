@@ -39,6 +39,11 @@ export PATH="$npm_config_prefix/bin:$PATH"
 
 NPM_BIN="$(command -v npm || true)"
 
+if [[ -z "$NPM_BIN" ]]; then
+  echo "E2E(first-install): npm not found on PATH. Install Node.js (with npm) first." >&2
+  exit 1
+fi
+
 mkdir -p "$HOME" "$XDG_CACHE_HOME" "$npm_config_cache" "$npm_config_prefix"
 
 echo "E2E(first-install): base=$BASE"
@@ -71,20 +76,13 @@ TARBALL=""
 
   # Ensure dependencies are present. Keep output minimal.
   if [[ ! -d node_modules ]]; then
-    step "yarn install" yarn -s install --frozen-lockfile
+    step "npm ci" npm ci
   fi
 
-  step "yarn build" yarn -s build
+  step "npm build" "$NPM_BIN" -s run build
 
-  if [[ -n "$NPM_BIN" ]]; then
-    step "npm pack" "$NPM_BIN" pack --silent
-    TARBALL="$(ls -1 *.tgz | tail -n 1)"
-  else
-    # Fallback: build a tarball using yarn.
-    # This keeps the test runnable on dev machines where npm isn't available.
-    step "yarn pack" yarn -s pack >/dev/null
-    TARBALL="$(ls -1 *.tgz | tail -n 1)"
-  fi
+  step "npm pack" "$NPM_BIN" pack --silent
+  TARBALL="$(ls -1 *.tgz | tail -n 1)"
   echo "$NPM_DIR/$TARBALL" > "$BASE/tarball_path"
 )
 TARBALL="$(cat "$BASE/tarball_path")"
@@ -95,24 +93,11 @@ if [[ ! -f "$TARBALL" ]]; then
 fi
 
 RAPIDKIT_BIN="rapidkit"
-if [[ -n "$NPM_BIN" ]]; then
-  step "npm install -g (isolated)" "$NPM_BIN" install -g "$TARBALL" >/dev/null
+step "npm install -g (isolated)" "$NPM_BIN" install -g "$TARBALL" >/dev/null
 
-  if ! command -v rapidkit >/dev/null 2>&1; then
-    echo "E2E(first-install): rapidkit CLI not found on PATH after npm install -g" >&2
-    exit 1
-  fi
-else
-  # Fallback: install into a temp project and run the local bin.
-  # Still validates first-time install behavior, but not the global install path.
-  APP="$BASE/app"
-  mkdir -p "$APP"
-  (cd "$APP" && step "yarn add (temp app)" yarn -s add "$TARBALL" >/dev/null)
-  RAPIDKIT_BIN="$APP/node_modules/.bin/rapidkit"
-  if [[ ! -x "$RAPIDKIT_BIN" ]]; then
-    echo "E2E(first-install): rapidkit bin not found after yarn add" >&2
-    exit 1
-  fi
+if ! command -v rapidkit >/dev/null 2>&1; then
+  echo "E2E(first-install): rapidkit CLI not found on PATH after npm install -g" >&2
+  exit 1
 fi
 
 ENGINE_SPEC="${RAPIDKIT_E2E_ENGINE_SPEC:-}"

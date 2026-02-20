@@ -5,7 +5,9 @@ This doc is a quick command reference for contributors.
 ## Prereqs
 
 - Node.js `>=20.19.6`
-- npm (or yarn/pnpm)
+- npm (official and only supported package manager for this repository)
+
+Policy details: `docs/PACKAGE_MANAGER_POLICY.md`
 
 ## Install
 
