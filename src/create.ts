@@ -587,6 +587,22 @@ export async function createProject(
     console.log(chalk.white('   rapidkit list            - List available kits'));
     console.log(chalk.white('   rapidkit modules         - List available modules'));
     console.log(chalk.white('   rapidkit --help          - Show all commands\n'));
+
+    // Go toolchain check — informational note for gofiber.standard projects
+    try {
+      const { stdout: goOut } = await execa('go', ['version'], { timeout: 3000 });
+      const goMatch = goOut.match(/go version go(\d+\.\d+(?:\.\d+)?)/);
+      const goVer = goMatch ? goMatch[1] : 'unknown';
+      console.log(
+        chalk.gray(`🐹 Go toolchain: Go ${goVer} detected — ready for gofiber.standard projects`)
+      );
+    } catch {
+      console.log(
+        chalk.yellow('⚠️  Go toolchain not installed — needed for gofiber.standard projects')
+      );
+      console.log(chalk.gray('   Install: https://go.dev/dl/'));
+    }
+    console.log('');
   } catch (_error) {
     spinner.fail('Failed to create RapidKit environment');
     console.error(chalk.red('\n❌ Error:'), _error);

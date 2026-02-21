@@ -24,7 +24,8 @@ interface ProjectHealth {
   hasEnvFile?: boolean;
   modulesHealthy?: boolean;
   missingModules?: string[];
-  framework?: 'FastAPI' | 'NestJS' | 'Unknown';
+  framework?: 'FastAPI' | 'NestJS' | 'Go/Fiber' | 'Go/Gin' | 'Unknown';
+  isGoProject?: boolean;
   kit?: string;
   stats?: {
     modules: number;
@@ -51,6 +52,7 @@ interface WorkspaceHealth {
   python: HealthCheckResult;
   poetry: HealthCheckResult;
   pipx: HealthCheckResult;
+  go: HealthCheckResult;
   rapidkitCore: HealthCheckResult;
   projects: ProjectHealth[];
   healthScore?: HealthScore;
@@ -131,6 +133,29 @@ async function checkPipx(): Promise<HealthCheckResult> {
       status: 'warn',
       message: 'pipx not installed',
       details: 'Optional: Install for isolated Python tools',
+    };
+  }
+}
+
+async function checkGo(): Promise<HealthCheckResult> {
+  try {
+    const { stdout } = await execa('go', ['version'], { timeout: 3000 });
+    // e.g. "go version go1.24.0 linux/amd64"
+    const match = stdout.match(/go version go(\d+\.\d+(?:\.\d+)?)/);
+    if (match) {
+      return {
+        status: 'ok',
+        message: `Go ${match[1]}`,
+        details: 'Available for Go/Fiber and Go/Gin projects',
+      };
+    }
+    return { status: 'ok', message: 'Go (version unknown)', details: 'go found in PATH' };
+  } catch {
+    return {
+      status: 'warn',
+      message: 'Go not installed',
+      details:
+        'Optional: Required only for gofiber.standard / gogin.standard projects — https://go.dev/dl/',
     };
   }
 }
@@ -283,7 +308,57 @@ async function performCommonChecks(projectPath: string, health: ProjectHealth): 
   // Tests check
   const testsPath = path.join(projectPath, 'tests');
   const testPath = path.join(projectPath, 'test');
-  health.hasTests = (await fsExtra.pathExists(testsPath)) || (await fsExtra.pathExists(testPath));
+  const hasTestDir = (await fsExtra.pathExists(testsPath)) || (await fsExtra.pathExists(testPath));
+
+  // Go: tests are *_test.go files anywhere in the project tree
+  let hasGoTests = false;
+  if (health.framework === 'Go/Fiber' || health.framework === 'Go/Gin') {
+    try {
+      const queue: Array<{ dir: string; depth: number }> = [{ dir: projectPath, depth: 0 }];
+      const maxDepth = 4;
+      const ignoredDirs = new Set(['.git', '.venv', 'node_modules', 'dist', 'build', 'vendor']);
+
+      while (queue.length > 0 && !hasGoTests) {
+        const current = queue.shift();
+        if (!current) break;
+
+        let entries: string[] = [];
+        try {
+          entries = await fsExtra.readdir(current.dir);
+        } catch {
+          continue;
+        }
+
+        for (const entry of entries) {
+          const fullPath = path.join(current.dir, entry);
+          let stat;
+          try {
+            stat = await fsExtra.stat(fullPath);
+          } catch {
+            continue;
+          }
+
+          if (stat.isFile() && entry.endsWith('_test.go')) {
+            hasGoTests = true;
+            break;
+          }
+
+          if (
+            stat.isDirectory() &&
+            current.depth < maxDepth &&
+            !ignoredDirs.has(entry) &&
+            !entry.startsWith('.')
+          ) {
+            queue.push({ dir: fullPath, depth: current.depth + 1 });
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  health.hasTests = hasTestDir || hasGoTests;
 
   // Code Quality checks
   if (health.framework === 'NestJS') {
@@ -292,6 +367,18 @@ async function performCommonChecks(projectPath: string, health: ProjectHealth): 
     const eslintJsonPath = path.join(projectPath, '.eslintrc.json');
     health.hasCodeQuality =
       (await fsExtra.pathExists(eslintPath)) || (await fsExtra.pathExists(eslintJsonPath));
+  } else if (health.framework === 'Go/Fiber' || health.framework === 'Go/Gin') {
+    // golangci-lint config or Makefile with lint target
+    const golangciPath = path.join(projectPath, '.golangci.yml');
+    const golangciYaml = path.join(projectPath, '.golangci.yaml');
+    const makefilePath = path.join(projectPath, 'Makefile');
+    const hasMakefileLint =
+      (await fsExtra.pathExists(makefilePath)) &&
+      (await fsExtra.readFile(makefilePath, 'utf8')).includes('golangci-lint');
+    health.hasCodeQuality =
+      (await fsExtra.pathExists(golangciPath)) ||
+      (await fsExtra.pathExists(golangciYaml)) ||
+      hasMakefileLint;
   } else if (health.framework === 'FastAPI') {
     // Ruff for FastAPI
     const ruffPath = path.join(projectPath, 'ruff.toml');
@@ -395,12 +482,15 @@ async function checkProject(projectPath: string): Promise<ProjectHealth> {
   }
 
   // Try to read kit info from .rapidkit/project.json
+  let projectJsonData: Record<string, unknown> | null = null;
   try {
     const projectJsonPath = path.join(rapidkitDir, 'project.json');
     if (await fsExtra.pathExists(projectJsonPath)) {
-      const projectData = await fsExtra.readJson(projectJsonPath);
-      if (projectData.kit) {
-        health.kit = projectData.kit;
+      projectJsonData = await fsExtra.readJson(projectJsonPath);
+      // Support both 'kit' (legacy) and 'kit_name' (new generator) fields
+      const kitValue = (projectJsonData?.kit_name || projectJsonData?.kit) as string | undefined;
+      if (kitValue) {
+        health.kit = kitValue;
       }
     }
   } catch {
@@ -430,9 +520,50 @@ async function checkProject(projectPath: string): Promise<ProjectHealth> {
     // Ignore if can't determine last modified
   }
 
-  // Detect project type (Python FastAPI or Node.js NestJS)
+  // Detect project type (Go/Fiber, Python FastAPI, or Node.js NestJS)
   const packageJsonPath = path.join(projectPath, 'package.json');
   const pyprojectTomlPath = path.join(projectPath, 'pyproject.toml');
+  const goModPath = path.join(projectPath, 'go.mod');
+
+  const isGoProject =
+    (await fsExtra.pathExists(goModPath)) ||
+    projectJsonData?.runtime === 'go' ||
+    (typeof projectJsonData?.kit_name === 'string' &&
+      ((projectJsonData.kit_name as string).startsWith('gofiber') ||
+        (projectJsonData.kit_name as string).startsWith('gogin')));
+
+  // Go project checks (Fiber or Gin)
+  if (isGoProject) {
+    const kitName = (projectJsonData?.kit_name as string | undefined) ?? '';
+    health.framework = kitName.startsWith('gogin') ? 'Go/Gin' : 'Go/Fiber';
+    health.isGoProject = true;
+    health.venvActive = true; // N/A for Go
+    health.coreInstalled = false; // N/A for Go
+
+    // Check if Go is installed
+    try {
+      await execa('go', ['version'], { timeout: 3000 });
+    } catch {
+      health.issues.push('Go toolchain not found — install from https://go.dev/dl/');
+      health.fixCommands?.push('https://go.dev/dl/');
+    }
+
+    // Check deps via go.sum
+    const goSumPath = path.join(projectPath, 'go.sum');
+    if (await fsExtra.pathExists(goSumPath)) {
+      health.depsInstalled = true;
+    } else {
+      health.depsInstalled = false;
+      health.issues.push('Go dependencies not downloaded (go.sum missing)');
+      health.fixCommands?.push(`cd ${projectPath} && go mod tidy`);
+    }
+
+    // .env check — Go reads env vars from OS directly; .env is optional (no dotenv loaded by default)
+    // Leave hasEnvFile undefined so the Environment row is hidden in the output.
+
+    await performCommonChecks(projectPath, health);
+    return health;
+  }
 
   const isNodeProject = await fsExtra.pathExists(packageJsonPath);
   const isPythonProject = await fsExtra.pathExists(pyprojectTomlPath);
@@ -771,7 +902,11 @@ function calculateHealthScore(
 
   // Count project issues
   projects.forEach((project) => {
-    if (project.issues.length === 0 && project.venvActive && project.depsInstalled) {
+    // Go projects: venvActive is set true (N/A) — use depsInstalled + no issues
+    const isHealthy = project.isGoProject
+      ? project.issues.length === 0 && project.depsInstalled
+      : project.issues.length === 0 && project.venvActive && project.depsInstalled;
+    if (isHealthy) {
       passed++;
     } else if (project.issues.length > 0) {
       warnings++;
@@ -809,6 +944,7 @@ async function getWorkspaceHealth(workspacePath: string): Promise<WorkspaceHealt
     python: await checkPython(),
     poetry: await checkPoetry(),
     pipx: await checkPipx(),
+    go: await checkGo(),
     rapidkitCore: await checkRapidKitCore(), // Will check workspace venv first via updated logic
     projects: [],
   };
@@ -870,7 +1006,7 @@ async function getWorkspaceHealth(workspacePath: string): Promise<WorkspaceHealt
   }
 
   // Calculate health score
-  const systemChecks = [health.python, health.poetry, health.pipx, health.rapidkitCore];
+  const systemChecks = [health.python, health.poetry, health.pipx, health.go, health.rapidkitCore];
   health.healthScore = calculateHealthScore(systemChecks, health.projects);
 
   // Extract version info
@@ -914,7 +1050,15 @@ function renderProjectHealth(project: ProjectHealth): void {
   // Show framework
   if (project.framework) {
     const frameworkIcon =
-      project.framework === 'FastAPI' ? '🐍' : project.framework === 'NestJS' ? '🦅' : '📦';
+      project.framework === 'FastAPI'
+        ? '🐍'
+        : project.framework === 'NestJS'
+          ? '🦅'
+          : project.framework === 'Go/Fiber'
+            ? '🐹'
+            : project.framework === 'Go/Gin'
+              ? '🐹'
+              : '📦';
     console.log(
       `   ${frameworkIcon} Framework: ${chalk.cyan(project.framework)}${project.kit ? chalk.gray(` (${project.kit})`) : ''}`
     );
@@ -923,8 +1067,9 @@ function renderProjectHealth(project: ProjectHealth): void {
   console.log(`   ${chalk.gray(`Path: ${project.path}`)}`);
 
   // Detect project type based on what was checked
-  const isNodeProject = project.venvActive && !project.coreInstalled;
-  const isPythonProject = !isNodeProject;
+  const isGoProject = project.isGoProject === true;
+  const isNodeProject = !isGoProject && project.venvActive && !project.coreInstalled;
+  const isPythonProject = !isGoProject && !isNodeProject;
 
   if (isPythonProject) {
     // Python project display
@@ -997,7 +1142,12 @@ function renderProjectHealth(project: ProjectHealth): void {
     additionalChecks.push(project.hasDocker ? '✅ Docker' : chalk.dim('⊘ No Docker'));
   }
   if (project.hasCodeQuality !== undefined) {
-    const qualityTool = project.framework === 'NestJS' ? 'ESLint' : 'Ruff';
+    const qualityTool =
+      project.framework === 'NestJS'
+        ? 'ESLint'
+        : project.framework === 'Go/Fiber' || project.framework === 'Go/Gin'
+          ? 'golangci-lint'
+          : 'Ruff';
     additionalChecks.push(
       project.hasCodeQuality ? `✅ ${qualityTool}` : chalk.dim(`⊘ No ${qualityTool}`)
     );
@@ -1183,6 +1333,7 @@ export async function runDoctor(
     renderHealthCheck(health.python, 'Python');
     renderHealthCheck(health.poetry, 'Poetry');
     renderHealthCheck(health.pipx, 'pipx');
+    renderHealthCheck(health.go, 'Go');
     renderHealthCheck(health.rapidkitCore, 'RapidKit Core');
 
     // Version compatibility warning
@@ -1234,11 +1385,13 @@ export async function runDoctor(
     const python = await checkPython();
     const poetry = await checkPoetry();
     const pipx = await checkPipx();
+    const go = await checkGo();
     const core = await checkRapidKitCore();
 
     renderHealthCheck(python, 'Python');
     renderHealthCheck(poetry, 'Poetry');
     renderHealthCheck(pipx, 'pipx');
+    renderHealthCheck(go, 'Go');
     renderHealthCheck(core, 'RapidKit Core');
 
     const hasErrors = [python, core].some((c) => c.status === 'error');

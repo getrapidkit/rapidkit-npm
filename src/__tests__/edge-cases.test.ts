@@ -224,8 +224,8 @@ describe('Edge Cases and Error Scenarios', () => {
     });
 
     it('should handle specific dates', () => {
-      const date = new Date('2024-01-01');
-      expect(date.getFullYear()).toBe(2024);
+      const date = new Date('2024-01-01T00:00:00Z');
+      expect(date.getUTCFullYear()).toBe(2024);
     });
 
     it('should handle timestamps', () => {

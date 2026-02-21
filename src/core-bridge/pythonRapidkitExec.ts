@@ -884,6 +884,102 @@ export async function runCoreRapidkit(args: string[], opts?: ExecOpts): Promise<
   }
 }
 
+/**
+ * Known RapidKitError patterns from the Python core engine.
+ * Maps a regex (tested against collected stderr) to a user-friendly message factory.
+ */
+const KNOWN_CORE_ERRORS: Array<{
+  pattern: RegExp;
+  message: (match: RegExpMatchArray) => string;
+}> = [
+  {
+    pattern: /RapidKitError:\s*Directory '([^']+)' exists and force is not set/,
+    message: (m) => {
+      const dir = path.basename(m[1]);
+      return (
+        `❌ Directory "${dir}" already exists.\n` +
+        `💡 Choose a different name, or remove the existing directory first:\n` +
+        `   rm -rf ${m[1]}`
+      );
+    },
+  },
+  {
+    pattern: /RapidKitError:\s*Project name '([^']+)' is (invalid|not allowed)/i,
+    message: (m) =>
+      `❌ Invalid project name: "${m[1]}"\n` +
+      `💡 Use lowercase letters, numbers, and hyphens only (e.g. my-api).`,
+  },
+  {
+    pattern: /RapidKitError:\s*Kit '([^']+)' not found/i,
+    message: (m) =>
+      `❌ Unknown kit: "${m[1]}"\n` + `💡 Run "npx rapidkit list" to see available kits.`,
+  },
+  {
+    // Generic RapidKitError fallback — extract just the message line
+    pattern: /RapidKitError:\s*(.+)/,
+    message: (m) => `❌ ${m[1].trim()}`,
+  },
+];
+
+/**
+ * Like runCoreRapidkit but streams stdout live while silently buffering stderr.
+ * On failure, known RapidKitError patterns are replaced with clean user-facing
+ * messages instead of showing the raw Python traceback.
+ */
+export async function runCoreRapidkitStreamed(args: string[], opts?: ExecOpts): Promise<number> {
+  const { spawn } = await import('child_process');
+
+  try {
+    const runner = await resolveRapidkitRunner(opts?.cwd);
+    const cmd = runner.cmd;
+    const cmdArgs = [...runner.baseArgs, ...args];
+
+    return await new Promise<number>((resolve) => {
+      const child = spawn(cmd, cmdArgs, {
+        cwd: opts?.cwd,
+        env: { ...process.env, ...opts?.env },
+        stdio: ['inherit', 'inherit', 'pipe'],
+      });
+
+      const stderrChunks: Buffer[] = [];
+
+      child.stderr?.on('data', (chunk: Buffer) => {
+        stderrChunks.push(chunk);
+      });
+
+      child.on('close', (code) => {
+        const exitCode = code ?? 1;
+
+        if (exitCode !== 0 && stderrChunks.length > 0) {
+          const raw = Buffer.concat(stderrChunks).toString('utf8');
+
+          for (const { pattern, message } of KNOWN_CORE_ERRORS) {
+            const match = raw.match(pattern);
+            if (match) {
+              process.stderr.write(message(match) + '\n');
+              resolve(exitCode);
+              return;
+            }
+          }
+
+          // No known pattern — fall back to the raw output so nothing is lost
+          process.stderr.write(raw);
+        }
+
+        resolve(exitCode);
+      });
+
+      child.on('error', (err) => {
+        process.stderr.write(`${formatBridgeError(err)}\n`);
+        resolve(1);
+      });
+    });
+  } catch (e) {
+    process.stderr.write(`${formatBridgeError(e)}\n`);
+    return 1;
+  }
+}
+
 export async function runCoreRapidkitCapture(
   args: string[],
   opts?: ExecOpts

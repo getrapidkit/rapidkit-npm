@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-02-21
+
+### Added
+- 🐹 Added first-class Go kits in npm CLI: `gofiber.standard` and `gogin.standard`.
+- 🧭 Added Go kit support in interactive `create project` kit selection flow.
+
+### Changed
+- 🔁 Standardized generated Go project commands (`init`, `dev`, `docs`, `test`, `build`, `start`) for parity with RapidKit DX.
+- 🛠️ Hardened Go Makefile/tooling flow by using explicit GOPATH binaries for `air` and `swag`, including docs generation in dev loop.
+- 🩺 Enhanced `doctor` command with Go toolchain checks and Go project health detection/reporting.
+- 📚 Updated README with Go/Fiber and Go/Gin usage and clarified module support scope.
+
+### Fixed
+- ✅ Fixed wrapper test/runtime instability by avoiding CLI auto-delegation during Vitest execution.
+- 🧪 Fixed timezone-sensitive date assertion in edge-case tests.
+
 ## [0.21.2] - 2026-02-20
 
 ### Added

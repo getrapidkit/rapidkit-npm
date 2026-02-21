@@ -1,5 +1,45 @@
 # Release Notes
 
+## Latest Release: v0.22.0 (February 21, 2026)
+
+### 🐹 v0.22.0 — Go Kit Launch & Command Parity (Minor)
+
+This minor release introduces first-class Go project scaffolding in the npm CLI and standardizes daily development workflows for Go/Fiber and Go/Gin projects.
+
+**What's New:**
+
+- 🚀 **New Go kits in rapidkit-npm**
+  - `gofiber.standard`
+  - `gogin.standard`
+  - Available in both direct and interactive project creation flows
+
+- ⚙️ **Go command parity in generated projects**
+  - Consistent `rapidkit init/dev/docs/test/build/start` behavior
+  - Local launchers, Makefile targets, and hot-reload flow aligned
+
+- 📖 **Swagger/OpenAPI developer experience improvements**
+  - Stable `/docs` route behavior
+  - Automatic docs generation wiring in dev/init workflows
+  - More robust `air`/`swag` invocation via explicit GOPATH bin usage
+
+- 🩺 **Go-aware diagnostics**
+  - `rapidkit doctor` now reports Go toolchain status
+  - Workspace/project health checks improved for Go/Fiber and Go/Gin projects
+
+- 📚 **Documentation updates**
+  - README expanded with Go kit quick-start paths
+  - Explicit module-scope clarification: RapidKit modules are currently FastAPI/NestJS-only
+
+**Upgrade:**
+
+```bash
+npm install -g rapidkit@0.22.0
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.22.0.md)
+
+---
+
 ## Latest Release: v0.21.2 (February 20, 2026)
 
 ### 🔒 v0.21.2 — Trust & Publishability Hardening (Patch)
@@ -130,6 +170,7 @@ npm install -g rapidkit@0.21.0
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.22.0](releases/RELEASE_NOTES_v0.22.0.md) | Feb 21, 2026 | Go/Fiber + Go/Gin kits, Go command parity, Swagger DX hardening     |
 | [v0.21.2](releases/RELEASE_NOTES_v0.21.2.md) | Feb 20, 2026 | Release flow modernization, npm-only policy, security/doc alignment |
 | [v0.21.1](releases/RELEASE_NOTES_v0.21.1.md) | Feb 18, 2026 | Context-aware init, create workspace mode, doctor workspace scan fix |
 | [v0.20.0](releases/RELEASE_NOTES_v0.20.0.md) | Feb 14, 2026 | FastAPI DDD Kit, Domain-Driven Design template, offline support      |

@@ -4,6 +4,7 @@ import { Command, Option } from 'commander';
 import chalk from 'chalk';
 import inquirer, { type Question } from 'inquirer';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { logger } from './logger.js';
 import { checkForUpdates, getVersion } from './update-checker.js';
@@ -17,10 +18,13 @@ import {
   getCachedCoreTopLevelCommands,
   resolveRapidkitPython,
   runCoreRapidkit,
+  runCoreRapidkitStreamed,
 } from './core-bridge/pythonRapidkitExec.js';
 import { BOOTSTRAP_CORE_COMMANDS_SET } from './core-bridge/bootstrapCoreCommands.js';
 import { createProject as createPythonEnvironment, registerWorkspaceAtPath } from './create.js';
 import { generateDemoKit } from './demo-kit.js';
+import { generateGoFiberKit } from './generators/gofiber-standard.js';
+import { generateGoGinKit } from './generators/gogin-standard.js';
 import { runDoctor } from './doctor.js';
 import { registerConfigCommands } from './commands/config.js';
 import { registerAICommands } from './commands/ai.js';
@@ -42,12 +46,129 @@ function normalizeFallbackTemplate(kit: string): 'fastapi' | 'nestjs' | null {
   return null;
 }
 
+/** Returns true when the kit slug targets the Go/Fiber generator (no Python needed). */
+function isGoFiberKit(kit: string): boolean {
+  const k = kit.trim().toLowerCase();
+  return k.startsWith('gofiber') || k === 'go' || k === 'go.standard' || k === 'fiber';
+}
+
+/** Returns true when the kit slug targets the Go/Gin generator (no Python needed). */
+function isGoGinKit(kit: string): boolean {
+  const k = kit.trim().toLowerCase();
+  return k.startsWith('gogin') || k === 'gin';
+}
+
+/** Read .rapidkit/project.json from the current project (walk up). Returns parsed JSON or null. */
+function readRapidkitProjectJson(start: string): Record<string, unknown> | null {
+  let p = start;
+  while (true) {
+    const candidate = path.join(p, '.rapidkit', 'project.json');
+    if (fs.existsSync(candidate)) {
+      try {
+        return JSON.parse(fs.readFileSync(candidate, 'utf8'));
+      } catch {
+        return null;
+      }
+    }
+    const parent = path.dirname(p);
+    if (parent === p) break;
+    p = parent;
+  }
+  return null;
+}
+
 function readFlagValue(argv: string[], flag: string): string | undefined {
   const idx = argv.indexOf(flag);
   if (idx >= 0 && idx + 1 < argv.length) return argv[idx + 1];
   const eq = argv.find((a) => a.startsWith(`${flag}=`));
   if (eq) return eq.slice(flag.length + 1);
   return undefined;
+}
+
+async function runGoFiberCreate(args: string[]): Promise<number> {
+  if (args[0] !== 'create' || args[1] !== 'project') return 1;
+
+  const kit = args[2];
+  const name = args[3];
+  if (!kit || !name) {
+    process.stderr.write(
+      'Usage: rapidkit create project gofiber.standard <name> [--output <dir>]\n'
+    );
+    return 1;
+  }
+
+  const outputDir = readFlagValue(args, '--output') || process.cwd();
+  const projectPath = path.resolve(outputDir, name);
+  const skipGit = args.includes('--skip-git') || args.includes('--no-git');
+
+  try {
+    const { default: fsExtra } = await import('fs-extra');
+    await fsExtra.ensureDir(path.dirname(projectPath));
+    if (await fsExtra.pathExists(projectPath)) {
+      process.stderr.write(`❌ Directory "${projectPath}" already exists\n`);
+      return 1;
+    }
+    await fsExtra.ensureDir(projectPath);
+
+    await generateGoFiberKit(projectPath, {
+      project_name: name,
+      module_path: name,
+      skipGit,
+    });
+
+    const workspacePath = findWorkspaceUp(process.cwd());
+    if (workspacePath) {
+      const { syncWorkspaceProjects } = await import('./workspace.js');
+      await syncWorkspaceProjects(workspacePath, true);
+    }
+
+    return 0;
+  } catch (e) {
+    process.stderr.write(`RapidKit Go/Fiber generator failed: ${(e as Error)?.message ?? e}\n`);
+    return 1;
+  }
+}
+
+async function runGoGinCreate(args: string[]): Promise<number> {
+  if (args[0] !== 'create' || args[1] !== 'project') return 1;
+
+  const kit = args[2];
+  const name = args[3];
+  if (!kit || !name) {
+    process.stderr.write('Usage: rapidkit create project gogin.standard <name> [--output <dir>]\n');
+    return 1;
+  }
+
+  const outputDir = readFlagValue(args, '--output') || process.cwd();
+  const projectPath = path.resolve(outputDir, name);
+  const skipGit = args.includes('--skip-git') || args.includes('--no-git');
+
+  try {
+    const { default: fsExtra } = await import('fs-extra');
+    await fsExtra.ensureDir(path.dirname(projectPath));
+    if (await fsExtra.pathExists(projectPath)) {
+      process.stderr.write(`❌ Directory "${projectPath}" already exists\n`);
+      return 1;
+    }
+    await fsExtra.ensureDir(projectPath);
+
+    await generateGoGinKit(projectPath, {
+      project_name: name,
+      module_path: name,
+      skipGit,
+    });
+
+    const workspacePath = findWorkspaceUp(process.cwd());
+    if (workspacePath) {
+      const { syncWorkspaceProjects } = await import('./workspace.js');
+      await syncWorkspaceProjects(workspacePath, true);
+    }
+
+    return 0;
+  } catch (e) {
+    process.stderr.write(`RapidKit Go/Gin generator failed: ${(e as Error)?.message ?? e}\n`);
+    return 1;
+  }
 }
 
 async function runCreateFallback(args: string[], reasonCode: BridgeFailureCode): Promise<number> {
@@ -258,6 +379,66 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
   try {
     // If this is a create project invocation, handle workspace registration
     if (args[0] === 'create' && args[1] === 'project') {
+      // No kit specified — show npm-level interactive selector that includes Go/Fiber
+      if (!args[2] || args[2].startsWith('-')) {
+        console.log(chalk.bold('\n🚀 RapidKit\n'));
+        const { kitChoice } = (await inquirer.prompt([
+          {
+            type: 'rawlist',
+            name: 'kitChoice',
+            message: 'Select a kit to scaffold:',
+            choices: [
+              { name: 'fastapi  — FastAPI Standard Kit', value: 'fastapi.standard' },
+              { name: 'fastapi  — FastAPI DDD Kit', value: 'fastapi.ddd' },
+              { name: 'nestjs   — NestJS Standard Kit', value: 'nestjs.standard' },
+              { name: 'go/fiber — Go Fiber Standard Kit', value: 'gofiber.standard' },
+              { name: 'go/gin   — Go Gin Standard Kit', value: 'gogin.standard' },
+            ],
+          } as Question<{ kitChoice: string }>,
+        ])) as { kitChoice: string };
+
+        if (isGoFiberKit(kitChoice) || isGoGinKit(kitChoice)) {
+          const { projectName } = (await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'projectName',
+              message: 'Project name:',
+              validate: (v: string) => v.trim().length > 0 || 'Project name is required',
+            } as Question<{ projectName: string }>,
+          ])) as { projectName: string };
+          const flags = args.slice(2).filter((a) => a.startsWith('-'));
+          if (isGoGinKit(kitChoice)) {
+            return await runGoGinCreate([
+              'create',
+              'project',
+              kitChoice,
+              projectName.trim(),
+              ...flags,
+            ]);
+          }
+          return await runGoFiberCreate([
+            'create',
+            'project',
+            kitChoice,
+            projectName.trim(),
+            ...flags,
+          ]);
+        }
+
+        // Inject selected kit so Python core skips its own kit-selection prompt
+        args.splice(2, 0, kitChoice);
+      }
+
+      // Go/Fiber: handle entirely at npm level, bypass Python engine
+      if (isGoFiberKit(args[2] || '')) {
+        return await runGoFiberCreate(args);
+      }
+
+      // Go/Gin: handle entirely at npm level, bypass Python engine
+      if (isGoGinKit(args[2] || '')) {
+        return await runGoGinCreate(args);
+      }
+
       const hasCreateWorkspace = args.includes('--create-workspace');
       const hasNoWorkspace = args.includes('--no-workspace');
       const hasYes = args.includes('--yes') || args.includes('-y');
@@ -399,10 +580,12 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
 
 // Local project commands that should be delegated to ./rapidkit
 const LOCAL_COMMANDS = [
+  'init',
   'dev',
   'start',
   'build',
   'test',
+  'docs',
   'lint',
   'format',
   'create', // workspace command
@@ -548,11 +731,49 @@ function resolveDefaultWorkspacePath(basePath: string): { name: string; targetPa
   }
 }
 
+// ─── Go/Fiber command handlers ───────────────────────────────────────────────
+
+/**
+ * `rapidkit init` inside a Go project — runs `go mod tidy` to fetch deps.
+ */
+async function handleGoInit(projectPath: string): Promise<number> {
+  console.log(chalk.cyan(`\n🐹 Go project detected: ${path.basename(projectPath)}`));
+  console.log(chalk.gray('Running go mod tidy…\n'));
+  return await runCommandInCwd('go', ['mod', 'tidy'], projectPath);
+}
+
+/**
+ * `rapidkit dev` inside a Go project — runs `make run` (if Makefile present)
+ * or falls back to `go run ./main.go`.
+ */
+async function handleGoDev(projectPath: string): Promise<number> {
+  const makefilePath = path.join(projectPath, 'Makefile');
+  if (fs.existsSync(makefilePath)) {
+    console.log(chalk.cyan('\n🐹 Starting Go/Fiber dev server (make run)…\n'));
+    return await runCommandInCwd('make', ['run'], projectPath);
+  }
+  console.log(chalk.cyan('\n🐹 Starting Go/Fiber dev server (go run ./main.go)…\n'));
+  return await runCommandInCwd('go', ['run', './main.go'], projectPath);
+}
+
 async function handleInitCommand(args: string[]): Promise<number> {
   const cwd = process.cwd();
 
   if (args.length > 1) {
+    // If called with a path argument, check if that path is a Go project
+    const targetPath = path.resolve(cwd, args[1]);
+    const goModAtTarget = path.join(targetPath, 'go.mod');
+    if (fs.existsSync(goModAtTarget)) {
+      return await handleGoInit(targetPath);
+    }
     return await runCoreRapidkit(args, { cwd });
+  }
+
+  // Check if cwd is a Go project
+  const projectJsonNow = readRapidkitProjectJson(cwd);
+  const goModInCwd = path.join(cwd, 'go.mod');
+  if (projectJsonNow?.runtime === 'go' || fs.existsSync(goModInCwd)) {
+    return await handleGoInit(cwd);
   }
 
   const workspacePath = findWorkspaceUp(cwd);
@@ -569,8 +790,15 @@ async function handleInitCommand(args: string[]): Promise<number> {
 
     const projectPaths = await collectWorkspaceProjects(workspacePath);
     for (const projectPath of projectPaths) {
-      const projectInitCode = await runCoreRapidkit(['init'], { cwd: projectPath });
-      if (projectInitCode !== 0) return projectInitCode;
+      const projJson = readRapidkitProjectJson(projectPath);
+      const goModHere = path.join(projectPath, 'go.mod');
+      if (projJson?.runtime === 'go' || fs.existsSync(goModHere)) {
+        const code = await handleGoInit(projectPath);
+        if (code !== 0) return code;
+      } else {
+        const projectInitCode = await runCoreRapidkit(['init'], { cwd: projectPath });
+        if (projectInitCode !== 0) return projectInitCode;
+      }
     }
 
     return 0;
@@ -1003,7 +1231,33 @@ program
             ? 'fastapi.standard'
             : lowered === 'nestjs'
               ? 'nestjs.standard'
-              : raw;
+              : lowered === 'go' || lowered === 'fiber'
+                ? 'gofiber.standard'
+                : lowered === 'gin'
+                  ? 'gogin.standard'
+                  : raw;
+
+        // Go/Fiber: handled entirely at npm level — bypass Python engine
+        if (isGoFiberKit(kit)) {
+          const projectPath = path.resolve(process.cwd(), name);
+          await generateGoFiberKit(projectPath, {
+            project_name: name,
+            module_path: name,
+            skipGit: options.skipGit,
+          });
+          return;
+        }
+
+        // Go/Gin: handled entirely at npm level — bypass Python engine
+        if (isGoGinKit(kit)) {
+          const projectPath = path.resolve(process.cwd(), name);
+          await generateGoGinKit(projectPath, {
+            project_name: name,
+            module_path: name,
+            skipGit: options.skipGit,
+          });
+          return;
+        }
 
         // If we're outside a registered workspace, offer to create/register one so the
         // newly created project is tracked and the workspace tools (local venv, launcher)
@@ -1060,7 +1314,7 @@ program
           '--install-essentials',
         ];
 
-        const createCode = await runCoreRapidkit(createArgs, { cwd: process.cwd() });
+        const createCode = await runCoreRapidkitStreamed(createArgs, { cwd: process.cwd() });
         if (createCode !== 0) process.exit(createCode);
 
         // Copy workspace Python version to project if inside a workspace
@@ -1333,38 +1587,81 @@ process.on('SIGTERM', async () => {
   process.exit(143);
 });
 
-// Delegate to local CLI if inside a RapidKit project
-delegateToLocalCLI().then(async (delegated) => {
-  if (!delegated) {
-    const args = process.argv.slice(2);
+const isVitestRuntime =
+  process.env.VITEST === 'true' || process.env.VITEST === '1' || process.env.NODE_ENV === 'test';
 
-    if (process.env.RAPIDKIT_NPM_DEBUG_ARGS === '1') {
-      // Intentionally write to stderr to avoid corrupting JSON stdout from core.
-      process.stderr.write(`[rapidkit-npm] argv=${JSON.stringify(args)}\n`);
-    }
-
-    // Special-case `create` to preserve canonical Core UX while allowing a
-    // last-resort offline fallback (fastapi/nestjs scaffolds) when Python/Core
-    // cannot run.
-    if (args[0] === 'create') {
-      const code = await handleCreateOrFallback(args);
-      process.exit(code);
-    }
-
-    if (args[0] === 'init') {
-      const code = await handleInitCommand(args);
-      process.exit(code);
-    }
-
-    const shouldForward = await shouldForwardToCore(args);
-    if (process.env.RAPIDKIT_NPM_DEBUG_ARGS === '1') {
-      process.stderr.write(`[rapidkit-npm] shouldForwardToCore=${shouldForward}\n`);
-    }
-
-    if (shouldForward) {
-      const code = await runCoreRapidkit(args, { cwd: process.cwd() });
-      process.exit(code);
-    }
-    program.parse();
+// When this file is executed as the CLI entrypoint (node dist/index.js ...),
+// we must bootstrap command handling even if NODE_ENV=test is set by the test runner.
+const isDirectCliExecution = (() => {
+  const entryArg = process.argv[1];
+  if (!entryArg) return false;
+  try {
+    return fs.realpathSync(entryArg) === fs.realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return path.resolve(entryArg) === path.resolve(fileURLToPath(import.meta.url));
   }
-});
+})();
+
+const shouldBootstrapCli = !isVitestRuntime || isDirectCliExecution;
+
+// Delegate to local CLI if inside a RapidKit project
+if (shouldBootstrapCli) {
+  delegateToLocalCLI().then(async (delegated) => {
+    if (!delegated) {
+      const args = process.argv.slice(2);
+
+      if (process.env.RAPIDKIT_NPM_DEBUG_ARGS === '1') {
+        // Intentionally write to stderr to avoid corrupting JSON stdout from core.
+        process.stderr.write(`[rapidkit-npm] argv=${JSON.stringify(args)}\n`);
+      }
+
+      // Special-case `create` to preserve canonical Core UX while allowing a
+      // last-resort offline fallback (fastapi/nestjs scaffolds) when Python/Core
+      // cannot run.
+      if (args[0] === 'create') {
+        const code = await handleCreateOrFallback(args);
+        process.exit(code);
+      }
+
+      if (args[0] === 'init') {
+        const code = await handleInitCommand(args);
+        process.exit(code);
+      }
+
+      // dev command: intercept for Go projects (no local rapidkit script to delegate to)
+      if (args[0] === 'dev') {
+        const projectJson = readRapidkitProjectJson(process.cwd());
+        const goModHere = path.join(process.cwd(), 'go.mod');
+        if (projectJson?.runtime === 'go' || fs.existsSync(goModHere)) {
+          const code = await handleGoDev(process.cwd());
+          process.exit(code);
+        }
+      }
+
+      // Block module commands for Go projects (module system is Python-only)
+      if (args[0] === 'add' || (args[0] === 'module' && args[1] === 'add')) {
+        const projectJson = readRapidkitProjectJson(process.cwd());
+        if (projectJson?.runtime === 'go' || projectJson?.module_support === false) {
+          console.error(chalk.red('❌ RapidKit modules are not available for Go projects.'));
+          console.error(
+            chalk.gray(
+              '   The module system requires Python and is only supported for FastAPI and NestJS projects.'
+            )
+          );
+          process.exit(1);
+        }
+      }
+
+      const shouldForward = await shouldForwardToCore(args);
+      if (process.env.RAPIDKIT_NPM_DEBUG_ARGS === '1') {
+        process.stderr.write(`[rapidkit-npm] shouldForwardToCore=${shouldForward}\n`);
+      }
+
+      if (shouldForward) {
+        const code = await runCoreRapidkit(args, { cwd: process.cwd() });
+        process.exit(code);
+      }
+      program.parse();
+    }
+  });
+}

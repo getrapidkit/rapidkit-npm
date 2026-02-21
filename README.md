@@ -4,7 +4,8 @@
 
 ### Build Production-Ready APIs in Seconds
 
-FastAPI & NestJS scaffolding with **27+ plug-and-play modules**.  
+FastAPI, NestJS, Go/Fiber, and Go/Gin scaffolding with production-ready defaults.  
+**27+ plug-and-play modules** are available for FastAPI & NestJS projects.  
 Clean architecture • Zero boilerplate • Instant deployment.
 
 [![npm version](https://img.shields.io/npm/v/rapidkit.svg?style=flat-square)](https://www.npmjs.com/package/rapidkit)
@@ -13,13 +14,21 @@ Clean architecture • Zero boilerplate • Instant deployment.
 [![GitHub Stars](https://img.shields.io/github/stars/getrapidkit/rapidkit-npm.svg?style=flat-square)](https://github.com/getrapidkit/rapidkit-npm/stargazers)
 
 ```bash
+# 1. Create a workspace — shared Python env for all your projects
 npx rapidkit init
 cd my-workspace
-npx rapidkit create project
-cd <project-name>
+
+# 2. Scaffold a project inside the workspace
+npx rapidkit create project fastapi.standard my-api
+cd my-api
+
+# 3. Install deps & start the dev server
 npx rapidkit init && npx rapidkit dev
 # ✅ Production-ready API running at http://localhost:8000
 ```
+
+> **Workspace approach:** one shared Python environment hosts multiple projects (FastAPI, NestJS, or both).
+> Each project gets its own folder, clean architecture, Docker, and CI/CD — but shares a single `~150 MB` venv.
 
 Using Node.js/NestJS? Use this direct kit command (inside or outside a workspace):
 
@@ -31,6 +40,15 @@ Using Python/FastAPI? Use these direct kit commands (inside or outside a workspa
 npx rapidkit create project fastapi.standard my-service # standard kit
 npx rapidkit create project fastapi.ddd my-service      # DDD kit
 ```
+
+Using Go? Use these direct kit commands (inside or outside a workspace):
+```bash
+npx rapidkit create project gofiber.standard my-service # Go Fiber standard kit
+npx rapidkit create project gogin.standard my-service   # Go Gin standard kit
+```
+
+> ℹ️ **Module support note:** `npx rapidkit add module ...` is currently supported for **FastAPI** and **NestJS** projects only.
+> Go kits (`gofiber.standard`, `gogin.standard`) do not support RapidKit modules in this release.
 
 [Quick Start](#-quick-start) • [Docs](https://getrapidkit.com) • [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=rapidkit.rapidkit-vscode) • [Examples](https://github.com/getrapidkit/rapidkit-examples)
 
@@ -52,7 +70,7 @@ No account. No config. No pain. Just build.
 |-------------------------------|-------------------------------|--------------------------------|
 | Project in 30 seconds         | 27+ plug-and-play modules     | Docker + CI/CD included        |
 | Zero configuration needed     | Add features in 1 command     | Best practices baked in        |
-| FastAPI & NestJS support      | Auth, DB, Cache, Monitoring   | Clean architecture guaranteed  |
+| FastAPI, NestJS & Go kits     | Auth/DB/Cache modules (Python/Node kits) | Clean architecture guaranteed  |
 
 ### 🔥 From This...
 
@@ -107,15 +125,24 @@ Use this when you want the quickest complete flow (workspace + project + run):
 
 ```bash
 cd ~/my-empty-folder
+
+# Creates my-workspace/ with a shared Python environment
 npx rapidkit init
 cd my-workspace
-npx rapidkit create project
-cd <project-name>
+
+# Scaffold a project (interactive, or pass kit + name directly)
+npx rapidkit create project fastapi.standard my-api
+cd my-api
+
+# Install project deps & start dev server
 npx rapidkit init && npx rapidkit dev
+# ✅ http://localhost:8000
 ```
 
 This is the recommended quickest onboarding path for most users.
 `npx rapidkit init` is context-aware and auto-detects plain folders, workspace roots, and project directories.
+
+**Why workspace?** All projects under `my-workspace/` share one Python virtualenv — so adding a second or third service costs almost no extra disk space, and the RapidKit Core version stays consistent across all of them.
 
 Prefer direct kit selection (works both inside and outside a workspace):
 
@@ -123,6 +150,18 @@ Prefer direct kit selection (works both inside and outside a workspace):
 npx rapidkit create project fastapi.standard my-service
 npx rapidkit create project fastapi.ddd my-service
 npx rapidkit create project nestjs.standard my-service
+npx rapidkit create project gofiber.standard my-service
+npx rapidkit create project gogin.standard my-service
+```
+
+Interactive kit picker (`npx rapidkit create project`) includes:
+
+```text
+1) fastapi  — FastAPI Standard Kit
+2) fastapi  — FastAPI DDD Kit
+3) nestjs   — NestJS Standard Kit
+4) go/fiber — Go Fiber Standard Kit
+5) go/gin   — Go Gin Standard Kit
 ```
 
 ### Option 1: Single Project (Fastest)
@@ -158,6 +197,21 @@ npx rapidkit dev            # Start dev server → http://localhost:3000
 npx rapidkit add module auth
 npx rapidkit add module db_postgres
 ```
+
+**Go (Fiber/Gin):**
+```bash
+# Create project
+npx rapidkit create project gofiber.standard my-api
+# or
+npx rapidkit create project gogin.standard my-api
+
+# Start developing
+cd my-api
+npx rapidkit init           # Install Go deps + tools + generate Swagger docs
+npx rapidkit dev            # Start dev server with hot reload
+```
+
+> ℹ️ Go kits do not support `npx rapidkit add module ...` in this version.
 
 ### Option 2: Workspace (Recommended for Multiple Projects)
 
@@ -213,7 +267,7 @@ npx rapidkit build      # Build for production
 npx rapidkit start      # Start production server
 
 # Explore modules
-npx rapidkit modules list        # List all 27+ modules
+npx rapidkit modules list        # List all 27+ modules (FastAPI/NestJS only)
 npx rapidkit modules info db_postgres   # View module details
 
 # Health check
@@ -392,6 +446,9 @@ my-service/
 
 RapidKit's modules are plug-and-play components that extend your project:
 
+> ℹ️ The module system currently supports **FastAPI** and **NestJS** kits.
+> Go kits (`gofiber.standard`, `gogin.standard`) currently do not support module installation.
+
 ```bash
 # Add authentication
 rapidkit add module auth
@@ -444,7 +501,7 @@ rapidkit ai generate-embeddings          # Generate embeddings (~$0.50)
 
 ## 🧩 Module Ecosystem
 
-RapidKit includes **27 production-ready modules** across 10 categories:
+RapidKit includes **27 production-ready modules** across 10 categories for **FastAPI** and **NestJS** projects:
 
 ### Quick Overview
 
@@ -513,7 +570,7 @@ npx rapidkit create project <kit> <name> # Direct creation
 
 # Information
 npx rapidkit list                         # List kits
-npx rapidkit modules list                 # List modules
+npx rapidkit modules list                 # List modules (FastAPI/NestJS kits)
 npx rapidkit kits info <name>             # Kit details
 npx rapidkit modules info <name>          # Module details
 
@@ -576,6 +633,9 @@ npx rapidkit modules list                 # List available modules
 npx rapidkit modules info <slug>          # Module details
 ```
 
+> ℹ️ `add module` and `modules ...` commands apply to **FastAPI/NestJS** projects.
+> For Go kits, these commands are intentionally unavailable in this release.
+
 ### Advanced Options
 
 ```bash
@@ -601,9 +661,9 @@ npx rapidkit create --no-update-check     # Skip version check
 | `init` | Context-aware dependency setup | Folder / workspace / project |
 | `dev` | Start dev server | Inside project |
 | `test` | Run tests | Inside project |
-| `add module` | Add module to project | Inside project |
+| `add module` | Add module to project (FastAPI/NestJS) | Inside project |
 | `list` | List kits | Anywhere |
-| `modules list` | List modules | Anywhere |
+| `modules list` | List modules (FastAPI/NestJS) | Anywhere |
 | `doctor` | Health check | Anywhere |
 | `workspace` | Manage workspaces | Anywhere |
 
@@ -626,6 +686,10 @@ npx rapidkit create --no-update-check     # Skip version check
 **NestJS Projects:**
 - Node.js 20.19.6+
 - npm
+
+**Go Projects (Fiber/Gin Kits):**
+- Go 1.23+ (or the version configured by the selected kit)
+- Make (recommended for `make dev/test/build/docs` targets)
 
 ### Optional but Recommended
 
