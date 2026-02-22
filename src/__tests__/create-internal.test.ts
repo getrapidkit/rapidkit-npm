@@ -822,25 +822,25 @@ describe('Create Module - Internal Functions', () => {
       );
 
       expect(fsExtra.outputFile).toHaveBeenCalledWith(
-        expect.stringContaining('.rapidkit/workspace.json'),
+        expect.stringMatching(/[\\/]\.rapidkit[\\/]workspace\.json$/),
         expect.any(String),
         'utf-8'
       );
 
       expect(fsExtra.outputFile).toHaveBeenCalledWith(
-        expect.stringContaining('.rapidkit/toolchain.lock'),
+        expect.stringMatching(/[\\/]\.rapidkit[\\/]toolchain\.lock$/),
         expect.any(String),
         'utf-8'
       );
 
       expect(fsExtra.outputFile).toHaveBeenCalledWith(
-        expect.stringContaining('.rapidkit/policies.yml'),
+        expect.stringMatching(/[\\/]\.rapidkit[\\/]policies\.yml$/),
         expect.any(String),
         'utf-8'
       );
 
       expect(fsExtra.outputFile).toHaveBeenCalledWith(
-        expect.stringContaining('.rapidkit/cache-config.yml'),
+        expect.stringMatching(/[\\/]\.rapidkit[\\/]cache-config\.yml$/),
         expect.any(String),
         'utf-8'
       );
