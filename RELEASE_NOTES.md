@@ -1,5 +1,48 @@
 # Release Notes
 
+## Latest Release: v0.23.0 (February 22, 2026)
+
+### 🚀 v0.23.0 — Workspace Architecture Rollout + npm Install Hotfix (Minor)
+
+This patch finalizes the Phase 1→4 workspace architecture rollout in `rapidkit-npm` and fixes a publish/install regression that affected global npm installs.
+
+**What's New:**
+
+- 🧱 **Workspace foundation artifacts**
+  - Workspace creation/register flows now write:
+    - `.rapidkit/workspace.json`
+    - `.rapidkit/toolchain.lock`
+    - `.rapidkit/policies.yml`
+    - `.rapidkit/cache-config.yml`
+
+- 🔌 **Runtime adapters (feature-flagged)**
+  - Added adapter contract + implementations for Python/Node/Go
+  - Enabled via `RAPIDKIT_ENABLE_RUNTIME_ADAPTERS=1`
+
+- 🧭 **Command contract hardening**
+  - Added wrapper-level contracts for:
+    - `rapidkit bootstrap`
+    - `rapidkit setup <python|node|go>`
+    - `rapidkit cache <status|clear|prune|repair>`
+  - Forwarding boundaries updated so these commands stay npm-wrapper local
+
+- ✅ **Init non-regression + CI gate**
+  - Added 3-scenario `init` non-regression integration coverage
+  - Added dedicated CI Phase 4 runtime-contract job
+
+- 🩹 **Global install fix**
+  - Fixed npm global install failure by including `scripts/enforce-package-manager.cjs` in published files
+
+**Upgrade:**
+
+```bash
+npm install -g rapidkit@0.23.0
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.23.0.md)
+
+---
+
 ## Latest Release: v0.22.0 (February 21, 2026)
 
 ### 🐹 v0.22.0 — Go Kit Launch & Command Parity (Minor)
@@ -170,6 +213,7 @@ npm install -g rapidkit@0.21.0
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.23.0](releases/RELEASE_NOTES_v0.23.0.md) | Feb 22, 2026 | Workspace architecture phases 1→4, runtime/command contracts, npm global install hotfix |
 | [v0.22.0](releases/RELEASE_NOTES_v0.22.0.md) | Feb 21, 2026 | Go/Fiber + Go/Gin kits, Go command parity, Swagger DX hardening     |
 | [v0.21.2](releases/RELEASE_NOTES_v0.21.2.md) | Feb 20, 2026 | Release flow modernization, npm-only policy, security/doc alignment |
 | [v0.21.1](releases/RELEASE_NOTES_v0.21.1.md) | Feb 18, 2026 | Context-aware init, create workspace mode, doctor workspace scan fix |
