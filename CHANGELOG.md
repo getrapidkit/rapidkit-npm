@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- 🧹 Removed deprecated `node-domexception` install warning by upgrading `openai` SDK to `^6.22.0` (no transitive `formdata-node` chain).
+- 🧯 Recovered dependency drift introduced by `npm audit fix --force` by restoring a compatible lint toolchain (`eslint@9` + `@typescript-eslint@8`) and removing unused `c8`.
+
+### Security
+- ✅ Verified runtime dependency surface with `npm audit --omit=dev` reports zero vulnerabilities.
+
 ## [0.23.0] - 2026-02-22
 
 ### Added
