@@ -1,10 +1,38 @@
 # Release Notes
 
+## Latest Release: v0.23.1 (February 22, 2026)
+
+### 🛠️ v0.23.1 — Audit Stabilization + Windows CI Path Fix (Patch)
+
+This patch release hardens dependency/audit stability and fixes Windows-specific CI test path assertions.
+
+**What's New:**
+
+- 🧯 **Audit stabilization**
+  - Restored compatible lint toolchain after forced audit drift (`eslint@9` + `@typescript-eslint@8`)
+  - Added npm override for `minimatch@^10.2.1` to reduce high-severity ReDoS exposure in dev dependency trees
+
+- 🪟 **Windows CI reliability**
+  - Fixed cross-platform test assertions for workspace foundation paths (`/` and `\\`)
+
+- 🔐 **Runtime security posture**
+  - Production/runtime audit remains clean via `npm audit --omit=dev`
+
+**Upgrade:**
+
+```bash
+npm install -g rapidkit@0.23.1
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.23.1.md)
+
+---
+
 ## Latest Release: v0.23.0 (February 22, 2026)
 
 ### 🚀 v0.23.0 — Workspace Architecture Rollout + npm Install Hotfix (Minor)
 
-This patch finalizes the Phase 1→4 workspace architecture rollout in `rapidkit-npm` and fixes a publish/install regression that affected global npm installs.
+This minor release finalizes the Phase 1→4 workspace architecture rollout in `rapidkit-npm` and fixes a publish/install regression that affected global npm installs.
 
 **What's New:**
 
@@ -213,6 +241,7 @@ npm install -g rapidkit@0.21.0
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.23.1](releases/RELEASE_NOTES_v0.23.1.md) | Feb 22, 2026 | Audit stabilization, minimatch override, Windows CI path fix        |
 | [v0.23.0](releases/RELEASE_NOTES_v0.23.0.md) | Feb 22, 2026 | Workspace architecture phases 1→4, runtime/command contracts, npm global install hotfix |
 | [v0.22.0](releases/RELEASE_NOTES_v0.22.0.md) | Feb 21, 2026 | Go/Fiber + Go/Gin kits, Go command parity, Swagger DX hardening     |
 | [v0.21.2](releases/RELEASE_NOTES_v0.21.2.md) | Feb 20, 2026 | Release flow modernization, npm-only policy, security/doc alignment |

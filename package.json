@@ -1,6 +1,6 @@
 {
   "name": "rapidkit",
-  "version": "0.23.0",
+  "version": "0.23.1",
   "type": "module",
   "description": "Create RapidKit projects with a single command - The official CLI for RapidKit framework",
   "keywords": [
@@ -113,6 +113,9 @@
       "eslint --fix",
       "prettier --write"
     ]
+  },
+  "overrides": {
+    "minimatch": "^10.2.1"
   },
   "packageManager": "npm@10.8.2"
 }
