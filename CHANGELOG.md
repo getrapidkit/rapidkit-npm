@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 🧱 Added workspace foundation artifacts during create/register flows:
+  - `.rapidkit/workspace.json`
+  - `.rapidkit/toolchain.lock`
+  - `.rapidkit/policies.yml`
+  - `.rapidkit/cache-config.yml`
+- 🔌 Added runtime adapter layer with first-class adapters for Python, Node, and Go.
+- 🧪 Added Phase 3 command test suites:
+  - unit contract coverage for `bootstrap`, `setup`, `cache`
+  - integration coverage for adapter-enabled mode
+  - process-level CLI integration coverage for `setup`, `cache`, and `bootstrap`
+
+### Changed
+- 🧭 Added npm-level command contract handlers for `bootstrap`, `setup`, and `cache`.
+- 🧠 Updated command forwarding boundaries so `bootstrap/setup/cache` stay wrapper-local and are not forwarded to core.
+- ⚙️ Extended runtime-aware command dispatch (`init/dev/test/build/start`) with feature-flagged adapter routing (`RAPIDKIT_ENABLE_RUNTIME_ADAPTERS=1`).
+- 🗂️ Extracted runtime detection helpers into `src/utils/runtime-detection.ts` for shared project-type detection (`isGoProject`, `isNodeProject`, `isPythonProject`).
+
+### Fixed
+- 🩹 Fixed npm global install failure by including `scripts/enforce-package-manager.cjs` in published package files so `preinstall` no longer fails with `MODULE_NOT_FOUND`.
+
+### Testing
+- ✅ Added deterministic dist-refresh logic in process-level CLI tests to prevent stale-build false failures.
+- ✅ Verified Phase 3 test matrix passes end-to-end (unit + integration + process-level + typecheck).
+- ✅ Added non-regression integration coverage for the three `rapidkit init` scenarios (normal folder, workspace root, project folder).
+- ✅ Added Phase 4 CI hardening gate for runtime-adapter contracts and `init` scenario non-regression suites.
+
 ## [0.22.0] - 2026-02-21
 
 ### Added

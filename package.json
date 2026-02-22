@@ -24,7 +24,8 @@
     "rapidkit": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "scripts/enforce-package-manager.cjs"
   ],
   "scripts": {
     "preinstall": "node scripts/enforce-package-manager.cjs",

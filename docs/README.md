@@ -18,6 +18,8 @@
 
 - **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Development guide, configuration, testing, and debugging
 - **[SETUP.md](./SETUP.md)** - Quick setup guide with all commands and workflow
+- **[RELEASE_HANDOFF_PHASE4.md](./RELEASE_HANDOFF_PHASE4.md)** - Release handoff package for workspace architecture phases 1→4
+- **[BLUEPRINT_CONFORMANCE_PHASE4.md](./BLUEPRINT_CONFORMANCE_PHASE4.md)** - Blueprint conformance matrix (implemented/partial/pending + evidence)
 
 ### Configuration & Commands
 
@@ -64,6 +66,8 @@ rapidkit-npm/
     ├── AI_DYNAMIC_INTEGRATION.md       # Advanced AI integration
     ├── DEVELOPMENT.md                  # Development guide
     ├── SETUP.md                        # Setup and commands
+    ├── RELEASE_HANDOFF_PHASE4.md       # Release handoff (phases 1→4)
+    ├── BLUEPRINT_CONFORMANCE_PHASE4.md # Blueprint conformance matrix
     ├── OPTIMIZATION_GUIDE.md           # Optimization suggestions
     ├── UTILITIES.md                    # Cache and performance utilities
     ├── SECURITY.md                     # Security policy

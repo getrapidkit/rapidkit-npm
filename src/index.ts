@@ -28,6 +28,14 @@ import { generateGoGinKit } from './generators/gogin-standard.js';
 import { runDoctor } from './doctor.js';
 import { registerConfigCommands } from './commands/config.js';
 import { registerAICommands } from './commands/ai.js';
+import { areRuntimeAdaptersEnabled, getRuntimeAdapter } from './runtime-adapters/index.js';
+import { Cache } from './utils/cache.js';
+import {
+  isGoProject,
+  isNodeProject,
+  isPythonProject,
+  readRapidkitProjectJson,
+} from './utils/runtime-detection.js';
 
 type BridgeFailureCode = 'PYTHON_NOT_FOUND' | 'BRIDGE_VENV_BOOTSTRAP_FAILED';
 
@@ -56,25 +64,6 @@ function isGoFiberKit(kit: string): boolean {
 function isGoGinKit(kit: string): boolean {
   const k = kit.trim().toLowerCase();
   return k.startsWith('gogin') || k === 'gin';
-}
-
-/** Read .rapidkit/project.json from the current project (walk up). Returns parsed JSON or null. */
-function readRapidkitProjectJson(start: string): Record<string, unknown> | null {
-  let p = start;
-  while (true) {
-    const candidate = path.join(p, '.rapidkit', 'project.json');
-    if (fs.existsSync(candidate)) {
-      try {
-        return JSON.parse(fs.readFileSync(candidate, 'utf8'));
-      } catch {
-        return null;
-      }
-    }
-    const parent = path.dirname(p);
-    if (parent === p) break;
-    p = parent;
-  }
-  return null;
 }
 
 function readFlagValue(argv: string[], flag: string): string | undefined {
@@ -737,6 +726,12 @@ function resolveDefaultWorkspacePath(basePath: string): { name: string; targetPa
  * `rapidkit init` inside a Go project — runs `go mod tidy` to fetch deps.
  */
 async function handleGoInit(projectPath: string): Promise<number> {
+  if (areRuntimeAdaptersEnabled()) {
+    const adapter = getRuntimeAdapter('go', { runCommandInCwd, runCoreRapidkit });
+    const result = await adapter.initProject(projectPath);
+    return result.exitCode;
+  }
+
   console.log(chalk.cyan(`\n🐹 Go project detected: ${path.basename(projectPath)}`));
   console.log(chalk.gray('Running go mod tidy…\n'));
   return await runCommandInCwd('go', ['mod', 'tidy'], projectPath);
@@ -747,6 +742,12 @@ async function handleGoInit(projectPath: string): Promise<number> {
  * or falls back to `go run ./main.go`.
  */
 async function handleGoDev(projectPath: string): Promise<number> {
+  if (areRuntimeAdaptersEnabled()) {
+    const adapter = getRuntimeAdapter('go', { runCommandInCwd, runCoreRapidkit });
+    const result = await adapter.runDev(projectPath);
+    return result.exitCode;
+  }
+
   const makefilePath = path.join(projectPath, 'Makefile');
   if (fs.existsSync(makefilePath)) {
     console.log(chalk.cyan('\n🐹 Starting Go/Fiber dev server (make run)…\n'));
@@ -756,24 +757,137 @@ async function handleGoDev(projectPath: string): Promise<number> {
   return await runCommandInCwd('go', ['run', './main.go'], projectPath);
 }
 
-async function handleInitCommand(args: string[]): Promise<number> {
+async function handleNodeCommand(
+  action: 'init' | 'dev' | 'test' | 'build' | 'start',
+  projectPath: string
+): Promise<number> {
+  if (!areRuntimeAdaptersEnabled()) return 1;
+
+  const adapter = getRuntimeAdapter('node', { runCommandInCwd, runCoreRapidkit });
+
+  if (action === 'init') {
+    const result = await adapter.initProject(projectPath);
+    return result.exitCode;
+  }
+  if (action === 'dev') {
+    const result = await adapter.runDev(projectPath);
+    return result.exitCode;
+  }
+  if (action === 'test') {
+    const result = await adapter.runTest(projectPath);
+    return result.exitCode;
+  }
+  if (action === 'build') {
+    const result = await adapter.runBuild(projectPath);
+    return result.exitCode;
+  }
+
+  const result = await adapter.runStart(projectPath);
+  return result.exitCode;
+}
+
+export async function handleBootstrapCommand(
+  args: string[],
+  initRunner: (nextArgs: string[]) => Promise<number> = handleInitCommand
+): Promise<number> {
+  // Phase 3 foundation: bootstrap acts as deterministic workspace/project init.
+  // Keep semantics safe by reusing existing init orchestration.
+  const passthrough = ['init', ...args.slice(1)];
+  return await initRunner(passthrough);
+}
+
+export async function handleSetupCommand(args: string[]): Promise<number> {
+  const runtime = (args[1] || '').toLowerCase();
+  if (!runtime || !['python', 'node', 'go'].includes(runtime)) {
+    console.log(chalk.yellow('Usage: rapidkit setup <python|node|go>'));
+    return 1;
+  }
+
+  if (!areRuntimeAdaptersEnabled()) {
+    console.log(
+      chalk.yellow(
+        'Runtime adapters are disabled. Set RAPIDKIT_ENABLE_RUNTIME_ADAPTERS=1 to use setup.'
+      )
+    );
+    return 1;
+  }
+
+  const adapter = getRuntimeAdapter(runtime as 'python' | 'node' | 'go', {
+    runCommandInCwd,
+    runCoreRapidkit,
+  });
+  const prereq = await adapter.checkPrereqs();
+  const hints = await adapter.doctorHints(process.cwd());
+
+  if (prereq.exitCode === 0) {
+    console.log(chalk.green(`✅ ${runtime} prerequisites look good.`));
+  } else {
+    console.log(chalk.red(`❌ ${runtime} prerequisites check failed.`));
+  }
+
+  if (hints.length > 0) {
+    console.log(chalk.gray('\nHints:'));
+    for (const hint of hints) console.log(chalk.gray(`- ${hint}`));
+  }
+
+  return prereq.exitCode;
+}
+
+export async function handleCacheCommand(args: string[]): Promise<number> {
+  const action = (args[1] || 'status').toLowerCase();
+  const cache = Cache.getInstance();
+
+  if (action === 'clear' || action === 'prune' || action === 'repair') {
+    await cache.clear();
+    console.log(chalk.green(`✅ Cache ${action} completed.`));
+    return 0;
+  }
+
+  if (action === 'status') {
+    console.log(chalk.cyan('RapidKit cache is enabled (memory + disk).'));
+    console.log(chalk.gray('Use: rapidkit cache clear|prune|repair'));
+    return 0;
+  }
+
+  console.log(chalk.yellow('Usage: rapidkit cache <status|clear|prune|repair>'));
+  return 1;
+}
+
+export async function handleInitCommand(args: string[]): Promise<number> {
   const cwd = process.cwd();
+  const useAdapters = areRuntimeAdaptersEnabled();
+  const pythonAdapter = useAdapters
+    ? getRuntimeAdapter('python', { runCommandInCwd, runCoreRapidkit })
+    : null;
 
   if (args.length > 1) {
     // If called with a path argument, check if that path is a Go project
     const targetPath = path.resolve(cwd, args[1]);
-    const goModAtTarget = path.join(targetPath, 'go.mod');
-    if (fs.existsSync(goModAtTarget)) {
+    const targetJson = readRapidkitProjectJson(targetPath);
+    if (isGoProject(targetJson, targetPath)) {
       return await handleGoInit(targetPath);
+    }
+    if (useAdapters && isNodeProject(targetJson, targetPath)) {
+      return await handleNodeCommand('init', targetPath);
+    }
+    if (pythonAdapter && isPythonProject(targetJson, targetPath)) {
+      const result = await pythonAdapter.initProject(targetPath);
+      return result.exitCode;
     }
     return await runCoreRapidkit(args, { cwd });
   }
 
   // Check if cwd is a Go project
   const projectJsonNow = readRapidkitProjectJson(cwd);
-  const goModInCwd = path.join(cwd, 'go.mod');
-  if (projectJsonNow?.runtime === 'go' || fs.existsSync(goModInCwd)) {
+  if (isGoProject(projectJsonNow, cwd)) {
     return await handleGoInit(cwd);
+  }
+  if (useAdapters && isNodeProject(projectJsonNow, cwd)) {
+    return await handleNodeCommand('init', cwd);
+  }
+  if (pythonAdapter && isPythonProject(projectJsonNow, cwd)) {
+    const result = await pythonAdapter.initProject(cwd);
+    return result.exitCode;
   }
 
   const workspacePath = findWorkspaceUp(cwd);
@@ -781,6 +895,10 @@ async function handleInitCommand(args: string[]): Promise<number> {
   const projectRoot = contextFile ? path.dirname(path.dirname(contextFile)) : null;
 
   if (projectRoot && projectRoot !== workspacePath) {
+    if (pythonAdapter) {
+      const result = await pythonAdapter.initProject(projectRoot);
+      return result.exitCode;
+    }
     return await runCoreRapidkit(['init'], { cwd: projectRoot });
   }
 
@@ -791,11 +909,20 @@ async function handleInitCommand(args: string[]): Promise<number> {
     const projectPaths = await collectWorkspaceProjects(workspacePath);
     for (const projectPath of projectPaths) {
       const projJson = readRapidkitProjectJson(projectPath);
-      const goModHere = path.join(projectPath, 'go.mod');
-      if (projJson?.runtime === 'go' || fs.existsSync(goModHere)) {
+      if (isGoProject(projJson, projectPath)) {
         const code = await handleGoInit(projectPath);
         if (code !== 0) return code;
       } else {
+        if (useAdapters && isNodeProject(projJson, projectPath)) {
+          const nodeCode = await handleNodeCommand('init', projectPath);
+          if (nodeCode !== 0) return nodeCode;
+          continue;
+        }
+        if (pythonAdapter && isPythonProject(projJson, projectPath)) {
+          const result = await pythonAdapter.initProject(projectPath);
+          if (result.exitCode !== 0) return result.exitCode;
+          continue;
+        }
         const projectInitCode = await runCoreRapidkit(['init'], { cwd: projectPath });
         if (projectInitCode !== 0) return projectInitCode;
       }
@@ -823,9 +950,17 @@ async function handleInitCommand(args: string[]): Promise<number> {
 async function delegateToLocalCLI(): Promise<boolean> {
   const cwd = process.cwd();
   const args = process.argv.slice(2);
+  const isWorkspaceRoot = fs.existsSync(path.join(cwd, '.rapidkit-workspace'));
+  const hasProjectJsonInCwd = fs.existsSync(path.join(cwd, '.rapidkit', 'project.json'));
 
   // CRITICAL: Never delegate 'create' command - npm CLI must handle it for project registry tracking
   if (args[0] === 'create') {
+    return false;
+  }
+
+  // Keep workspace-root `init` on npm wrapper orchestration.
+  // This preserves expected behavior for workspace dependency init + child project init.
+  if (args[0] === 'init' && isWorkspaceRoot && !hasProjectJsonInCwd) {
     return false;
   }
 
@@ -894,6 +1029,13 @@ async function delegateToLocalCLI(): Promise<boolean> {
 
   // DON'T delegate `create` command - let npm CLI handle it for project registry tracking
   const isCreateCommand = firstArg === 'create';
+
+  // Keep `init` in workspace root on npm wrapper orchestration.
+  // Delegating to local script here can route to project-only init behavior and break
+  // expected workspace-root semantics (workspace deps + child project initialization).
+  if (firstArg === 'init' && isWorkspaceRoot && !hasProjectJsonInCwd) {
+    return false;
+  }
 
   // If we have a local script AND the command is a local command, delegate immediately
   // This works for projects created with --template (npm engine) and workspace projects
@@ -996,7 +1138,7 @@ const program = new Command();
 // output, even when environment variables are present.
 const SHOW_LEGACY = false;
 
-async function shouldForwardToCore(args: string[]): Promise<boolean> {
+export async function shouldForwardToCore(args: string[]): Promise<boolean> {
   if (args.length === 0) return false;
 
   const first = args[0];
@@ -1006,6 +1148,9 @@ async function shouldForwardToCore(args: string[]): Promise<boolean> {
   if (first === 'shell' && second === 'activate') return false;
   if (first === 'workspace') return false; // workspace management is npm-only
   if (first === 'doctor') return false; // doctor is npm-only health check
+  if (first === 'bootstrap') return false; // bootstrap is npm-level contract command
+  if (first === 'setup') return false; // setup is npm-level contract command
+  if (first === 'cache') return false; // cache is npm-level contract command
   if (first === 'ai') return false; // AI commands are npm-only
   if (first === 'config') return false; // config commands are npm-only
 
@@ -1628,12 +1773,45 @@ if (shouldBootstrapCli) {
         process.exit(code);
       }
 
+      if (args[0] === 'bootstrap') {
+        const code = await handleBootstrapCommand(args);
+        process.exit(code);
+      }
+
+      if (args[0] === 'setup') {
+        const code = await handleSetupCommand(args);
+        process.exit(code);
+      }
+
+      if (args[0] === 'cache') {
+        const code = await handleCacheCommand(args);
+        process.exit(code);
+      }
+
       // dev command: intercept for Go projects (no local rapidkit script to delegate to)
       if (args[0] === 'dev') {
         const projectJson = readRapidkitProjectJson(process.cwd());
-        const goModHere = path.join(process.cwd(), 'go.mod');
-        if (projectJson?.runtime === 'go' || fs.existsSync(goModHere)) {
+        if (isGoProject(projectJson, process.cwd())) {
           const code = await handleGoDev(process.cwd());
+          process.exit(code);
+        }
+
+        if (areRuntimeAdaptersEnabled() && isNodeProject(projectJson, process.cwd())) {
+          const code = await handleNodeCommand('dev', process.cwd());
+          process.exit(code);
+        }
+      }
+
+      if (
+        (args[0] === 'test' || args[0] === 'build' || args[0] === 'start') &&
+        areRuntimeAdaptersEnabled()
+      ) {
+        const projectJson = readRapidkitProjectJson(process.cwd());
+        if (isNodeProject(projectJson, process.cwd())) {
+          const code = await handleNodeCommand(
+            args[0] as 'test' | 'build' | 'start',
+            process.cwd()
+          );
           process.exit(code);
         }
       }

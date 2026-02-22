@@ -49,6 +49,101 @@ async function writeWorkspaceGitignore(workspacePath: string): Promise<void> {
   );
 }
 
+function buildWorkspaceManifest(
+  workspaceName: string,
+  installMethod: InstallMethod,
+  pythonVersion?: string
+): string {
+  return JSON.stringify(
+    {
+      schema_version: '1.0',
+      workspace_name: workspaceName,
+      rapidkit_version: getVersion(),
+      created_at: new Date().toISOString(),
+      created_by: 'rapidkit-npm',
+      profile: 'minimal',
+      engine: {
+        install_method: installMethod,
+        python_version: pythonVersion || null,
+      },
+    },
+    null,
+    2
+  );
+}
+
+function buildToolchainLock(installMethod: InstallMethod, pythonVersion?: string): string {
+  return JSON.stringify(
+    {
+      schema_version: '1.0',
+      generated_by: 'rapidkit-npm',
+      generated_at: new Date().toISOString(),
+      runtime: {
+        python: {
+          version: pythonVersion || null,
+          install_method: installMethod,
+        },
+        node: {
+          version: process.version,
+        },
+        go: {
+          version: null,
+        },
+      },
+    },
+    null,
+    2
+  );
+}
+
+function buildPoliciesYaml(): string {
+  return `version: "1.0"
+mode: warn
+rules:
+  enforce_workspace_marker: true
+  enforce_toolchain_lock: false
+  disallow_untrusted_tool_sources: false
+`;
+}
+
+function buildCacheConfigYaml(): string {
+  return `version: "1.0"
+cache:
+  strategy: shared
+  prune_on_bootstrap: false
+  self_heal: true
+  verify_integrity: false
+`;
+}
+
+async function writeWorkspaceFoundationFiles(
+  workspacePath: string,
+  workspaceName: string,
+  installMethod: InstallMethod,
+  pythonVersion?: string
+): Promise<void> {
+  await fsExtra.outputFile(
+    path.join(workspacePath, '.rapidkit', 'workspace.json'),
+    buildWorkspaceManifest(workspaceName, installMethod, pythonVersion),
+    'utf-8'
+  );
+  await fsExtra.outputFile(
+    path.join(workspacePath, '.rapidkit', 'toolchain.lock'),
+    buildToolchainLock(installMethod, pythonVersion),
+    'utf-8'
+  );
+  await fsExtra.outputFile(
+    path.join(workspacePath, '.rapidkit', 'policies.yml'),
+    buildPoliciesYaml(),
+    'utf-8'
+  );
+  await fsExtra.outputFile(
+    path.join(workspacePath, '.rapidkit', 'cache-config.yml'),
+    buildCacheConfigYaml(),
+    'utf-8'
+  );
+}
+
 type InstallMethod = 'poetry' | 'venv' | 'pipx';
 
 type PipxInvoker = { kind: 'binary' } | { kind: 'python-module'; pythonCmd: string };
@@ -446,6 +541,13 @@ export async function createProject(
     if (actualPythonVersion) {
       await writePythonVersion(projectPath, actualPythonVersion);
     }
+
+    await writeWorkspaceFoundationFiles(
+      projectPath,
+      name,
+      pythonAnswers.installMethod,
+      actualPythonVersion || pythonAnswers.pythonVersion
+    );
 
     // Create .gitignore regardless of git initialization (matches VS Code extension behavior).
     await writeWorkspaceGitignore(projectPath);
@@ -1102,6 +1204,12 @@ export async function registerWorkspaceAtPath(
   // Create marker and gitignore
   await writeWorkspaceMarker(workspacePath, path.basename(workspacePath), method);
   await writeWorkspaceGitignore(workspacePath);
+  await writeWorkspaceFoundationFiles(
+    workspacePath,
+    path.basename(workspacePath),
+    method,
+    pythonVersion
+  );
 
   const spinner = ora('Registering workspace').start();
 

@@ -820,6 +820,30 @@ describe('Create Module - Internal Functions', () => {
         expect.any(String),
         'utf-8'
       );
+
+      expect(fsExtra.outputFile).toHaveBeenCalledWith(
+        expect.stringContaining('.rapidkit/workspace.json'),
+        expect.any(String),
+        'utf-8'
+      );
+
+      expect(fsExtra.outputFile).toHaveBeenCalledWith(
+        expect.stringContaining('.rapidkit/toolchain.lock'),
+        expect.any(String),
+        'utf-8'
+      );
+
+      expect(fsExtra.outputFile).toHaveBeenCalledWith(
+        expect.stringContaining('.rapidkit/policies.yml'),
+        expect.any(String),
+        'utf-8'
+      );
+
+      expect(fsExtra.outputFile).toHaveBeenCalledWith(
+        expect.stringContaining('.rapidkit/cache-config.yml'),
+        expect.any(String),
+        'utf-8'
+      );
     });
 
     it('should include python version in workspace marker', async () => {

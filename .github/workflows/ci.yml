@@ -119,3 +119,38 @@ jobs:
           flags: unittests
           name: rapidkit-coverage
           fail_ci_if_error: false
+
+  phase4-runtime-contracts:
+    name: Phase4 Runtime Contracts (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run Phase 4 adapter/contract regression suites
+        env:
+          RAPIDKIT_ENABLE_RUNTIME_ADAPTERS: '1'
+        run: |
+          npm run test -- \
+            src/__tests__/phase3-commands.test.ts \
+            src/__tests__/phase3-commands.integration.test.ts \
+            src/__tests__/phase3-cli.integration.test.ts \
+            src/__tests__/init-scenarios.integration.test.ts \
+            src/__tests__/runtime-adapters.test.ts
+
+      - name: Run type check
+        run: npm run typecheck

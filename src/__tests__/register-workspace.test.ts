@@ -52,6 +52,30 @@ describe('registerWorkspaceAtPath', () => {
       'utf-8'
     );
 
+    expect(fsExtra.outputFile).toHaveBeenCalledWith(
+      expect.stringContaining('.rapidkit/workspace.json'),
+      expect.any(String),
+      'utf-8'
+    );
+
+    expect(fsExtra.outputFile).toHaveBeenCalledWith(
+      expect.stringContaining('.rapidkit/toolchain.lock'),
+      expect.any(String),
+      'utf-8'
+    );
+
+    expect(fsExtra.outputFile).toHaveBeenCalledWith(
+      expect.stringContaining('.rapidkit/policies.yml'),
+      expect.any(String),
+      'utf-8'
+    );
+
+    expect(fsExtra.outputFile).toHaveBeenCalledWith(
+      expect.stringContaining('.rapidkit/cache-config.yml'),
+      expect.any(String),
+      'utf-8'
+    );
+
     // Poetry commands (default install method)
     expect(execa).toHaveBeenCalledWith('poetry', ['--version']);
     expect(execa).toHaveBeenCalledWith(
