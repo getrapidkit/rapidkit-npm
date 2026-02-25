@@ -31,6 +31,10 @@ jobs:
         shell: pwsh
         run: npm ci
 
+      - name: Workaround npm optional-deps bug (rollup on Windows)
+        shell: pwsh
+        run: npm install --no-save @rollup/rollup-win32-x64-msvc
+
       - name: Build
         shell: pwsh
         run: npm run build
