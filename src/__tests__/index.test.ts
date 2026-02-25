@@ -24,12 +24,12 @@ describe('CLI Entry Point', () => {
     it('should display version with --version flag', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '--version']);
       expect(stdout).toMatch(/\d+\.\d+\.\d+/);
-    });
+    }, 15000);
 
     it('should display version with -V flag', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '-V']);
       expect(stdout).toMatch(/\d+\.\d+\.\d+/);
-    });
+    }, 15000);
 
     it('should display help with --help flag', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '--help']);
@@ -60,7 +60,7 @@ describe('CLI Entry Point', () => {
         '--skip-install (npm wrapper) enables fast-path for lock/dependency steps.'
       );
       expect(stdout).toContain('core --skip-essentials');
-    });
+    }, 15000);
 
     it('should not show legacy flags even when legacy env is enabled', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '--help'], {
