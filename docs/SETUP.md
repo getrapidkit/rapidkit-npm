@@ -1,52 +1,57 @@
 # Setup & Workflow
 
-This doc is a quick command reference for developing and validating the RapidKit npm CLI.
+This document is the canonical setup/reference for maintaining the RapidKit npm CLI.
 
-> Development and validation reference for the RapidKit npm CLI.
->
-> If you are an end user, start with:
-> - `../README.md`
-> - `docs/OPEN_SOURCE_USER_SCENARIOS.md`
-> - `docs/doctor-command.md`
+If you are an end user, start with:
+- `../README.md`
+- `./OPEN_SOURCE_USER_SCENARIOS.md`
+- `./doctor-command.md`
 
-## Prereqs
+## Prerequisites
 
-- Node.js `>=20.19.6`
+- Node.js `>= 20.19.6`
 - npm (official and only supported package manager for this repository)
 
-Policy details: `docs/PACKAGE_MANAGER_POLICY.md`
+Policy details: `./PACKAGE_MANAGER_POLICY.md`
 
 ## Install
 
 ```bash
-npm install
+npm ci
 ```
 
-## Validate (recommended before pushing)
-
-```bash
-npm run validate
-```
-
-## Build
+## Build & Quality Gates
 
 ```bash
 npm run build
+npm run validate
+npm run validate:docs
 ```
 
-## Local CLI smoke tests
+- `validate`: typecheck + lint + format + tests
+- `validate:docs`: markdown links + docs drift guard + docs examples + README command smoke
+
+## Workspace-Based CLI Smoke (Recommended)
 
 ```bash
+npm run build
+
+# CLI surface
 node dist/index.js --help
 node dist/index.js --version
 
-node dist/index.js create project fastapi.standard test-fastapi
-node dist/index.js create project nestjs.standard test-nest
-
-node dist/index.js my-workspace --yes --skip-git --no-update-check
+# Workspace lifecycle
+node dist/index.js create workspace test-ws --yes --profile polyglot
+cd test-ws
+node ../dist/index.js bootstrap --profile polyglot
+node ../dist/index.js setup python
+node ../dist/index.js setup node --warm-deps
+node ../dist/index.js setup go --warm-deps
+node ../dist/index.js cache status
+node ../dist/index.js mirror status
 ```
 
-## Scenario matrix (release confidence)
+## Scenario Matrix (Release Confidence)
 
 ```bash
 npm run test:scenarios
@@ -54,239 +59,53 @@ npm run test:scenarios:full
 npm run test:scenarios:docker
 ```
 
-## Packaging sanity check
+## Packaging Sanity Check
 
 ```bash
 npm pack --dry-run
 ```
 
-# Quick Optimization Setup
-
-## Install New Dependencies
+## Common Development Commands
 
 ```bash
-# Navigate to the rapidkit-npm directory
-cd path/to/rapidkit-npm
-
-# Install linting and formatting tools
-npm install -D @typescript-eslint/eslint-plugin@latest \
-               @typescript-eslint/parser@latest \
-               eslint@^8.57.0 \
-               prettier@^3.2.5 \
-               husky@^9.0.11 \
-               lint-staged@^15.2.2
-```
-
-## Setup Husky (Pre-commit Hooks)
-
-```bash
-# Initialize Husky (new v9 command)
-npx husky init
-
-# Create pre-commit hook
-echo "npx lint-staged" > .husky/pre-commit
-chmod +x .husky/pre-commit
-
-# Create pre-push hook (optional)
-echo "npm run validate" > .husky/pre-push
-chmod +x .husky/pre-push
-```
-
-## Run New Commands
-
-```bash
-# Type checking without build
 npm run typecheck
-
-# Linting
-npm run lint           # Show errors
-npm run lint:fix       # Auto-fix errors
-
-# Formatting
-npm run format         # Format code
-npm run format:check   # Check formatting without changes
-
-# Complete validation (before commit)
-npm run validate       # typecheck + lint + format:check + test
-
-# Build and test
-npm run build
-npm test
-npm run test:coverage
-```
-
-## Performance Check
-
-```bash
-# Run tests with performance metrics
-npm run test:coverage
-
-# Build with time measurement
-time npm run build
-```
-
-## Cleanup and Optimization
-
-```bash
-# Clear cache
-rm -rf node_modules/.cache
-rm -rf dist
-
-# Clean reinstall
-npm ci
-
-# Security audit
-npm audit
-
-# Fix security issues
-npm audit fix
-```
-
-## Test in Different Environments
-
-```bash
-# Local test - FastAPI
-npm run build
-node dist/index.js create project fastapi.standard test-fastapi
-cd test-fastapi
-rapidkit init
-rapidkit dev
-
-# Local test - NestJS
-node dist/index.js create project nestjs.standard test-nest
-cd test-nest
-rapidkit init
-rapidkit dev
-
-# Local test - Workspace
-node dist/index.js test-workspace
-cd test-workspace
-rapidkit create project fastapi.standard my-api --output .
-```
-
-## CI/CD (Optional)
-
-If you want automated CI/CD, GitHub Actions workflows will run automatically:
-
-- `ci.yml` - On every push/PR to main and develop
-- `release.yml` - On every git tag with v prefix (e.g., v1.0.0-beta.6)
-
-**Note**: CI/CD is optional. If you don't need it, you can skip setting up workflows.
-
-## Implemented Optimizations
-
-✅ **Code Quality**
-
-- ESLint for TypeScript
-- Prettier for formatting
-- Husky for pre-commit hooks
-- Lint-staged for staged changes
-
-✅ **Performance**
-
-- Cache system with memory and disk caching
-- Performance monitoring utilities
-- Metrics tracking
-
-✅ **New Scripts**
-
-- `npm run lint` - Check code
-- `npm run format` - Format code
-- `npm run typecheck` - Check types
-- `npm run validate` - Complete validation
-
-## Next Steps (Optional)
-
-### 1. Bundle Size Optimization
-
-```bash
-npm install -D webpack-bundle-analyzer
-# Analyze bundle size
-```
-
-### 2. Replace Heavy Dependencies
-
-```bash
-# Replace inquirer with prompts (lighter)
-npm uninstall inquirer @types/inquirer
-npm install prompts @types/prompts
-
-# Replace chalk with picocolors (much smaller)
-npm uninstall chalk
-npm install picocolors
-```
-
-### 3. Add More Tests
-
-```bash
-# Integration tests
-# Performance benchmarks
-# Snapshot tests
-```
-
-## Important Notes
-
-1. **Always run `npm run validate` before commit**
-2. **For releases, use git tags**: `git tag v1.0.0-beta.6 && git push --tags`
-3. **If using CI/CD, configure required secrets in GitHub**: `NPM_TOKEN`
-4. **After each major change, check coverage**: `npm run test:coverage`
-
-## Common Issues and Solutions
-
-### Husky Not Working
-
-```bash
-rm -rf .git/hooks
-npx husky init
-```
-
-### ESLint Shows Many Errors
-
-```bash
-# Auto-fix
+npm run lint
 npm run lint:fix
-
-# Or incrementally
-npx eslint src --ext .ts --fix --max-warnings 10
+npm run format
+npm run format:check
+npm run test
+npm run test:coverage
 ```
 
-### Tests Fail After Changes
+## Environment Variables
+
+Bridge + Core integration:
+
+- `RAPIDKIT_DEV_PATH`: local RapidKit Core checkout path for development/testing
+- `RAPIDKIT_CORE_PYTHON_PACKAGE`: override Core install target for Python bridge
+- `RAPIDKIT_BRIDGE_FORCE_VENV=1`: force cached bridge venv even if system Python has Core
+- `RAPIDKIT_BRIDGE_UPGRADE_PIP=1`: upgrade pip inside bridge venv during bootstrap
+- `XDG_CACHE_HOME`: cache root used by bridge (Linux default: `$HOME/.cache`)
+
+Scenario toggles:
+
+- `RAPIDKIT_SCENARIO_FULL_BOOTSTRAP=1`: enable extended bootstrap scenarios
+- `RAPIDKIT_SCENARIO_WORKSPACE_CREATE=1`: enable workspace creation scenario
+
+General:
+
+- `DEBUG`: enable debug logging (alternative to `--debug`)
+- `NODE_ENV`: runtime mode
+
+## Open-Source Release Hygiene
+
+Before tagging a release:
 
 ```bash
-# Watch mode for detailed checking
-npm run test:watch
-
-# Or with debug output
-npm run test -- --reporter=verbose
+npm run validate
+npm run validate:docs
+npm run test:scenarios
+npm pack --dry-run
 ```
 
-## Quick Reference
-
-| Command                 | Description               |
-| ----------------------- | ------------------------- |
-| `npm run lint`          | Check code with ESLint    |
-| `npm run lint:fix`      | Auto-fix linting errors   |
-| `npm run format`        | Format code with Prettier |
-| `npm run format:check`  | Check formatting          |
-| `npm run typecheck`     | Check TypeScript types    |
-| `npm run validate`      | Run all checks            |
-| `npm test`              | Run tests                 |
-| `npm run test:coverage` | Run tests with coverage   |
-| `npm run build`         | Build the project         |
-
-## Git Workflow
-
-```bash
-# 1. Make changes
-git add .
-
-# 2. Pre-commit hook runs automatically (lint-staged)
-git commit -m "feat: add new feature"
-
-# 3. Pre-push hook runs (npm run validate) - if configured
-git push
-
-# 4. For releases
-git tag v1.0.0-beta.6
-git push --tags
-```
+Ensure all examples use placeholders (never real credentials), and do not commit generated artifacts such as local coverage outputs unless intentionally versioned.

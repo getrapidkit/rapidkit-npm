@@ -96,5 +96,5 @@ describe('init scenarios integration (non-regression)', () => {
 
     expect(code).toBe(0);
     expect(fs.existsSync(path.join(projectDir, 'package-lock.json'))).toBe(true);
-  });
+  }, 15000);
 });

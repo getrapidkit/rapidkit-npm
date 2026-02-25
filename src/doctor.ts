@@ -1449,9 +1449,7 @@ export async function runDoctor(
         );
       }
       console.log(
-        chalk.gray(
-          '\nTip: Run "npx rapidkit doctor workspace" (or "npx rapidkit doctor --workspace") for detailed project checks'
-        )
+        chalk.gray('\nTip: Run "npx rapidkit doctor workspace" for detailed project checks')
       );
     } else {
       console.log(chalk.bold.green('\n✅ All required tools are installed!'));
@@ -1463,9 +1461,7 @@ export async function runDoctor(
         );
       }
       console.log(
-        chalk.gray(
-          '\nTip: Run "npx rapidkit doctor workspace" (or "npx rapidkit doctor --workspace") for detailed project checks'
-        )
+        chalk.gray('\nTip: Run "npx rapidkit doctor workspace" for detailed project checks')
       );
     }
   }

@@ -1,5 +1,53 @@
 # Release Notes
 
+## Latest Release: v0.24.2 (February 25, 2026)
+
+### 🧱 v0.24.2 — Workspace Docs Governance, Runtime Warm-Setup Coverage, and CI Ownership Hardening (Patch)
+
+This patch finalizes workspace-based architecture documentation and adds automated docs governance checks to keep command contracts, workflow ownership, and examples publish-safe for open-source release.
+
+**What's New:**
+
+- 📚 **Workspace architecture docs refresh**
+  - Updated maintainer/user docs for canonical workspace lifecycle:
+    - `docs/SETUP.md`
+    - `docs/doctor-command.md`
+    - `docs/README.md`
+    - `docs/OPEN_SOURCE_USER_SCENARIOS.md`
+  - Canonical doctor usage standardized to `rapidkit doctor workspace`.
+
+- ✅ **Automated docs governance gates**
+  - Added local markdown link validation:
+    - `scripts/check-markdown-links.mjs`
+  - Added docs drift guard for command/workflow contract presence in README:
+    - `scripts/docs-drift-guard.mjs`
+  - Added README command smoke script against built CLI:
+    - `scripts/smoke-readme-commands.mjs`
+  - Wired docs checks into npm scripts and CI Linux lane:
+    - `package.json` (`check:markdown-links`, `check:docs-drift`, `smoke:readme`, `validate:docs`)
+    - `.github/workflows/ci.yml`
+
+- 🧪 **Workspace E2E ownership and focus clarity**
+  - Expanded lifecycle/chaos coverage in:
+    - `.github/workflows/workspace-e2e-matrix.yml`
+  - Narrowed bridge-only regression smoke scope to avoid overlap:
+    - `.github/workflows/e2e-smoke.yml`
+
+- ⚙️ **Runtime/setup contract alignment**
+  - Added setup cache warm hooks for Node/Go adapters and setup-time warm dependency behavior.
+  - Standardized setup help/usage surface and docs with `--warm-deps`.
+  - Normalized legacy doctor hints to canonical workspace command wording.
+
+**Upgrade:**
+
+```bash
+npm install -g rapidkit@0.24.2
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.24.2.md)
+
+---
+
 ## Latest Release: v0.24.1 (February 25, 2026)
 
 ### 🧩 v0.24.1 — Setup Contract Fixes, Cross-OS CI Stability, and Workspace Flow Alignment (Patch)
@@ -86,247 +134,13 @@ npm install -g rapidkit@0.24.0
 
 ---
 
-## Latest Release: v0.23.1 (February 22, 2026)
-
-### 🛠️ v0.23.1 — Audit Stabilization + Windows CI Path Fix (Patch)
-
-This patch release hardens dependency/audit stability and fixes Windows-specific CI test path assertions.
-
-**What's New:**
-
-- 🧯 **Audit stabilization**
-  - Restored compatible lint toolchain after forced audit drift (`eslint@9` + `@typescript-eslint@8`)
-  - Added npm override for `minimatch@^10.2.1` to reduce high-severity ReDoS exposure in dev dependency trees
-
-- 🪟 **Windows CI reliability**
-  - Fixed cross-platform test assertions for workspace foundation paths (`/` and `\\`)
-
-- 🔐 **Runtime security posture**
-  - Production/runtime audit remains clean via `npm audit --omit=dev`
-
-**Upgrade:**
-
-```bash
-npm install -g rapidkit@0.23.1
-```
-
-[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.23.1.md)
-
----
-
-## Latest Release: v0.23.0 (February 22, 2026)
-
-### 🚀 v0.23.0 — Workspace Architecture Rollout + npm Install Hotfix (Minor)
-
-This minor release finalizes the Phase 1→4 workspace architecture rollout in `rapidkit-npm` and fixes a publish/install regression that affected global npm installs.
-
-**What's New:**
-
-- 🧱 **Workspace foundation artifacts**
-  - Workspace creation/register flows now write:
-    - `.rapidkit/workspace.json`
-    - `.rapidkit/toolchain.lock`
-    - `.rapidkit/policies.yml`
-    - `.rapidkit/cache-config.yml`
-
-- 🔌 **Runtime adapters (feature-flagged)**
-  - Added adapter contract + implementations for Python/Node/Go
-  - Enabled via `RAPIDKIT_ENABLE_RUNTIME_ADAPTERS=1`
-
-- 🧭 **Command contract hardening**
-  - Added wrapper-level contracts for:
-    - `rapidkit bootstrap`
-    - `rapidkit setup <python|node|go>`
-    - `rapidkit cache <status|clear|prune|repair>`
-  - Forwarding boundaries updated so these commands stay npm-wrapper local
-
-- ✅ **Init non-regression + CI gate**
-  - Added 3-scenario `init` non-regression integration coverage
-  - Added dedicated CI Phase 4 runtime-contract job
-
-- 🩹 **Global install fix**
-  - Fixed npm global install failure by including `scripts/enforce-package-manager.cjs` in published files
-
-**Upgrade:**
-
-```bash
-npm install -g rapidkit@0.23.0
-```
-
-[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.23.0.md)
-
----
-
-## Latest Release: v0.22.0 (February 21, 2026)
-
-### 🐹 v0.22.0 — Go Kit Launch & Command Parity (Minor)
-
-This minor release introduces first-class Go project scaffolding in the npm CLI and standardizes daily development workflows for Go/Fiber and Go/Gin projects.
-
-**What's New:**
-
-- 🚀 **New Go kits in rapidkit-npm**
-  - `gofiber.standard`
-  - `gogin.standard`
-  - Available in both direct and interactive project creation flows
-
-- ⚙️ **Go command parity in generated projects**
-  - Consistent `rapidkit init/dev/docs/test/build/start` behavior
-  - Local launchers, Makefile targets, and hot-reload flow aligned
-
-- 📖 **Swagger/OpenAPI developer experience improvements**
-  - Stable `/docs` route behavior
-  - Automatic docs generation wiring in dev/init workflows
-  - More robust `air`/`swag` invocation via explicit GOPATH bin usage
-
-- 🩺 **Go-aware diagnostics**
-  - `rapidkit doctor` now reports Go toolchain status
-  - Workspace/project health checks improved for Go/Fiber and Go/Gin projects
-
-- 📚 **Documentation updates**
-  - README expanded with Go kit quick-start paths
-  - Explicit module-scope clarification: RapidKit modules are currently FastAPI/NestJS-only
-
-**Upgrade:**
-
-```bash
-npm install -g rapidkit@0.22.0
-```
-
-[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.22.0.md)
-
----
-
-## Latest Release: v0.21.2 (February 20, 2026)
-
-### 🔒 v0.21.2 — Trust & Publishability Hardening (Patch)
-
-This patch focuses on release reliability and contributor consistency with a modernized release flow, npm-only policy enforcement, and security/doc alignment.
-
-**What's New:**
-
-- 🔁 **Modern release flow (no hardcoded versioning)**
-  - Dynamic release script with semantic bump support (`patch|minor|major|x.y.z`)
-  - Safer release controls: `--no-publish`, `--yes`, `--allow-dirty`
-  - Dynamic tag/release handling based on `package.json` version
-
-- 📦 **One-command release shortcuts**
-  - `npm run release:dry`
-  - `npm run release:patch`
-  - `npm run release:minor`
-  - `npm run release:major`
-
-- 📏 **Official npm-only policy**
-  - Enforced in install path via preinstall guard
-  - Dedicated policy doc: `docs/PACKAGE_MANAGER_POLICY.md`
-  - Contributor + setup docs aligned to npm-first workflow
-
-- 🛡️ **Security policy alignment**
-  - `docs/SECURITY.md` now reflects active support on latest `0.x` minor line
-
-- 🩺 **Doctor workspace scan hardening**
-  - Workspace scanning now ignores common build artifact directories (`dist*`, `build*`)
-  - Prevents false-positive project discovery from packaged output folders
-
-**Upgrade:**
-
-```bash
-npm install -g rapidkit@0.21.2
-```
-
-[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.21.2.md)
-
----
-
-## Latest Release: v0.21.1 (February 18, 2026)
-
-### 🚀 v0.21.1 — Context-Aware Init, Workspace Command Mode, and Doctor Scan Fix (Patch)
-
-This patch release improves day-1 CLI onboarding and workspace reliability with a context-aware `init` flow, explicit `create workspace` command mode, and a doctor scan correctness fix.
-
-**What's New:**
-
-- ✨ **New workspace command mode**
-  - `npx rapidkit create workspace`
-  - `npx rapidkit create workspace <name>`
-  - Legacy `npx rapidkit <name>` continues to work.
-
-- 🧠 **Context-aware `npx rapidkit init`**
-  - Plain folder: auto-creates default workspace (`my-workspace`, `my-workspace-2`, ...)
-  - Workspace root: installs workspace dependencies and initializes detected child projects
-  - Project inside workspace: initializes only that project
-
-- 🩺 **Doctor workspace scan fix**
-  - Workspace root `.rapidkit` is no longer counted as a project unless real project markers exist.
-  - Added regression coverage for this case.
-
-- 📚 **Documentation updates**
-  - New “Fastest Start” guidance based on `npx rapidkit init`
-  - Clarified prompt behavior for `create workspace`
-
-**Upgrade:**
-
-```bash
-npm install -g rapidkit@0.21.1
-```
-
-[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.21.1.md)
-
----
-
-## Latest Release: v0.21.0 (February 16, 2026)
-
-### ⚡ v0.21.0 — Performance Optimizations & Documentation Reorganization (Minor)
-
-This minor release focuses on **significant performance improvements** through dynamic imports and bundle optimization, plus comprehensive **documentation reorganization** to separate public and internal docs.
-
-**What's New:**
-
-- ⚡ **Phase 1 Performance Optimizations** - 50-60% faster startup
-  - 🚀 Dynamic imports for OpenAI (~30-40KB) and Inquirer (~25-30KB)
-  - 📦 Bundle size: **27.8 KB** compressed (well under 200KB limit)
-  - 🎯 Code splitting enabled (7 chunks)
-  - 🌲 Aggressive tree shaking
-  - 📊 Performance monitoring tools (bench, size-check, analyze)
-  - ⚡ Common commands now 50-60% faster:
-    - `rapidkit --help`: 323ms
-    - `rapidkit --version`: 390ms
-    - `rapidkit workspace list --help`: 331ms
-
-- 📚 **Documentation Organization**
-  - ✅ Separated public docs from internal development docs
-  - 📁 Moved 9 internal docs to `/Front/Docs/npm/develop/`
-  - 📖 Updated docs index with proper categorization
-  - 🎯 Clear distinction for open source community
-
-- 🛠️ **New Developer Tools**
-  - `npm run bench` - Performance benchmarking
-  - `npm run size-check` - Bundle size validation (200KB limit)
-  - `npm run analyze` - Visual bundle analyzer
-  - `npm run quality` - Comprehensive quality check
-
-**Technical Details:**
-
-- Bundle optimized from ~40KB to 27.8 KB compressed
-- Heavy dependencies load only when needed (pay-as-you-go model)
-- 7 chunks for better caching and faster loads
-- Automated size monitoring prevents regressions
-
-**Upgrade:**
-
-```bash
-npm install -g rapidkit@0.21.0
-```
-
-[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.21.0.md)
-
----
-
 
 ## Previous Releases
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.24.2](releases/RELEASE_NOTES_v0.24.2.md) | Feb 25, 2026 | Workspace docs governance, docs drift/link/smoke gates, CI ownership hardening |
+| [v0.24.1](releases/RELEASE_NOTES_v0.24.1.md) | Feb 25, 2026 | Setup contract fixes, cross-OS matrix reliability, workspace flow alignment |
 | [v0.24.0](releases/RELEASE_NOTES_v0.24.0.md) | Feb 25, 2026 | Windows-native bridge E2E, mirror lifecycle hardening, runtime adapter stability |
 | [v0.23.1](releases/RELEASE_NOTES_v0.23.1.md) | Feb 22, 2026 | Audit stabilization, minimatch override, Windows CI path fix        |
 | [v0.23.0](releases/RELEASE_NOTES_v0.23.0.md) | Feb 22, 2026 | Workspace architecture phases 1→4, runtime/command contracts, npm global install hotfix |

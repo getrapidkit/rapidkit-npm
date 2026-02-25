@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.2] - 2026-02-25
+
+### Added
+- 🧰 Added docs governance scripts:
+  - `scripts/check-markdown-links.mjs`
+  - `scripts/docs-drift-guard.mjs`
+  - `scripts/smoke-readme-commands.mjs`
+- ✅ Added docs validation npm pipeline:
+  - `check:markdown-links`, `check:docs-drift`, `smoke:readme`, `validate:docs`.
+
+### Changed
+- 📚 Refreshed workspace-based docs and canonical command contracts:
+  - `docs/SETUP.md`
+  - `docs/doctor-command.md`
+  - `docs/README.md`
+  - `docs/OPEN_SOURCE_USER_SCENARIOS.md`
+- 🩺 Standardized workspace doctor references to `rapidkit doctor workspace`.
+- 🧪 Expanded workspace matrix lifecycle/chaos E2E coverage and narrowed bridge-only smoke workflow scope.
+- ⚙️ Improved runtime setup flow with optional warm dependency behavior (`--warm-deps`) and adapter cache warm hooks.
+
+### Fixed
+- 🧭 Reduced docs/CI drift risk by enforcing command/workflow ownership presence checks in README.
+- 🪟🍎 Improved cross-workflow CI ownership clarity to avoid duplicated regression surface.
+
 ## [0.24.1] - 2026-02-25
 
 ### Fixed

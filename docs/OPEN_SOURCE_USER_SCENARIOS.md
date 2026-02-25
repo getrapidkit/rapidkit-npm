@@ -23,6 +23,9 @@ Goal: get productive quickly with minimal complexity.
 ```bash
 npx rapidkit my-workspace
 cd my-workspace
+npx rapidkit bootstrap --profile polyglot
+npx rapidkit setup python
+npx rapidkit setup node --warm-deps
 npx rapidkit create project fastapi.standard api --output .
 cd api
 rapidkit init
@@ -45,7 +48,9 @@ Goal: improve stability and repeatability using mirror artifacts.
 
 ```bash
 cd my-workspace
+npx rapidkit doctor workspace
 rapidkit mirror status
+rapidkit cache status
 rapidkit mirror sync
 rapidkit mirror verify
 rapidkit init

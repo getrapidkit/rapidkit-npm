@@ -112,7 +112,7 @@ export class PythonRuntimeAdapter implements RuntimeAdapter {
 
   async doctorHints(_projectPath: string): Promise<string[]> {
     return [
-      'Run "npx rapidkit doctor --workspace" for a full workspace scan.',
+      'Run "npx rapidkit doctor workspace" for a full workspace scan.',
       'Use "npx rapidkit init" after adding or changing modules.',
       'Use workspace launcher "./rapidkit" to avoid environment drift.',
     ];

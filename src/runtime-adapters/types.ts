@@ -8,6 +8,7 @@ export type CommandResult = {
 export interface RuntimeAdapter {
   readonly runtime: RuntimeName;
   checkPrereqs(): Promise<CommandResult>;
+  warmSetupCache?(projectPath: string): Promise<CommandResult>;
   initProject(projectPath: string): Promise<CommandResult>;
   runDev(projectPath: string): Promise<CommandResult>;
   runTest(projectPath: string): Promise<CommandResult>;

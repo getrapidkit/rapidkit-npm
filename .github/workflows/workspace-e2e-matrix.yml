@@ -2,15 +2,30 @@ name: Workspace E2E Matrix
 
 on:
   push:
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/workspace-e2e-matrix.yml"
     branches: [main, develop]
   pull_request:
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/workspace-e2e-matrix.yml"
     branches: [main, develop]
+  workflow_dispatch:
 
 jobs:
   workspace-matrix:
     name: Workspace Matrix (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+
+    defaults:
+      run:
+        shell: bash
 
     strategy:
       fail-fast: false
@@ -32,26 +47,26 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Setup Go 1.24
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
       - name: Install dependencies
-        shell: bash
         run: npm ci
 
       - name: Workaround npm optional-deps bug (rollup on Windows)
         if: runner.os == 'Windows'
-        shell: bash
         run: npm install --no-save @rollup/rollup-win32-x64-msvc
 
       - name: Workaround npm optional-deps bug (rollup on macOS arm64)
         if: runner.os == 'macOS'
-        shell: bash
         run: npm install --no-save @rollup/rollup-darwin-arm64
 
       - name: Build
-        shell: bash
         run: npm run build
 
       - name: Workspace lifecycle smoke (cross-OS)
-        shell: bash
         run: |
           set -euo pipefail
           TEST_ROOT="$RUNNER_TEMP/rapidkit-ws-matrix"
@@ -64,8 +79,105 @@ jobs:
           $CLI create workspace ws-matrix --yes --profile go-only
           cd ws-matrix
 
+          # Bootstrap profile-switch smoke
           $CLI bootstrap --profile go-only
           $CLI bootstrap --profile polyglot
+          $CLI bootstrap --profile minimal
 
+          # Runtime setup + cache warm-up smoke
+          $CLI setup python
+          $CLI setup node --warm-deps
+          $CLI setup go --warm-deps
+
+          # Workspace ops smoke
+          $CLI cache status
+          $CLI mirror status
+
+          # Project creation smoke for node+go warm-deps in real project dirs
+          $CLI create project nestjs.standard matrix-nest --yes --skip-install
+          $CLI create project gofiber.standard matrix-fiber --yes --skip-install
+
+          (cd matrix-nest && $CLI setup node --warm-deps)
+          (cd matrix-fiber && $CLI setup go --warm-deps)
+
+          test -f .rapidkit/toolchain.lock
           test -f .rapidkit/reports/bootstrap-compliance.latest.json
+          test -f .rapidkit/reports/mirror-ops.latest.json
           echo "✅ workspace matrix smoke passed on $RUNNER_OS"
+
+  workspace-chaos:
+    name: Workspace Chaos (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Setup Go 1.24
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Chaos smoke (non-fatal warm-deps under network failure)
+        run: |
+          set -euo pipefail
+          TEST_ROOT="$RUNNER_TEMP/rapidkit-ws-chaos"
+          rm -rf "$TEST_ROOT"
+          mkdir -p "$TEST_ROOT"
+          cd "$TEST_ROOT"
+
+          CLI="node $GITHUB_WORKSPACE/dist/index.js"
+
+          $CLI create workspace ws-chaos --yes --profile polyglot
+          cd ws-chaos
+
+          $CLI create project nestjs.standard chaos-nest --yes --skip-install
+          $CLI create project gofiber.standard chaos-fiber --yes --skip-install
+
+          # Broken registries/proxies should not crash setup --warm-deps (non-fatal by design)
+          set +e
+          npm_config_registry="http://127.0.0.1:9" \
+            $CLI setup node --warm-deps > node-chaos.log 2>&1
+          node_exit=$?
+
+          GOPROXY="http://127.0.0.1:9" \
+            $CLI setup go --warm-deps > go-chaos.log 2>&1
+          go_exit=$?
+          set -e
+
+          if [[ "$node_exit" -ne 0 ]]; then
+            echo "❌ setup node --warm-deps should remain non-fatal in chaos mode"
+            cat node-chaos.log
+            exit 1
+          fi
+          if [[ "$go_exit" -ne 0 ]]; then
+            echo "❌ setup go --warm-deps should remain non-fatal in chaos mode"
+            cat go-chaos.log
+            exit 1
+          fi
+
+          grep -Ei "warm-up (failed|skipped|completed)|dependency warm-up" node-chaos.log >/dev/null
+          grep -Ei "warm-up (failed|skipped|completed)|dependency warm-up" go-chaos.log >/dev/null
+          echo "✅ chaos smoke passed (non-fatal warm-deps behavior verified)"

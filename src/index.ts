@@ -29,6 +29,7 @@ import { runDoctor } from './doctor.js';
 import { registerConfigCommands } from './commands/config.js';
 import { registerAICommands } from './commands/ai.js';
 import { getRuntimeAdapter } from './runtime-adapters/index.js';
+import type { CommandResult } from './runtime-adapters/types.js';
 import { Cache } from './utils/cache.js';
 import {
   isGoProject,
@@ -1690,10 +1691,71 @@ export async function handleBootstrapCommand(
 
 export async function handleSetupCommand(args: string[]): Promise<number> {
   const runtime = (args[1] || '').toLowerCase();
+  const warmDeps = args.includes('--warm-deps') || args.includes('--warm-dependencies');
   if (!runtime || !['python', 'node', 'go'].includes(runtime)) {
-    console.log(chalk.yellow('Usage: rapidkit setup <python|node|go>'));
+    console.log(chalk.yellow('Usage: rapidkit setup <python|node|go> [--warm-deps]'));
     return 1;
   }
+
+  const warmRuntimeDependencies = async (
+    targetRuntime: 'python' | 'node' | 'go',
+    targetPath: string
+  ): Promise<CommandResult> => {
+    if (targetRuntime === 'node') {
+      const hasPackageJson = fs.existsSync(path.join(targetPath, 'package.json'));
+      if (!hasPackageJson) {
+        return {
+          exitCode: 0,
+          message: 'Node warm-up skipped: package.json not found in current directory.',
+        };
+      }
+
+      const hasPnpmLock = fs.existsSync(path.join(targetPath, 'pnpm-lock.yaml'));
+      const hasYarnLock = fs.existsSync(path.join(targetPath, 'yarn.lock'));
+
+      if (hasPnpmLock) {
+        return {
+          exitCode: await runCommandInCwd(
+            'pnpm',
+            ['install', '--lockfile-only', '--ignore-scripts'],
+            targetPath
+          ),
+        };
+      }
+      if (hasYarnLock) {
+        return {
+          exitCode: await runCommandInCwd('yarn', ['install', '--ignore-scripts'], targetPath),
+        };
+      }
+
+      return {
+        exitCode: await runCommandInCwd(
+          'npm',
+          ['install', '--package-lock-only', '--ignore-scripts'],
+          targetPath
+        ),
+      };
+    }
+
+    if (targetRuntime === 'go') {
+      const hasGoMod = fs.existsSync(path.join(targetPath, 'go.mod'));
+      if (!hasGoMod) {
+        return {
+          exitCode: 0,
+          message: 'Go warm-up skipped: go.mod not found in current directory.',
+        };
+      }
+
+      return {
+        exitCode: await runCommandInCwd('go', ['mod', 'download'], targetPath),
+      };
+    }
+
+    return {
+      exitCode: 0,
+      message: 'Dependency warm-up currently applies to node/go runtimes.',
+    };
+  };
 
   // Use system Python (no cwd) to bypass workspace-venv runner discovery.
   // Workspace-local venv rapidkit versions may have a double-print bug in doctor check;
@@ -1705,12 +1767,51 @@ export async function handleSetupCommand(args: string[]): Promise<number> {
   });
   const prereq = await adapter.checkPrereqs();
   const hints = await adapter.doctorHints(process.cwd());
+  const workspacePath = findWorkspaceUp(process.cwd());
+  const runtimePath = workspacePath || process.cwd();
 
   if (prereq.exitCode === 0) {
     console.log(chalk.green(`\u2705 ${runtime} prerequisites look good.`));
+    const otherRuntimes = ['python', 'node', 'go'].filter((r) => r !== runtime).join('/');
+    console.log(
+      chalk.gray(
+        `  Scope: validated ${runtime} runtime only. ${otherRuntimes} checks are optional unless your workspace profile uses them.`
+      )
+    );
+    if (runtime === 'python') {
+      console.log(
+        chalk.gray(
+          '  Note: Poetry is recommended, but venv/pipx-based flows are supported in workspace creation.'
+        )
+      );
+    }
+
+    if (adapter.warmSetupCache) {
+      const warm = await adapter.warmSetupCache(runtimePath);
+      if (warm.exitCode === 0) {
+        console.log(chalk.gray(`  ${runtime} cache warm-up completed.`));
+      } else {
+        console.log(chalk.yellow(`  ${runtime} cache warm-up skipped (non-fatal).`));
+      }
+    }
+
+    if (warmDeps) {
+      const depsWarmResult = await warmRuntimeDependencies(
+        runtime as 'python' | 'node' | 'go',
+        runtimePath
+      );
+      const skipped = /skipped/i.test(depsWarmResult.message || '');
+      if (depsWarmResult.message) {
+        console.log(chalk.gray(`  ${depsWarmResult.message}`));
+      }
+      if (depsWarmResult.exitCode === 0 && !skipped) {
+        console.log(chalk.gray(`  ${runtime} dependency warm-up completed (--warm-deps).`));
+      } else if (depsWarmResult.exitCode !== 0) {
+        console.log(chalk.yellow(`  ${runtime} dependency warm-up failed (non-fatal).`));
+      }
+    }
 
     // Update toolchain.lock with the detected runtime version
-    const workspacePath = findWorkspaceUp(process.cwd());
     if (workspacePath) {
       try {
         const lockPath = path.join(workspacePath, '.rapidkit', 'toolchain.lock');
@@ -3181,7 +3282,11 @@ function printHelp() {
 
   console.log(chalk.bold('Workspace commands (inside a workspace):'));
   console.log(chalk.gray('  rapidkit bootstrap [--profile <p>]   Re-bootstrap toolchains'));
-  console.log(chalk.gray('  rapidkit setup python|node|go        Set up a single runtime'));
+  console.log(
+    chalk.gray(
+      '  rapidkit setup python|node|go [--warm-deps]  Set up runtime (+ optional deps warm-up)'
+    )
+  );
   console.log(
     chalk.gray('  rapidkit mirror [status|sync|verify|rotate] Registry mirror management')
   );

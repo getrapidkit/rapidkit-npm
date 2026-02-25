@@ -72,6 +72,11 @@ jobs:
       - name: Build project
         run: npm run build
 
+      # Docs quality gates (Linux only)
+      - name: Validate docs quality
+        if: runner.os == 'Linux'
+        run: npm run validate:docs
+
       # Lint
       - name: Run linter
         run: npm run lint

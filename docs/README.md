@@ -10,6 +10,7 @@ Public documentation is split into two tracks:
 
 - **[../README.md](../README.md)** - Main project documentation, installation, and quick start
 - **[../CHANGELOG.md](../CHANGELOG.md)** - Version history and changes
+- **[SETUP.md](./SETUP.md)** - Maintainer setup, validation, and workspace smoke flow
 
 ### User Guides
 
@@ -57,6 +58,7 @@ Public documentation is split into two tracks:
 3. Review [OPTIMIZATION_GUIDE.md](./OPTIMIZATION_GUIDE.md) for improvement opportunities
 4. Check [UTILITIES.md](./UTILITIES.md) for cache/performance helpers
 5. Validate docs JSON templates with `npm run validate:docs-examples`
+6. Run full docs release checks with `npm run validate:docs`
 
 ## 📖 Documentation Structure
 
@@ -107,4 +109,16 @@ rapidkit init      # Install dependencies
 rapidkit dev       # Start dev server (port 8000)
 rapidkit test      # Run tests
 rapidkit --help    # Show all commands
+```
+
+### Workspace Runtime Lifecycle
+
+```bash
+rapidkit bootstrap --profile polyglot
+rapidkit setup python
+rapidkit setup node --warm-deps
+rapidkit setup go --warm-deps
+rapidkit doctor workspace
+rapidkit cache status
+rapidkit mirror status
 ```

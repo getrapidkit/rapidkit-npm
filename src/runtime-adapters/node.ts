@@ -112,6 +112,23 @@ export class NodeRuntimeAdapter implements RuntimeAdapter {
     return this.run('node', ['--version'], process.cwd());
   }
 
+  async warmSetupCache(projectPath: string): Promise<CommandResult> {
+    const pm = this.detectPackageManager(projectPath);
+    return this.withDependencyEnv(projectPath, pm, async () => {
+      try {
+        if (process.env.npm_config_cache) {
+          fs.mkdirSync(process.env.npm_config_cache, { recursive: true });
+        }
+        if (pm === 'pnpm' && process.env.npm_config_store_dir) {
+          fs.mkdirSync(process.env.npm_config_store_dir, { recursive: true });
+        }
+        return { exitCode: 0 };
+      } catch {
+        return { exitCode: 1, message: 'Failed to prepare Node cache directories' };
+      }
+    });
+  }
+
   async initProject(projectPath: string): Promise<CommandResult> {
     const pm = this.detectPackageManager(projectPath);
     const mode = this.resolveDependencyMode(projectPath);

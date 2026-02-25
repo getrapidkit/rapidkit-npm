@@ -84,6 +84,22 @@ export class GoRuntimeAdapter implements RuntimeAdapter {
     return this.run('go', ['version'], process.cwd());
   }
 
+  async warmSetupCache(projectPath: string): Promise<CommandResult> {
+    return this.withGoCacheEnv(projectPath, async () => {
+      try {
+        if (process.env.GOMODCACHE) {
+          fs.mkdirSync(process.env.GOMODCACHE, { recursive: true });
+        }
+        if (process.env.GOCACHE) {
+          fs.mkdirSync(process.env.GOCACHE, { recursive: true });
+        }
+        return { exitCode: 0 };
+      } catch {
+        return { exitCode: 1, message: 'Failed to prepare Go cache directories' };
+      }
+    });
+  }
+
   async initProject(projectPath: string): Promise<CommandResult> {
     return this.withGoCacheEnv(projectPath, () => this.run('go', ['mod', 'tidy'], projectPath));
   }

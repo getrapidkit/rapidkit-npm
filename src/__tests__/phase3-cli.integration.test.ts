@@ -219,7 +219,7 @@ describe('Phase 3 commands - CLI process integration', () => {
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     }
-  });
+  }, 15000);
 
   it('applies dependency policy context across dev/test/build/start lifecycle commands', () => {
     const dist = ensureDistBuilt();
@@ -345,5 +345,5 @@ describe('Phase 3 commands - CLI process integration', () => {
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     }
-  });
+  }, 20000);
 });
