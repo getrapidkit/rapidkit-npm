@@ -97,6 +97,18 @@ function buildDelegationEnvForInit(): NodeJS.ProcessEnv {
   if (!env.POETRY_PYTHON) {
     env.POETRY_PYTHON = process.platform === 'win32' ? 'python' : 'python3';
   }
+  if (!env.RAPIDKIT_SKIP_LOCK_SYNC) {
+    env.RAPIDKIT_SKIP_LOCK_SYNC = '1';
+  }
+  if (!env.POETRY_KEYRING_ENABLED) {
+    env.POETRY_KEYRING_ENABLED = 'false';
+  }
+  if (!env.PYTHON_KEYRING_BACKEND) {
+    env.PYTHON_KEYRING_BACKEND = 'keyring.backends.null.Keyring';
+  }
+  if (!env.POETRY_NO_INTERACTION) {
+    env.POETRY_NO_INTERACTION = '1';
+  }
   return env;
 }
 

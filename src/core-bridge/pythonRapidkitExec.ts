@@ -26,6 +26,18 @@ type CaptureResult = {
   stderr: string;
 };
 
+function filterNoisyInitOutput(text: string): string {
+  if (!text) return text;
+
+  const noisyPatterns = [
+    "Installed Poetry version does not support '--no-update'. Falling back to 'poetry lock'.",
+  ];
+
+  const lines = text.split(/\r?\n/);
+  const kept = lines.filter((line) => !noisyPatterns.some((pattern) => line.includes(pattern)));
+  return kept.join('\n');
+}
+
 type BridgeErrorCode =
   | 'PYTHON_NOT_FOUND'
   | 'BRIDGE_VENV_CREATE_FAILED'
@@ -902,6 +914,33 @@ export async function runCoreRapidkit(args: string[], opts?: ExecOpts): Promise<
     const runner = await resolveRapidkitRunner(opts?.cwd);
     const cmd = runner.cmd;
     const cmdArgs = [...runner.baseArgs, ...args];
+
+    const isInitCommand = args[0] === 'init';
+
+    if (isInitCommand) {
+      const res = await execa(cmd, cmdArgs, {
+        cwd: opts?.cwd,
+        env: { ...process.env, ...opts?.env },
+        reject: false,
+        stdio: 'pipe',
+      });
+
+      const filteredStdout = filterNoisyInitOutput((res.stdout ?? '').toString());
+      const filteredStderr = filterNoisyInitOutput((res.stderr ?? '').toString());
+
+      if (filteredStdout) {
+        process.stdout.write(
+          filteredStdout.endsWith('\n') ? filteredStdout : `${filteredStdout}\n`
+        );
+      }
+      if (filteredStderr) {
+        process.stderr.write(
+          filteredStderr.endsWith('\n') ? filteredStderr : `${filteredStderr}\n`
+        );
+      }
+
+      return typeof res.exitCode === 'number' ? res.exitCode : 1;
+    }
 
     const res = await execa(cmd, cmdArgs, {
       cwd: opts?.cwd,
