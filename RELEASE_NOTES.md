@@ -1,5 +1,56 @@
 # Release Notes
 
+## Latest Release: v0.24.0 (February 25, 2026)
+
+### 🧭 v0.24.0 — Windows Bridge E2E, Mirror Lifecycle Hardening, and Runtime Adapter Stability (Minor)
+
+This minor release improves cross-OS confidence (especially Windows), introduces a production-ready mirror lifecycle foundation, and hardens runtime adapter behavior for workspace bootstrap and project operations.
+
+**What's New:**
+
+- 🪟 **Windows-native CI validation**
+  - Added dedicated Windows bridge workflow to validate real bridge + workspace lifecycle in native PowerShell:
+    - `.github/workflows/windows-bridge-e2e.yml`
+  - Added/updated workspace matrix coverage file:
+    - `.github/workflows/workspace-e2e-matrix.yml`
+
+- 🪞 **Mirror lifecycle foundation + governance docs**
+  - Added mirror lifecycle engine:
+    - `src/utils/mirror.ts`
+  - Added enterprise/open-source operational docs and templates:
+    - `docs/ENTERPRISE_GOVERNANCE_RUNBOOK.md`
+    - `docs/OPEN_SOURCE_USER_SCENARIOS.md`
+    - `docs/mirror-config.enterprise.example.json`
+    - `docs/governance-policy.enterprise.example.json`
+    - `docs/policies.workspace.example.yml`
+  - Added docs example validator:
+    - `scripts/validate-doc-examples.mjs`
+
+- 🧪 **Expanded reliability test surface**
+  - Added focused mirror and scenario tests:
+    - `src/__tests__/mirror-lifecycle.unit.test.ts`
+    - `src/__tests__/mirror-evidence-export.integration.test.ts`
+    - `src/__tests__/mirror-sigstore-branches.test.ts`
+    - `src/__tests__/user-level-scenarios.integration.test.ts`
+
+- ⚙️ **Runtime adapter and bridge hardening**
+  - Improved adapter environment/caching behavior for Python, Node, and Go runtimes.
+  - Stabilized Python bridge execution environment handling in runtime adapter integration path.
+
+- 📚 **UX/docs alignment and cleanup**
+  - Continued alignment between CLI help, README, and command behavior.
+  - Removed obsolete phase-specific docs from active documentation set.
+
+**Upgrade:**
+
+```bash
+npm install -g rapidkit@0.24.0
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.24.0.md)
+
+---
+
 ## Latest Release: v0.23.1 (February 22, 2026)
 
 ### 🛠️ v0.23.1 — Audit Stabilization + Windows CI Path Fix (Patch)
@@ -241,6 +292,7 @@ npm install -g rapidkit@0.21.0
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.24.0](releases/RELEASE_NOTES_v0.24.0.md) | Feb 25, 2026 | Windows-native bridge E2E, mirror lifecycle hardening, runtime adapter stability |
 | [v0.23.1](releases/RELEASE_NOTES_v0.23.1.md) | Feb 22, 2026 | Audit stabilization, minimatch override, Windows CI path fix        |
 | [v0.23.0](releases/RELEASE_NOTES_v0.23.0.md) | Feb 22, 2026 | Workspace architecture phases 1→4, runtime/command contracts, npm global install hotfix |
 | [v0.22.0](releases/RELEASE_NOTES_v0.22.0.md) | Feb 21, 2026 | Go/Fiber + Go/Gin kits, Go command parity, Swagger DX hardening     |

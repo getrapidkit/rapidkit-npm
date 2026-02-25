@@ -97,3 +97,8 @@ export async function checkForUpdates(): Promise<void> {
 export function getVersion(): string {
   return CURRENT_VERSION;
 }
+
+export const __testables = {
+  parseVersion,
+  compareVersions,
+};

@@ -1,0 +1,15 @@
+version: "1.0"
+mode: warn
+dependency_sharing_mode: isolated
+
+rules:
+  enforce_workspace_marker: true
+  enforce_toolchain_lock: false
+  disallow_untrusted_tool_sources: false
+  enforce_compatibility_matrix: false
+  require_mirror_lock_for_offline: true
+
+# dependency_sharing_mode options:
+# - isolated               (default, safest)
+# - shared-runtime-caches  (share Node/Python/Go caches at workspace level)
+# - shared-node-deps       (compat alias for Node shared mode)

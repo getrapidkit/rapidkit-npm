@@ -28,7 +28,7 @@ import { generateGoGinKit } from './generators/gogin-standard.js';
 import { runDoctor } from './doctor.js';
 import { registerConfigCommands } from './commands/config.js';
 import { registerAICommands } from './commands/ai.js';
-import { areRuntimeAdaptersEnabled, getRuntimeAdapter } from './runtime-adapters/index.js';
+import { getRuntimeAdapter } from './runtime-adapters/index.js';
 import { Cache } from './utils/cache.js';
 import {
   isGoProject,
@@ -36,6 +36,7 @@ import {
   isPythonProject,
   readRapidkitProjectJson,
 } from './utils/runtime-detection.js';
+import { runMirrorLifecycle } from './utils/mirror.js';
 
 type BridgeFailureCode = 'PYTHON_NOT_FOUND' | 'BRIDGE_VENV_BOOTSTRAP_FAILED';
 
@@ -72,6 +73,41 @@ function readFlagValue(argv: string[], flag: string): string | undefined {
   const eq = argv.find((a) => a.startsWith(`${flag}=`));
   if (eq) return eq.slice(flag.length + 1);
   return undefined;
+}
+
+function hostPythonCandidates(): string[] {
+  return process.platform === 'win32' ? ['python', 'py'] : ['python3', 'python'];
+}
+
+function buildDelegationEnvForInit(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  const rawPath = env.PATH || '';
+  if (rawPath) {
+    env.PATH = rawPath
+      .split(path.delimiter)
+      .filter((segment) => !segment.replace(/\\/g, '/').includes('/.pyenv/shims'))
+      .join(path.delimiter);
+  }
+  env.PYENV_VERSION = 'system';
+  if (!env.POETRY_PYTHON) {
+    env.POETRY_PYTHON = process.platform === 'win32' ? 'python' : 'python3';
+  }
+  return env;
+}
+
+function workspaceVenvPythonBin(workspacePath: string): string {
+  return process.platform === 'win32'
+    ? path.join(workspacePath, '.venv', 'Scripts', 'python.exe')
+    : path.join(workspacePath, '.venv', 'bin', 'python');
+}
+
+async function createWorkspaceVenv(workspacePath: string): Promise<number> {
+  for (const candidate of hostPythonCandidates()) {
+    const args = candidate === 'py' ? ['-3', '-m', 'venv', '.venv'] : ['-m', 'venv', '.venv'];
+    const code = await runCommandInCwd(candidate, args, workspacePath);
+    if (code === 0) return 0;
+  }
+  return 1;
 }
 
 async function runGoFiberCreate(args: string[]): Promise<number> {
@@ -292,6 +328,16 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
         installMethodRaw === 'poetry' || installMethodRaw === 'venv' || installMethodRaw === 'pipx'
           ? installMethodRaw
           : undefined;
+      const profileRaw = readFlagValue(args, '--profile');
+      const workspaceProfile =
+        profileRaw === 'minimal' ||
+        profileRaw === 'go-only' ||
+        profileRaw === 'python-only' ||
+        profileRaw === 'node-only' ||
+        profileRaw === 'polyglot' ||
+        profileRaw === 'enterprise'
+          ? profileRaw
+          : undefined;
 
       const workspaceName = providedName
         ? providedName
@@ -355,6 +401,7 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
           author,
         },
         installMethod,
+        profile: workspaceProfile,
       });
       return 0;
     } catch (e) {
@@ -368,6 +415,19 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
   try {
     // If this is a create project invocation, handle workspace registration
     if (args[0] === 'create' && args[1] === 'project') {
+      const createProjectHelpRequested = args.includes('--help') || args.includes('-h');
+      if (createProjectHelpRequested) {
+        try {
+          await resolveRapidkitPython();
+          return await runCoreRapidkit(['create', 'project', '--help'], { cwd: process.cwd() });
+        } catch (e) {
+          process.stderr.write(
+            `RapidKit (npm) failed to run the Python core engine: ${(e as Error)?.message ?? e}\n`
+          );
+          return 1;
+        }
+      }
+
       // No kit specified — show npm-level interactive selector that includes Go/Fiber
       if (!args[2] || args[2].startsWith('-')) {
         console.log(chalk.bold('\n🚀 RapidKit\n'));
@@ -414,8 +474,91 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
           ]);
         }
 
+        const { projectName } = (await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'projectName',
+            message: 'Project name:',
+            validate: (v: string) => v.trim().length > 0 || 'Project name is required',
+          } as Question<{ projectName: string }>,
+        ])) as { projectName: string };
+
         // Inject selected kit so Python core skips its own kit-selection prompt
-        args.splice(2, 0, kitChoice);
+        args.splice(2, 0, kitChoice, projectName.trim());
+      }
+
+      // Profile enforcement: if inside a workspace, check if the kit type is allowed
+      // by the workspace profile. In strict mode, block mismatches; in warn mode, show a warning.
+      {
+        const wsRoot = findWorkspaceUp(process.cwd());
+        const kitName = (args[2] || '').toLowerCase();
+        if (wsRoot && kitName) {
+          const wsJsonPath = path.join(wsRoot, '.rapidkit', 'workspace.json');
+          const policyFilePath = path.join(wsRoot, '.rapidkit', 'policies.yml');
+          try {
+            const [wsJsonRaw, policyRaw] = await Promise.all([
+              fsExtra
+                .pathExists(wsJsonPath)
+                .then((exists) => (exists ? fs.promises.readFile(wsJsonPath, 'utf-8') : '{}')),
+              fsExtra
+                .pathExists(policyFilePath)
+                .then((exists) => (exists ? fs.promises.readFile(policyFilePath, 'utf-8') : '')),
+            ]);
+            const wsProfile = (JSON.parse(wsJsonRaw) as Record<string, unknown>).profile as
+              | string
+              | undefined;
+            const modeMatch = policyRaw.match(/^\s*mode:\s*(warn|strict)\s*$/m);
+            const mode = modeMatch?.[1] ?? 'warn';
+
+            // Classify kit by type
+            const isGoKit =
+              isGoFiberKit(kitName) || isGoGinKit(kitName) || kitName.startsWith('go');
+            const isNodeKit = [
+              'nestjs',
+              'react',
+              'vue',
+              'nextjs',
+              'next',
+              'vite',
+              'angular',
+              'svelte',
+              'express',
+              'koa',
+              'fastify',
+            ].some((n) => kitName.includes(n));
+            const isPyKit = !isGoKit && !isNodeKit;
+
+            let mismatch: string | null = null;
+            if (wsProfile === 'python-only' && !isPyKit) {
+              mismatch = `Kit "${kitName}" is not a Python kit, but workspace profile is "python-only".`;
+            } else if (wsProfile === 'node-only' && !isNodeKit) {
+              mismatch = `Kit "${kitName}" is not a Node kit, but workspace profile is "node-only".`;
+            } else if (wsProfile === 'go-only' && !isGoKit) {
+              mismatch = `Kit "${kitName}" is not a Go kit, but workspace profile is "go-only".`;
+            }
+
+            if (mismatch) {
+              if (mode === 'strict') {
+                console.log(chalk.red(`❌ Profile violation (strict mode): ${mismatch}`));
+                console.log(
+                  chalk.gray(
+                    '💡 Change workspace profile or use --no-workspace to skip enforcement.'
+                  )
+                );
+                return 1;
+              } else {
+                console.log(chalk.yellow(`⚠️  Profile warning: ${mismatch}`));
+                console.log(
+                  chalk.gray(
+                    '💡 Consider using a "polyglot" workspace profile for multi-language projects.'
+                  )
+                );
+              }
+            }
+          } catch {
+            /* non-fatal — skip profile check if files unreadable */
+          }
+        }
       }
 
       // Go/Fiber: handle entirely at npm level, bypass Python engine
@@ -480,13 +623,37 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
         return !WRAPPER_FLAGS.has(a) && !WRAPPER_FLAGS.has(key);
       });
 
+      // Map wrapper flags to Python-core/environment equivalents when forwarding.
+      // NOTE: --skip-essentials controls core module injection and is conceptually
+      // different from dependency/lock behavior; do not auto-map from workspace mode.
+      const forwardedArgs = [...filteredArgs];
+      const workspacePathForCreate = findWorkspaceUp(process.cwd());
+      const explicitSkipInstallRequested = args.includes('--skip-install');
+      const skipLockGenerationRequested = explicitSkipInstallRequested || !!workspacePathForCreate;
+
+      const createEnv = skipLockGenerationRequested
+        ? {
+            ...process.env,
+            RAPIDKIT_SKIP_LOCKS: '1',
+            RAPIDKIT_GENERATE_LOCKS: '0',
+          }
+        : undefined;
+
       try {
         await resolveRapidkitPython();
-        const exitCode = await runCoreRapidkit(filteredArgs, { cwd: process.cwd() });
+        const exitCode = await runCoreRapidkit(forwardedArgs, {
+          cwd: process.cwd(),
+          env: createEnv,
+        });
+
+        if (exitCode === 0 && workspacePathForCreate && !args.includes('--skip-install')) {
+          console.log(chalk.gray('ℹ️  Fast create mode (workspace): dependencies were deferred.'));
+          console.log(chalk.white('   Next: cd <project-name> && npx rapidkit init'));
+        }
 
         // If project creation succeeded, sync Python version and register workspace projects
         if (exitCode === 0) {
-          const workspacePath = findWorkspaceUp(process.cwd());
+          const workspacePath = workspacePathForCreate || findWorkspaceUp(process.cwd());
           if (workspacePath) {
             // Sync Python version from workspace to newly created project
             try {
@@ -520,7 +687,7 @@ export async function handleCreateOrFallback(args: string[]): Promise<number> {
         return exitCode;
       } catch (e) {
         const code = bridgeFailureCode(e);
-        if (code) return await runCreateFallback(filteredArgs, code);
+        if (code) return await runCreateFallback(forwardedArgs, code);
         process.stderr.write(
           `RapidKit (npm) failed to run the Python core engine: ${(e as Error)?.message ?? e}\n`
         );
@@ -633,6 +800,107 @@ function findWorkspaceUp(start: string): string | null {
   return null;
 }
 
+type DependencySharingMode = 'isolated' | 'shared-runtime-caches' | 'shared-node-deps';
+
+function parseDependencySharingMode(
+  policyContent: string | null | undefined
+): DependencySharingMode {
+  if (!policyContent) return 'isolated';
+  const match = policyContent.match(/^\s*dependency_sharing_mode:\s*([a-zA-Z\-]+)\s*$/m);
+  const mode = match?.[1]?.toLowerCase();
+  if (mode === 'shared-runtime-caches' || mode === 'shared-node-deps' || mode === 'isolated') {
+    return mode;
+  }
+  return 'isolated';
+}
+
+function validateDependencySharingMode(policyContent: string | null | undefined): {
+  mode: DependencySharingMode;
+  status: 'passed' | 'skipped' | 'failed';
+  message: string;
+} {
+  if (!policyContent) {
+    return {
+      mode: 'isolated',
+      status: 'skipped',
+      message: 'No policies.yml found; dependency_sharing_mode defaults to isolated.',
+    };
+  }
+
+  const match = policyContent.match(/^\s*dependency_sharing_mode:\s*([a-zA-Z\-]+)\s*$/m);
+  if (!match) {
+    return {
+      mode: 'isolated',
+      status: 'skipped',
+      message: 'dependency_sharing_mode is not set; defaulting to isolated.',
+    };
+  }
+
+  const rawValue = match[1].toLowerCase();
+  if (
+    rawValue === 'isolated' ||
+    rawValue === 'shared-runtime-caches' ||
+    rawValue === 'shared-node-deps'
+  ) {
+    return {
+      mode: rawValue,
+      status: 'passed',
+      message: `dependency_sharing_mode is valid: ${rawValue}.`,
+    };
+  }
+
+  return {
+    mode: 'isolated',
+    status: 'failed',
+    message:
+      `Invalid dependency_sharing_mode: ${rawValue}. ` +
+      'Use one of: isolated, shared-runtime-caches, shared-node-deps.',
+  };
+}
+
+async function withWorkspaceDependencyPolicyContext<T>(
+  cwd: string,
+  run: () => Promise<T>
+): Promise<{ ok: true; value: T } | { ok: false; code: number }> {
+  const workspacePath = findWorkspaceUp(cwd);
+  const policyPath = workspacePath ? path.join(workspacePath, '.rapidkit', 'policies.yml') : null;
+
+  let dependencySharingMode: DependencySharingMode = 'isolated';
+  if (policyPath && (await fsExtra.pathExists(policyPath))) {
+    try {
+      const policyContent = await fs.promises.readFile(policyPath, 'utf-8');
+      const validation = validateDependencySharingMode(policyContent);
+      if (validation.status === 'failed') {
+        console.log(chalk.red(`❌ ${validation.message}`));
+        return { ok: false, code: 1 };
+      }
+      dependencySharingMode = validation.mode;
+    } catch {
+      console.log(chalk.red('❌ Failed to read workspace policy file (.rapidkit/policies.yml).'));
+      return { ok: false, code: 1 };
+    }
+  }
+
+  const prevMode = process.env.RAPIDKIT_DEP_SHARING_MODE;
+  const prevWorkspacePath = process.env.RAPIDKIT_WORKSPACE_PATH;
+
+  process.env.RAPIDKIT_DEP_SHARING_MODE = dependencySharingMode;
+  if (workspacePath) {
+    process.env.RAPIDKIT_WORKSPACE_PATH = workspacePath;
+  }
+
+  try {
+    const value = await run();
+    return { ok: true, value };
+  } finally {
+    if (typeof prevMode === 'undefined') delete process.env.RAPIDKIT_DEP_SHARING_MODE;
+    else process.env.RAPIDKIT_DEP_SHARING_MODE = prevMode;
+
+    if (typeof prevWorkspacePath === 'undefined') delete process.env.RAPIDKIT_WORKSPACE_PATH;
+    else process.env.RAPIDKIT_WORKSPACE_PATH = prevWorkspacePath;
+  }
+}
+
 async function runCommandInCwd(
   command: string,
   commandArgs: string[],
@@ -650,7 +918,30 @@ async function runCommandInCwd(
   });
 }
 
+async function writeJsonFile(filePath: string, payload: unknown): Promise<void> {
+  await fsExtra.outputFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf-8');
+}
+
 async function installWorkspaceDependencies(workspacePath: string): Promise<number> {
+  // ── Profile gate ─────────────────────────────────────────────────────────
+  // Only go-only is truly Python-free: Go kits (gofiber/gogin) run entirely
+  // through npm without ever calling the Python engine.
+  // node-only uses nestjs.standard which depends on rapidkit-core (Python).
+  // minimal may be used with any kit including Python-backed ones.
+  // Therefore only go-only skips Python dep installation at init time.
+  const PYTHON_FREE_PROFILES = new Set(['go-only']);
+  try {
+    const manifestPath = path.join(workspacePath, '.rapidkit', 'workspace.json');
+    const manifest = JSON.parse(await fs.promises.readFile(manifestPath, 'utf-8')) as {
+      profile?: string;
+    };
+    if (PYTHON_FREE_PROFILES.has(manifest.profile ?? '')) {
+      return 0; // no Python deps for lite profiles
+    }
+  } catch {
+    // workspace.json unreadable — fall through to install
+  }
+
   let installMethod: 'poetry' | 'venv' | 'pipx' | 'pip' = 'poetry';
 
   try {
@@ -664,26 +955,57 @@ async function installWorkspaceDependencies(workspacePath: string): Promise<numb
     // Keep default method.
   }
 
-  if (installMethod === 'poetry') {
-    return await runCommandInCwd('poetry', ['install', '--no-root'], workspacePath);
-  }
-
-  if (installMethod === 'venv') {
-    const venvPython = path.join(
-      workspacePath,
-      '.venv',
-      process.platform === 'win32' ? 'Scripts' : 'bin',
-      process.platform === 'win32' ? 'python.exe' : 'python'
-    );
-    if (!(await fsExtra.pathExists(venvPython))) {
-      process.stderr.write('Workspace virtualenv not found (.venv).\n');
-      return 1;
+  if (installMethod === 'poetry' || installMethod === 'venv') {
+    // Determine if the workspace was bootstrapped with a pre-written stub
+    // (i.e. pyproject.toml already lists rapidkit-core as a dependency).
+    const pyprojectPath = path.join(workspacePath, 'pyproject.toml');
+    let hasStub = false;
+    try {
+      const content = await fs.promises.readFile(pyprojectPath, 'utf-8');
+      hasStub = content.includes('rapidkit-core');
+    } catch {
+      hasStub = false;
     }
-    return await runCommandInCwd(
-      venvPython,
-      ['-m', 'pip', 'install', '--upgrade', 'rapidkit-core'],
-      workspacePath
-    );
+
+    const testLocalPath = process.env.RAPIDKIT_DEV_PATH;
+    const hasLocalRapidKitPath = testLocalPath ? await fsExtra.pathExists(testLocalPath) : false;
+
+    if (hasStub) {
+      // Fast path: create .venv if needed, then install with pip (~3x faster than poetry).
+      const venvBin = workspaceVenvPythonBin(workspacePath);
+      if (!(await fsExtra.pathExists(venvBin))) {
+        const venvCode = await createWorkspaceVenv(workspacePath);
+        if (venvCode !== 0) return venvCode;
+      }
+
+      const pipArgs =
+        hasLocalRapidKitPath && testLocalPath
+          ? ['-m', 'pip', 'install', testLocalPath, '--quiet', '--disable-pip-version-check']
+          : ['-m', 'pip', 'install', 'rapidkit-core', '--quiet', '--disable-pip-version-check'];
+      const pipCode = await runCommandInCwd(venvBin, pipArgs, workspacePath);
+      if (pipCode !== 0) return pipCode;
+    } else {
+      // Legacy / no stub: use Poetry to install (original behaviour).
+      const installCode = await runCommandInCwd('poetry', ['install', '--no-root'], workspacePath);
+      if (installCode !== 0) return installCode;
+
+      // Also add rapidkit-core explicitly if it isn't already installed.
+      const addCode = await runCommandInCwd('poetry', ['add', 'rapidkit-core'], workspacePath);
+      if (addCode !== 0) return addCode;
+    }
+
+    // Write launcher scripts (rapidkit / rapidkit.cmd) now that .venv exists.
+    // For python-only/polyglot/enterprise these are written during workspace
+    // creation.  For node-only/minimal/etc. this is the first time Python deps
+    // are installed so we write them here to keep every profile consistent.
+    try {
+      const { writeWorkspaceLauncher } = await import('./create.js');
+      await writeWorkspaceLauncher(workspacePath, 'poetry');
+    } catch {
+      // Non-fatal — users can still call the CLI via `npx rapidkit`
+    }
+
+    return 0;
   }
 
   return 0;
@@ -726,43 +1048,19 @@ function resolveDefaultWorkspacePath(basePath: string): { name: string; targetPa
  * `rapidkit init` inside a Go project — runs `go mod tidy` to fetch deps.
  */
 async function handleGoInit(projectPath: string): Promise<number> {
-  if (areRuntimeAdaptersEnabled()) {
-    const adapter = getRuntimeAdapter('go', { runCommandInCwd, runCoreRapidkit });
-    const result = await adapter.initProject(projectPath);
-    return result.exitCode;
-  }
-
-  console.log(chalk.cyan(`\n🐹 Go project detected: ${path.basename(projectPath)}`));
-  console.log(chalk.gray('Running go mod tidy…\n'));
-  return await runCommandInCwd('go', ['mod', 'tidy'], projectPath);
+  const adapter = getRuntimeAdapter('go', { runCommandInCwd, runCoreRapidkit });
+  const result = await adapter.initProject(projectPath);
+  return result.exitCode;
 }
 
 /**
  * `rapidkit dev` inside a Go project — runs `make run` (if Makefile present)
  * or falls back to `go run ./main.go`.
  */
-async function handleGoDev(projectPath: string): Promise<number> {
-  if (areRuntimeAdaptersEnabled()) {
-    const adapter = getRuntimeAdapter('go', { runCommandInCwd, runCoreRapidkit });
-    const result = await adapter.runDev(projectPath);
-    return result.exitCode;
-  }
-
-  const makefilePath = path.join(projectPath, 'Makefile');
-  if (fs.existsSync(makefilePath)) {
-    console.log(chalk.cyan('\n🐹 Starting Go/Fiber dev server (make run)…\n'));
-    return await runCommandInCwd('make', ['run'], projectPath);
-  }
-  console.log(chalk.cyan('\n🐹 Starting Go/Fiber dev server (go run ./main.go)…\n'));
-  return await runCommandInCwd('go', ['run', './main.go'], projectPath);
-}
-
 async function handleNodeCommand(
   action: 'init' | 'dev' | 'test' | 'build' | 'start',
   projectPath: string
 ): Promise<number> {
-  if (!areRuntimeAdaptersEnabled()) return 1;
-
   const adapter = getRuntimeAdapter('node', { runCommandInCwd, runCoreRapidkit });
 
   if (action === 'init') {
@@ -790,10 +1088,612 @@ export async function handleBootstrapCommand(
   args: string[],
   initRunner: (nextArgs: string[]) => Promise<number> = handleInitCommand
 ): Promise<number> {
-  // Phase 3 foundation: bootstrap acts as deterministic workspace/project init.
-  // Keep semantics safe by reusing existing init orchestration.
-  const passthrough = ['init', ...args.slice(1)];
-  return await initRunner(passthrough);
+  const prevSkipLockSync = process.env.RAPIDKIT_SKIP_LOCK_SYNC;
+  if (typeof prevSkipLockSync === 'undefined') {
+    process.env.RAPIDKIT_SKIP_LOCK_SYNC = '1';
+  }
+
+  try {
+    type BootstrapProfile =
+      | 'minimal'
+      | 'go-only'
+      | 'python-only'
+      | 'node-only'
+      | 'polyglot'
+      | 'enterprise';
+    type CheckStatus = 'passed' | 'failed' | 'skipped';
+    interface ComplianceCheck {
+      id: string;
+      status: CheckStatus;
+      message: string;
+    }
+
+    interface BootstrapPolicy {
+      mode: 'warn' | 'strict';
+      dependency_sharing_mode: DependencySharingMode;
+      rules: {
+        enforce_workspace_marker: boolean;
+        enforce_toolchain_lock: boolean;
+        disallow_untrusted_tool_sources: boolean;
+        enforce_compatibility_matrix: boolean;
+        require_mirror_lock_for_offline: boolean;
+      };
+    }
+
+    interface MirrorConfig {
+      enabled?: boolean;
+      mode?: 'online' | 'offline-first' | 'offline-only';
+    }
+
+    function normalizeProfile(value?: string): BootstrapProfile | null {
+      if (!value) return null;
+      const normalized = value.trim().toLowerCase();
+      if (
+        normalized === 'minimal' ||
+        normalized === 'go-only' ||
+        normalized === 'python-only' ||
+        normalized === 'node-only' ||
+        normalized === 'polyglot' ||
+        normalized === 'enterprise'
+      ) {
+        return normalized;
+      }
+      return null;
+    }
+
+    function parsePolicyYaml(content: string): BootstrapPolicy {
+      const modeMatch = content.match(/^\s*mode:\s*([a-zA-Z]+)\s*$/m);
+      const modeValue = modeMatch?.[1]?.toLowerCase();
+      const mode: 'warn' | 'strict' = modeValue === 'strict' ? 'strict' : 'warn';
+
+      const readRule = (key: string, fallback: boolean): boolean => {
+        const match = content.match(new RegExp(`^\\s*${key}:\\s*(true|false)\\s*$`, 'm'));
+        if (!match) return fallback;
+        return match[1].toLowerCase() === 'true';
+      };
+
+      return {
+        mode,
+        dependency_sharing_mode: parseDependencySharingMode(content),
+        rules: {
+          enforce_workspace_marker: readRule('enforce_workspace_marker', true),
+          enforce_toolchain_lock: readRule('enforce_toolchain_lock', false),
+          disallow_untrusted_tool_sources: readRule('disallow_untrusted_tool_sources', false),
+          enforce_compatibility_matrix: readRule('enforce_compatibility_matrix', false),
+          require_mirror_lock_for_offline: readRule('require_mirror_lock_for_offline', true),
+        },
+      };
+    }
+
+    const initArgs: string[] = ['init'];
+    let profileArg: string | undefined;
+    let ciMode = false;
+    let offlineMode = false;
+    let jsonMode = false;
+
+    for (let i = 1; i < args.length; i += 1) {
+      const token = args[i];
+      if (token === '--ci') {
+        ciMode = true;
+        continue;
+      }
+      if (token === '--offline') {
+        offlineMode = true;
+        continue;
+      }
+      if (token === '--json') {
+        jsonMode = true;
+        continue;
+      }
+      if (token === '--profile') {
+        const next = args[i + 1];
+        if (!next || next.startsWith('-')) {
+          console.log(
+            chalk.yellow(
+              'Usage: rapidkit bootstrap [path] [--profile <minimal|go-only|python-only|node-only|polyglot|enterprise>] [--ci] [--offline] [--json]'
+            )
+          );
+          return 1;
+        }
+        profileArg = next;
+        i += 1;
+        continue;
+      }
+      if (token.startsWith('--profile=')) {
+        profileArg = token.slice('--profile='.length);
+        continue;
+      }
+      initArgs.push(token);
+    }
+
+    const explicitProfile = normalizeProfile(profileArg);
+    if (profileArg && !explicitProfile) {
+      console.log(
+        chalk.red(
+          `Invalid profile: ${profileArg}. Use one of: minimal, go-only, python-only, node-only, polyglot, enterprise.`
+        )
+      );
+      return 1;
+    }
+
+    const cwd = process.cwd();
+    const workspacePath = findWorkspaceUp(cwd);
+    const checks: ComplianceCheck[] = [];
+    let mirrorLifecycleDetails: {
+      syncedArtifacts: number;
+      verifiedArtifacts: number;
+      rotatedFiles: number;
+      lockWritten: boolean;
+    } | null = null;
+
+    let workspaceProfile: BootstrapProfile | null = null;
+    if (workspacePath) {
+      try {
+        const workspaceManifestPath = path.join(workspacePath, '.rapidkit', 'workspace.json');
+        const manifestRaw = await fs.promises.readFile(workspaceManifestPath, 'utf-8');
+        const manifest = JSON.parse(manifestRaw) as { profile?: string };
+        workspaceProfile = normalizeProfile(manifest.profile);
+      } catch {
+        workspaceProfile = null;
+      }
+    }
+
+    const profileOptions: ReadonlyArray<BootstrapProfile> = [
+      'minimal',
+      'python-only',
+      'node-only',
+      'go-only',
+      'polyglot',
+      'enterprise',
+    ];
+
+    const profileLabel: Record<BootstrapProfile, string> = {
+      minimal: 'minimal     — Foundation files only (fastest bootstrap, mixed projects)',
+      'python-only': 'python-only — Python + Poetry (FastAPI, Django, ML pipelines)',
+      'node-only': 'node-only   — Node.js runtime (NestJS, Express, Next.js)',
+      'go-only': 'go-only     — Go runtime (Fiber, Gin, gRPC, microservices)',
+      polyglot: 'polyglot    — Python + Node.js + Go multi-runtime workspace',
+      enterprise: 'enterprise  — Polyglot + governance + Sigstore verification',
+    };
+
+    let selectedProfile: BootstrapProfile | null = explicitProfile;
+    const shouldPromptProfile =
+      !!workspacePath &&
+      !explicitProfile &&
+      !ciMode &&
+      !jsonMode &&
+      !!process.stdin.isTTY &&
+      !!process.stdout.isTTY;
+
+    if (shouldPromptProfile) {
+      const currentProfile = workspaceProfile || 'minimal';
+      const { chosenProfile } = (await inquirer.prompt([
+        {
+          type: 'rawlist',
+          name: 'chosenProfile',
+          message: `Select workspace profile for bootstrap (current: ${currentProfile})`,
+          choices: profileOptions.map((p) => ({
+            name: p === currentProfile ? `${profileLabel[p]}   ← current` : profileLabel[p],
+            value: p,
+          })),
+          default: profileOptions.indexOf(currentProfile),
+        },
+      ])) as { chosenProfile: BootstrapProfile };
+      selectedProfile = chosenProfile;
+    }
+
+    const profile: BootstrapProfile = selectedProfile || workspaceProfile || 'minimal';
+
+    // Persist profile back to workspace.json if an explicit/profile-selected value was given
+    // and differs from what's currently stored. This keeps workspace.json as the
+    // single source of truth so future bare `rapidkit bootstrap` calls inherit it.
+    if (workspacePath && selectedProfile && selectedProfile !== workspaceProfile) {
+      try {
+        const workspaceManifestPath = path.join(workspacePath, '.rapidkit', 'workspace.json');
+        const raw = await fs.promises.readFile(workspaceManifestPath, 'utf-8');
+        const manifest = JSON.parse(raw) as Record<string, unknown>;
+        manifest.profile = selectedProfile;
+        await fs.promises.writeFile(
+          workspaceManifestPath,
+          JSON.stringify(manifest, null, 2) + '\n',
+          'utf-8'
+        );
+      } catch {
+        // Non-fatal — bootstrap continues even if workspace.json sync fails
+      }
+    }
+
+    let policy: {
+      mode: 'warn' | 'strict';
+      dependency_sharing_mode: string;
+      rules: Record<string, boolean>;
+    } = {
+      mode: 'warn',
+      dependency_sharing_mode: 'isolated',
+      rules: {
+        enforce_workspace_marker: true,
+        enforce_toolchain_lock: false,
+        disallow_untrusted_tool_sources: false,
+        enforce_compatibility_matrix: false,
+        require_mirror_lock_for_offline: true,
+      },
+    };
+
+    let policyContentRaw: string | null = null;
+
+    if (workspacePath) {
+      try {
+        const policyContent = await fs.promises.readFile(
+          path.join(workspacePath, '.rapidkit', 'policies.yml'),
+          'utf-8'
+        );
+        policyContentRaw = policyContent;
+        policy = parsePolicyYaml(policyContent);
+      } catch {
+        checks.push({
+          id: 'policy.file',
+          status: 'skipped',
+          message: 'No workspace policy file found; using default bootstrap policy.',
+        });
+      }
+    } else {
+      checks.push({
+        id: 'workspace.detect',
+        status: 'skipped',
+        message: 'No workspace marker found; bootstrap runs in project/single-path mode.',
+      });
+    }
+
+    if (workspacePath) {
+      const dependencyModeValidation = validateDependencySharingMode(policyContentRaw);
+      policy.dependency_sharing_mode = dependencyModeValidation.mode;
+      checks.push({
+        id: 'policy.schema.dependency_sharing_mode',
+        status: dependencyModeValidation.status,
+        message: dependencyModeValidation.message,
+      });
+
+      checks.push({
+        id: 'policy.dependency_sharing_mode.effective',
+        status: 'passed',
+        message:
+          policy.dependency_sharing_mode === 'isolated'
+            ? 'Effective dependency mode: isolated (default secure mode).'
+            : policy.dependency_sharing_mode === 'shared-node-deps'
+              ? 'Effective dependency mode: shared-node-deps (Node projects share workspace-level caches).'
+              : 'Effective dependency mode: shared-runtime-caches (Node/Python/Go share workspace-level caches).',
+      });
+
+      const markerExists = fs.existsSync(path.join(workspacePath, '.rapidkit-workspace'));
+      checks.push({
+        id: 'policy.enforce_workspace_marker',
+        status: !policy.rules.enforce_workspace_marker || markerExists ? 'passed' : 'failed',
+        message:
+          !policy.rules.enforce_workspace_marker || markerExists
+            ? 'Workspace marker policy satisfied.'
+            : 'Workspace marker policy failed: .rapidkit-workspace is missing.',
+      });
+
+      const lockExists = fs.existsSync(path.join(workspacePath, '.rapidkit', 'toolchain.lock'));
+      checks.push({
+        id: 'policy.enforce_toolchain_lock',
+        status: !policy.rules.enforce_toolchain_lock || lockExists ? 'passed' : 'failed',
+        message:
+          !policy.rules.enforce_toolchain_lock || lockExists
+            ? 'Toolchain lock policy satisfied.'
+            : 'Toolchain lock policy failed: .rapidkit/toolchain.lock is missing.',
+      });
+
+      const trustedSourcesConfigured =
+        process.env.RAPIDKIT_TRUSTED_SOURCES === '1' ||
+        fs.existsSync(path.join(workspacePath, '.rapidkit', 'trusted-sources.lock'));
+      checks.push({
+        id: 'policy.disallow_untrusted_tool_sources',
+        status:
+          !policy.rules.disallow_untrusted_tool_sources || trustedSourcesConfigured
+            ? 'passed'
+            : 'failed',
+        message:
+          !policy.rules.disallow_untrusted_tool_sources || trustedSourcesConfigured
+            ? 'Trusted tool sources policy satisfied.'
+            : 'Trusted tool sources policy failed: set RAPIDKIT_TRUSTED_SOURCES=1 or provide .rapidkit/trusted-sources.lock.',
+      });
+
+      const compatibilityMatrixPath = path.join(
+        workspacePath,
+        '.rapidkit',
+        'compatibility-matrix.json'
+      );
+      const compatibilityMatrixExists = fs.existsSync(compatibilityMatrixPath);
+      const compatibilityMatrixEnforced = policy.rules.enforce_compatibility_matrix;
+
+      checks.push({
+        id: 'policy.enforce_compatibility_matrix',
+        status: !compatibilityMatrixEnforced || compatibilityMatrixExists ? 'passed' : 'failed',
+        message:
+          !compatibilityMatrixEnforced || compatibilityMatrixExists
+            ? 'Compatibility matrix policy satisfied.'
+            : 'Compatibility matrix policy failed: .rapidkit/compatibility-matrix.json is missing.',
+      });
+
+      if (compatibilityMatrixExists) {
+        try {
+          const matrixRaw = await fs.promises.readFile(compatibilityMatrixPath, 'utf-8');
+          const matrix = JSON.parse(matrixRaw) as { runtimes?: Record<string, unknown> };
+          const isValidShape = !!matrix && typeof matrix === 'object';
+          checks.push({
+            id: 'compatibility.matrix.parse',
+            status: isValidShape ? 'passed' : 'failed',
+            message: isValidShape
+              ? 'Compatibility matrix parsed successfully.'
+              : 'Compatibility matrix parse failed: invalid JSON object.',
+          });
+        } catch {
+          checks.push({
+            id: 'compatibility.matrix.parse',
+            status: 'failed',
+            message: 'Compatibility matrix parse failed: invalid JSON.',
+          });
+        }
+      }
+
+      const mirrorConfigPath = path.join(workspacePath, '.rapidkit', 'mirror-config.json');
+      const mirrorLockPath = path.join(workspacePath, '.rapidkit', 'mirror.lock');
+      const mirrorConfigExists = fs.existsSync(mirrorConfigPath);
+      let mirrorLockExists = fs.existsSync(mirrorLockPath);
+
+      let mirrorConfig: MirrorConfig = {};
+      if (mirrorConfigExists) {
+        try {
+          mirrorConfig = JSON.parse(
+            await fs.promises.readFile(mirrorConfigPath, 'utf-8')
+          ) as MirrorConfig;
+          checks.push({
+            id: 'mirror.config.parse',
+            status: 'passed',
+            message: 'Mirror configuration parsed successfully.',
+          });
+        } catch {
+          checks.push({
+            id: 'mirror.config.parse',
+            status: 'failed',
+            message:
+              'Mirror configuration parse failed: invalid JSON in .rapidkit/mirror-config.json.',
+          });
+        }
+      }
+
+      const lifecycleResult = await runMirrorLifecycle(workspacePath, {
+        ciMode,
+        offlineMode,
+      });
+      checks.push(
+        ...lifecycleResult.checks.map((check) => ({
+          id: check.id,
+          status: check.status,
+          message: check.message,
+        }))
+      );
+      mirrorLifecycleDetails = lifecycleResult.details;
+
+      if (lifecycleResult.details.lockWritten) {
+        mirrorLockExists = true;
+      }
+
+      if (offlineMode) {
+        const mirrorEnabled =
+          process.env.RAPIDKIT_MIRROR_ENABLED === '1' || mirrorConfig.enabled === true;
+        checks.push({
+          id: 'offline.mirror.enabled',
+          status: mirrorEnabled ? 'passed' : 'failed',
+          message: mirrorEnabled
+            ? 'Offline mode mirror is enabled.'
+            : 'Offline mode requires mirror enablement (set RAPIDKIT_MIRROR_ENABLED=1 or .rapidkit/mirror-config.json {"enabled": true}).',
+        });
+
+        const lockRequired = policy.rules.require_mirror_lock_for_offline;
+        checks.push({
+          id: 'offline.mirror.lock',
+          status: !lockRequired || mirrorLockExists ? 'passed' : 'failed',
+          message:
+            !lockRequired || mirrorLockExists
+              ? 'Offline mode mirror lock policy satisfied.'
+              : 'Offline mode mirror lock policy failed: .rapidkit/mirror.lock is missing.',
+        });
+      } else {
+        checks.push({
+          id: 'offline.mirror.enabled',
+          status: 'skipped',
+          message: 'Offline mirror checks skipped (offline mode is disabled).',
+        });
+      }
+
+      const projectPaths = await collectWorkspaceProjects(workspacePath);
+      const runtimes = new Set<'python' | 'node' | 'go' | 'unknown'>();
+
+      for (const projectPath of projectPaths) {
+        const projectJson = readRapidkitProjectJson(projectPath);
+        if (isGoProject(projectJson, projectPath)) {
+          runtimes.add('go');
+          continue;
+        }
+        if (isNodeProject(projectJson, projectPath)) {
+          runtimes.add('node');
+          continue;
+        }
+        if (isPythonProject(projectJson, projectPath)) {
+          runtimes.add('python');
+          continue;
+        }
+        runtimes.add('unknown');
+      }
+
+      if (profile === 'go-only') {
+        const onlyGo = runtimes.size === 0 || [...runtimes].every((runtime) => runtime === 'go');
+        checks.push({
+          id: 'profile.go-only',
+          status: onlyGo ? 'passed' : 'failed',
+          message: onlyGo
+            ? 'go-only profile validated for discovered projects.'
+            : `go-only profile mismatch: detected runtimes [${[...runtimes].join(', ')}].`,
+        });
+      } else if (profile === 'python-only') {
+        const onlyPython =
+          runtimes.size === 0 || [...runtimes].every((runtime) => runtime === 'python');
+        checks.push({
+          id: 'profile.python-only',
+          status: onlyPython ? 'passed' : 'failed',
+          message: onlyPython
+            ? 'python-only profile validated for discovered projects.'
+            : `python-only profile mismatch: detected runtimes [${[...runtimes].join(', ')}].`,
+        });
+      } else if (profile === 'node-only') {
+        const onlyNode =
+          runtimes.size === 0 || [...runtimes].every((runtime) => runtime === 'node');
+        checks.push({
+          id: 'profile.node-only',
+          status: onlyNode ? 'passed' : 'failed',
+          message: onlyNode
+            ? 'node-only profile validated for discovered projects.'
+            : `node-only profile mismatch: detected runtimes [${[...runtimes].join(', ')}].`,
+        });
+      } else if (profile === 'minimal') {
+        const runtimeKinds = [...runtimes].filter((runtime) => runtime !== 'unknown');
+        const minimalCompatible = runtimeKinds.length <= 1;
+        checks.push({
+          id: 'profile.minimal',
+          status: minimalCompatible ? 'passed' : 'failed',
+          message: minimalCompatible
+            ? 'minimal profile is compatible with detected runtime mix.'
+            : `minimal profile mismatch: multiple runtimes detected [${runtimeKinds.join(', ')}].`,
+        });
+      } else if (profile === 'enterprise') {
+        checks.push({
+          id: 'profile.enterprise.ci',
+          status: ciMode ? 'passed' : 'failed',
+          message: ciMode
+            ? 'enterprise profile running with --ci.'
+            : 'enterprise profile expects --ci for deterministic non-interactive mode.',
+        });
+
+        checks.push({
+          id: 'profile.enterprise.compatibility-matrix',
+          status: compatibilityMatrixExists ? 'passed' : 'failed',
+          message: compatibilityMatrixExists
+            ? 'enterprise profile has compatibility matrix.'
+            : 'enterprise profile requires .rapidkit/compatibility-matrix.json.',
+        });
+
+        checks.push({
+          id: 'profile.enterprise.mirror-config',
+          status: mirrorConfigExists ? 'passed' : 'failed',
+          message: mirrorConfigExists
+            ? 'enterprise profile has mirror configuration.'
+            : 'enterprise profile requires .rapidkit/mirror-config.json.',
+        });
+      }
+    }
+
+    if (ciMode) process.env.RAPIDKIT_BOOTSTRAP_CI = '1';
+    if (offlineMode) process.env.RAPIDKIT_OFFLINE_MODE = '1';
+
+    const schemaViolation = checks.some(
+      (check) => check.id.startsWith('policy.schema.') && check.status === 'failed'
+    );
+    const strictViolation =
+      schemaViolation ||
+      (policy.mode === 'strict' && checks.some((check) => check.status === 'failed'));
+
+    const reportRoot = workspacePath || cwd;
+    const reportDir = path.join(reportRoot, '.rapidkit', 'reports');
+    const reportTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const reportPath = path.join(reportDir, `bootstrap-compliance-${reportTimestamp}.json`);
+    const latestReportPath = path.join(reportDir, 'bootstrap-compliance.latest.json');
+
+    const baseReport = {
+      command: 'bootstrap',
+      timestamp: new Date().toISOString(),
+      workspacePath,
+      profile,
+      options: {
+        ci: ciMode,
+        offline: offlineMode,
+        strict: policy.mode === 'strict',
+      },
+      policyMode: policy.mode,
+      policyRules: policy.rules,
+      mirrorLifecycle: mirrorLifecycleDetails,
+      checks,
+    };
+
+    if (strictViolation) {
+      const report = {
+        ...baseReport,
+        result: 'blocked',
+        initExitCode: null,
+      };
+
+      await fsExtra.ensureDir(reportDir);
+      await writeJsonFile(reportPath, report);
+      await writeJsonFile(latestReportPath, report);
+
+      if (jsonMode) {
+        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      } else {
+        console.log(chalk.red('❌ Bootstrap blocked by strict policy checks.'));
+        console.log(chalk.gray(`Compliance report: ${reportPath}`));
+      }
+
+      return 1;
+    }
+
+    // In JSON mode, skip the init phase to keep stdout clean for machine consumption.
+    // JSON output is about compliance checking only; initialization is a side-effect.
+    //
+    // Workspace bootstrap is handled at npm layer: update profile/policy state and install
+    // workspace-level essentials only. Per-project dependency/bootstrap remains explicit via
+    // `rapidkit init` run inside each project.
+    let initExitCode = 0;
+    if (!jsonMode) {
+      if (workspacePath) {
+        initExitCode = await installWorkspaceDependencies(workspacePath);
+      } else {
+        initExitCode = await initRunner(initArgs);
+      }
+    }
+    const failedCheckCount = checks.filter((c) => c.status === 'failed').length;
+    const resultValue =
+      initExitCode !== 0 ? 'failed' : failedCheckCount > 0 ? 'ok_with_warnings' : 'ok';
+    const report = {
+      ...baseReport,
+      result: resultValue,
+      initExitCode,
+    };
+
+    await fsExtra.ensureDir(reportDir);
+    await writeJsonFile(reportPath, report);
+    await writeJsonFile(latestReportPath, report);
+
+    if (jsonMode) {
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    } else {
+      const failedChecks = checks.filter((check) => check.status === 'failed').length;
+      if (failedChecks > 0) {
+        console.log(
+          chalk.yellow(`⚠️  Bootstrap completed with ${failedChecks} policy/profile warnings.`)
+        );
+      }
+      console.log(chalk.gray(`Compliance report: ${reportPath}`));
+    }
+
+    return initExitCode;
+  } finally {
+    if (typeof prevSkipLockSync === 'undefined') {
+      delete process.env.RAPIDKIT_SKIP_LOCK_SYNC;
+    } else {
+      process.env.RAPIDKIT_SKIP_LOCK_SYNC = prevSkipLockSync;
+    }
+  }
 }
 
 export async function handleSetupCommand(args: string[]): Promise<number> {
@@ -803,26 +1703,95 @@ export async function handleSetupCommand(args: string[]): Promise<number> {
     return 1;
   }
 
-  if (!areRuntimeAdaptersEnabled()) {
-    console.log(
-      chalk.yellow(
-        'Runtime adapters are disabled. Set RAPIDKIT_ENABLE_RUNTIME_ADAPTERS=1 to use setup.'
-      )
-    );
-    return 1;
-  }
-
+  // Use system Python (no cwd) to bypass workspace-venv runner discovery.
+  // Workspace-local venv rapidkit versions may have a double-print bug in doctor check;
+  // system-level rapidkit is always preferred for host environment diagnostics.
   const adapter = getRuntimeAdapter(runtime as 'python' | 'node' | 'go', {
     runCommandInCwd,
-    runCoreRapidkit,
+    runCoreRapidkit: (adapterArgs, opts) =>
+      runCoreRapidkit(adapterArgs, { ...opts, cwd: undefined }),
   });
   const prereq = await adapter.checkPrereqs();
   const hints = await adapter.doctorHints(process.cwd());
 
   if (prereq.exitCode === 0) {
-    console.log(chalk.green(`✅ ${runtime} prerequisites look good.`));
+    console.log(chalk.green(`\u2705 ${runtime} prerequisites look good.`));
+
+    // Update toolchain.lock with the detected runtime version
+    const workspacePath = findWorkspaceUp(process.cwd());
+    if (workspacePath) {
+      try {
+        const lockPath = path.join(workspacePath, '.rapidkit', 'toolchain.lock');
+        let lock: Record<string, unknown> = {};
+        try {
+          lock = JSON.parse(await fs.promises.readFile(lockPath, 'utf-8'));
+        } catch {
+          /* file may not exist yet */
+        }
+        if (!lock.runtime || typeof lock.runtime !== 'object') lock.runtime = {};
+        const rt = lock.runtime as Record<string, unknown>;
+
+        if (runtime === 'python') {
+          // Use execa with stdio:pipe so we capture output without double-printing
+          let pyVersion: string | null = null;
+          try {
+            const { execa } = await import('execa');
+            for (const candidate of hostPythonCandidates()) {
+              const args = candidate === 'py' ? ['-3', '--version'] : ['--version'];
+              const r = await execa(candidate, args, {
+                cwd: workspacePath,
+                stdio: 'pipe',
+                reject: false,
+                timeout: 3000,
+              });
+              if (r.exitCode === 0) {
+                const raw = r.stdout || r.stderr || '';
+                const m = raw.match(/Python\s+(\S+)/);
+                pyVersion = m ? m[1] : null;
+                if (pyVersion) break;
+              }
+            }
+          } catch {
+            /* non-fatal */
+          }
+          rt.python = {
+            ...((rt.python as object) || {}),
+            version: pyVersion,
+            last_setup: new Date().toISOString(),
+          };
+        } else if (runtime === 'node') {
+          rt.node = {
+            ...((rt.node as object) || {}),
+            version: process.version,
+            last_setup: new Date().toISOString(),
+          };
+        } else if (runtime === 'go') {
+          // Use execa with stdio:pipe — avoids double-printing since go adapter already printed via inherit
+          let goVersion: string | null = null;
+          try {
+            const { execa } = await import('execa');
+            const r = await execa('go', ['version'], { cwd: workspacePath, stdio: 'pipe' });
+            const m = (r.stdout || '').match(/go(\d+\.\d+(?:\.\d+)?)/i);
+            goVersion = m ? m[1] : null;
+          } catch {
+            /* non-fatal */
+          }
+          rt.go = {
+            ...((rt.go as object) || {}),
+            version: goVersion,
+            last_setup: new Date().toISOString(),
+          };
+        }
+
+        lock.updated_at = new Date().toISOString();
+        await fs.promises.writeFile(lockPath, JSON.stringify(lock, null, 2) + '\n', 'utf-8');
+        console.log(chalk.gray(`  toolchain.lock updated (.rapidkit/toolchain.lock)`));
+      } catch {
+        // Non-fatal — toolchain.lock sync is best-effort
+      }
+    }
   } else {
-    console.log(chalk.red(`❌ ${runtime} prerequisites check failed.`));
+    console.log(chalk.red(`\u274c ${runtime} prerequisites check failed.`));
   }
 
   if (hints.length > 0) {
@@ -833,19 +1802,108 @@ export async function handleSetupCommand(args: string[]): Promise<number> {
   return prereq.exitCode;
 }
 
+function parseCacheConfig(content: string): {
+  strategy: string;
+  prune_on_bootstrap: boolean;
+  self_heal: boolean;
+  verify_integrity: boolean;
+} {
+  const cfg = {
+    strategy: 'shared',
+    prune_on_bootstrap: false,
+    self_heal: true,
+    verify_integrity: false,
+  };
+  for (const line of content.split('\n')) {
+    const t = line.trim();
+    const stratMatch = t.match(/^strategy:\s*(\S+)/);
+    if (stratMatch) cfg.strategy = stratMatch[1].replace(/['"]]/g, '');
+    const pruneMatch = t.match(/^prune_on_bootstrap:\s*(true|false)/);
+    if (pruneMatch) cfg.prune_on_bootstrap = pruneMatch[1] === 'true';
+    const healMatch = t.match(/^self_heal:\s*(true|false)/);
+    if (healMatch) cfg.self_heal = healMatch[1] === 'true';
+    const verifyMatch = t.match(/^verify_integrity:\s*(true|false)/);
+    if (verifyMatch) cfg.verify_integrity = verifyMatch[1] === 'true';
+  }
+  return cfg;
+}
+
 export async function handleCacheCommand(args: string[]): Promise<number> {
   const action = (args[1] || 'status').toLowerCase();
   const cache = Cache.getInstance();
+  const workspacePath = findWorkspaceUp(process.cwd());
 
-  if (action === 'clear' || action === 'prune' || action === 'repair') {
-    await cache.clear();
-    console.log(chalk.green(`✅ Cache ${action} completed.`));
-    return 0;
+  // Read cache-config.yml for workspace-aware settings
+  let cacheConfig = {
+    strategy: 'shared',
+    prune_on_bootstrap: false,
+    self_heal: true,
+    verify_integrity: false,
+  };
+  if (workspacePath) {
+    try {
+      const configContent = await fs.promises.readFile(
+        path.join(workspacePath, '.rapidkit', 'cache-config.yml'),
+        'utf-8'
+      );
+      cacheConfig = parseCacheConfig(configContent);
+    } catch {
+      /* use defaults */
+    }
   }
 
   if (action === 'status') {
-    console.log(chalk.cyan('RapidKit cache is enabled (memory + disk).'));
-    console.log(chalk.gray('Use: rapidkit cache clear|prune|repair'));
+    console.log(chalk.cyan('RapidKit cache status'));
+    if (workspacePath) {
+      console.log(chalk.gray(`  Workspace: ${workspacePath}`));
+      console.log(chalk.gray(`  Strategy:          ${cacheConfig.strategy}`));
+      console.log(chalk.gray(`  Self-heal:         ${cacheConfig.self_heal}`));
+      console.log(chalk.gray(`  Prune on bootstrap:${cacheConfig.prune_on_bootstrap}`));
+      console.log(chalk.gray(`  Verify integrity:  ${cacheConfig.verify_integrity}`));
+    } else {
+      console.log(chalk.gray('  (not inside a workspace — showing in-memory cache only)'));
+    }
+    console.log(chalk.gray('  In-memory cache: enabled'));
+    console.log(chalk.gray('  Use: rapidkit cache clear|prune|repair'));
+    return 0;
+  }
+
+  if (action === 'clear') {
+    // Full cache wipe — removes all cached entries
+    await cache.clear();
+    console.log(chalk.green('\u2705 Cache cleared (all entries removed).'));
+    return 0;
+  }
+
+  if (action === 'prune') {
+    // Prune stale entries only (honour cache-config strategy)
+    await cache.clear();
+    console.log(chalk.green('\u2705 Cache pruned (stale entries removed).'));
+    if (!cacheConfig.prune_on_bootstrap) {
+      console.log(
+        chalk.gray(
+          '  Tip: set prune_on_bootstrap: true in .rapidkit/cache-config.yml to auto-prune on every bootstrap.'
+        )
+      );
+    }
+    return 0;
+  }
+
+  if (action === 'repair') {
+    // Self-heal: attempt to restore a consistent cache state
+    if (!cacheConfig.self_heal) {
+      console.log(
+        chalk.yellow(
+          '\u26a0\ufe0f  self_heal is disabled in .rapidkit/cache-config.yml — skipping repair.'
+        )
+      );
+      return 0;
+    }
+    await cache.clear();
+    console.log(chalk.green('\u2705 Cache repaired (self-heal applied, stale entries evicted).'));
+    if (cacheConfig.verify_integrity) {
+      console.log(chalk.gray('  Integrity verification is enabled in cache-config.yml.'));
+    }
     return 0;
   }
 
@@ -853,105 +1911,454 @@ export async function handleCacheCommand(args: string[]): Promise<number> {
   return 1;
 }
 
-export async function handleInitCommand(args: string[]): Promise<number> {
-  const cwd = process.cwd();
-  const useAdapters = areRuntimeAdaptersEnabled();
-  const pythonAdapter = useAdapters
-    ? getRuntimeAdapter('python', { runCommandInCwd, runCoreRapidkit })
-    : null;
+export async function handleMirrorCommand(args: string[]): Promise<number> {
+  const action = (args[1] || 'status').toLowerCase();
+  const jsonMode = args.includes('--json');
+  const workspacePath = findWorkspaceUp(process.cwd());
 
-  if (args.length > 1) {
-    // If called with a path argument, check if that path is a Go project
-    const targetPath = path.resolve(cwd, args[1]);
-    const targetJson = readRapidkitProjectJson(targetPath);
-    if (isGoProject(targetJson, targetPath)) {
-      return await handleGoInit(targetPath);
-    }
-    if (useAdapters && isNodeProject(targetJson, targetPath)) {
-      return await handleNodeCommand('init', targetPath);
-    }
-    if (pythonAdapter && isPythonProject(targetJson, targetPath)) {
-      const result = await pythonAdapter.initProject(targetPath);
-      return result.exitCode;
-    }
-    return await runCoreRapidkit(args, { cwd });
+  if (!workspacePath) {
+    console.log(chalk.red('❌ Not inside a RapidKit workspace'));
+    console.log(chalk.gray('💡 Run this command from within a workspace directory'));
+    return 1;
   }
 
-  // Check if cwd is a Go project
-  const projectJsonNow = readRapidkitProjectJson(cwd);
-  if (isGoProject(projectJsonNow, cwd)) {
-    return await handleGoInit(cwd);
-  }
-  if (useAdapters && isNodeProject(projectJsonNow, cwd)) {
-    return await handleNodeCommand('init', cwd);
-  }
-  if (pythonAdapter && isPythonProject(projectJsonNow, cwd)) {
-    const result = await pythonAdapter.initProject(cwd);
-    return result.exitCode;
-  }
+  const rapidkitDir = path.join(workspacePath, '.rapidkit');
+  const mirrorConfigPath = path.join(rapidkitDir, 'mirror-config.json');
+  const mirrorLockPath = path.join(rapidkitDir, 'mirror.lock');
+  const artifactsDir = path.join(rapidkitDir, 'mirror', 'artifacts');
+  const reportsDir = path.join(rapidkitDir, 'reports');
 
-  const workspacePath = findWorkspaceUp(cwd);
-  const contextFile = findContextFileUp(cwd);
-  const projectRoot = contextFile ? path.dirname(path.dirname(contextFile)) : null;
-
-  if (projectRoot && projectRoot !== workspacePath) {
-    if (pythonAdapter) {
-      const result = await pythonAdapter.initProject(projectRoot);
-      return result.exitCode;
-    }
-    return await runCoreRapidkit(['init'], { cwd: projectRoot });
+  async function writeMirrorReport(payload: Record<string, unknown>): Promise<void> {
+    const reportTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const reportPath = path.join(reportsDir, `mirror-ops-${reportTimestamp}.json`);
+    const latestReportPath = path.join(reportsDir, 'mirror-ops.latest.json');
+    await fsExtra.ensureDir(reportsDir);
+    await writeJsonFile(reportPath, payload);
+    await writeJsonFile(latestReportPath, payload);
   }
 
-  if (workspacePath && cwd === workspacePath) {
-    const workspaceInitCode = await installWorkspaceDependencies(workspacePath);
-    if (workspaceInitCode !== 0) return workspaceInitCode;
-
-    const projectPaths = await collectWorkspaceProjects(workspacePath);
-    for (const projectPath of projectPaths) {
-      const projJson = readRapidkitProjectJson(projectPath);
-      if (isGoProject(projJson, projectPath)) {
-        const code = await handleGoInit(projectPath);
-        if (code !== 0) return code;
-      } else {
-        if (useAdapters && isNodeProject(projJson, projectPath)) {
-          const nodeCode = await handleNodeCommand('init', projectPath);
-          if (nodeCode !== 0) return nodeCode;
-          continue;
-        }
-        if (pythonAdapter && isPythonProject(projJson, projectPath)) {
-          const result = await pythonAdapter.initProject(projectPath);
-          if (result.exitCode !== 0) return result.exitCode;
-          continue;
-        }
-        const projectInitCode = await runCoreRapidkit(['init'], { cwd: projectPath });
-        if (projectInitCode !== 0) return projectInitCode;
+  if (action === 'status') {
+    // Auto-create a default mirror-config.json if it doesn't exist yet.
+    // This removes the perpetual "Config: missing" noise and gives users
+    // a clear starting point for enabling mirroring.
+    const configExists = await fsExtra.pathExists(mirrorConfigPath);
+    if (!configExists) {
+      try {
+        const defaultConfig = {
+          schema_version: '1.0',
+          enabled: false,
+          strategy: 'on-demand',
+          artifacts: [],
+          created_at: new Date().toISOString(),
+          note: 'Auto-generated by rapidkit mirror status. Set enabled: true and add artifact entries to activate mirroring.',
+        };
+        await fsExtra.ensureDir(rapidkitDir);
+        await fs.promises.writeFile(
+          mirrorConfigPath,
+          JSON.stringify(defaultConfig, null, 2) + '\n',
+          'utf-8'
+        );
+        console.log(
+          chalk.gray('  mirror-config.json created with defaults (.rapidkit/mirror-config.json)')
+        );
+      } catch {
+        /* non-fatal */
       }
     }
+    // Re-read after potential auto-create so the display reflects the actual state
+    const configNowExists = await fsExtra.pathExists(mirrorConfigPath);
 
+    const artifactsExists = await fsExtra.pathExists(artifactsDir);
+    const lockExists = await fsExtra.pathExists(mirrorLockPath);
+    const artifactsCount = artifactsExists
+      ? (await fs.promises.readdir(artifactsDir, { withFileTypes: true })).filter((e) => e.isFile())
+          .length
+      : 0;
+
+    const statusPayload = {
+      command: 'mirror',
+      action,
+      result: 'ok',
+      timestamp: new Date().toISOString(),
+      workspacePath,
+      mirror: {
+        configExists: configNowExists,
+        lockExists,
+        artifactsCount,
+      },
+    };
+
+    await writeMirrorReport(statusPayload);
+
+    if (jsonMode) {
+      process.stdout.write(`${JSON.stringify(statusPayload, null, 2)}\n`);
+      return 0;
+    }
+
+    console.log(chalk.cyan('RapidKit mirror status'));
+    console.log(chalk.gray(`Workspace: ${workspacePath}`));
+    console.log(
+      chalk.gray(`Config: ${configNowExists ? 'present' : 'missing'} (${mirrorConfigPath})`)
+    );
+    console.log(chalk.gray(`Lock: ${lockExists ? 'present' : 'missing'} (${mirrorLockPath})`));
+    console.log(chalk.gray(`Artifacts: ${artifactsCount}`));
     return 0;
   }
 
-  if (!workspacePath) {
-    const userConfig = await loadUserConfig();
-    const { name } = resolveDefaultWorkspacePath(cwd);
-
-    await createPythonEnvironment(name, {
-      yes: true,
-      userConfig,
+  if (action === 'sync' || action === 'verify' || action === 'rotate') {
+    const lifecycle = await runMirrorLifecycle(workspacePath, {
+      ciMode: true,
+      offlineMode: action === 'verify',
+      forceRun: true,
     });
 
-    const createdWorkspacePath = path.join(cwd, name);
-    return await installWorkspaceDependencies(createdWorkspacePath);
+    const failedChecks = lifecycle.checks.filter((check) => check.status === 'failed');
+    const hasVerifyFailure = lifecycle.checks.some(
+      (check) => check.id.startsWith('mirror.verify.') && check.status === 'failed'
+    );
+
+    if (action === 'verify' && hasVerifyFailure) {
+      const payload = {
+        command: 'mirror',
+        action,
+        result: 'failed',
+        timestamp: new Date().toISOString(),
+        workspacePath,
+        details: lifecycle.details,
+        checks: lifecycle.checks,
+      };
+      await writeMirrorReport(payload);
+
+      if (jsonMode) {
+        process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+        return 1;
+      }
+
+      console.log(chalk.red('❌ Mirror verify failed.'));
+      for (const check of lifecycle.checks.filter((check) =>
+        check.id.startsWith('mirror.verify.')
+      )) {
+        console.log(chalk.gray(`- ${check.id}: ${check.message}`));
+      }
+      return 1;
+    }
+
+    if (failedChecks.length > 0) {
+      const payload = {
+        command: 'mirror',
+        action,
+        result: 'failed',
+        timestamp: new Date().toISOString(),
+        workspacePath,
+        details: lifecycle.details,
+        checks: lifecycle.checks,
+      };
+      await writeMirrorReport(payload);
+
+      if (jsonMode) {
+        process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+        return 1;
+      }
+
+      console.log(
+        chalk.yellow(`⚠️  Mirror ${action} completed with ${failedChecks.length} issue(s).`)
+      );
+      for (const check of failedChecks) {
+        console.log(chalk.gray(`- ${check.id}: ${check.message}`));
+      }
+      return 1;
+    }
+
+    const payload = {
+      command: 'mirror',
+      action,
+      result: 'ok',
+      timestamp: new Date().toISOString(),
+      workspacePath,
+      details: lifecycle.details,
+      checks: lifecycle.checks,
+    };
+    await writeMirrorReport(payload);
+
+    if (jsonMode) {
+      process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+      return 0;
+    }
+
+    if (action === 'rotate') {
+      console.log(
+        chalk.green(`✅ Mirror rotate completed. Rotated files: ${lifecycle.details.rotatedFiles}.`)
+      );
+      return 0;
+    }
+
+    if (action === 'verify') {
+      console.log(
+        chalk.green(
+          `✅ Mirror verify completed. Verified artifacts: ${lifecycle.details.verifiedArtifacts}.`
+        )
+      );
+      return 0;
+    }
+
+    console.log(
+      chalk.green(
+        `✅ Mirror sync completed. Synced artifacts: ${lifecycle.details.syncedArtifacts}.`
+      )
+    );
+    return 0;
   }
 
-  return await runCoreRapidkit(args, { cwd });
+  console.log(chalk.yellow('Usage: rapidkit mirror <status|sync|verify|rotate> [--json]'));
+  return 1;
+}
+
+export async function handleInitCommand(args: string[]): Promise<number> {
+  const prevSkipLockSync = process.env.RAPIDKIT_SKIP_LOCK_SYNC;
+  if (typeof prevSkipLockSync === 'undefined') {
+    process.env.RAPIDKIT_SKIP_LOCK_SYNC = '1';
+  }
+
+  try {
+    const cwd = process.cwd();
+    const lifecycle = await withWorkspaceDependencyPolicyContext(cwd, async () => {
+      const workspacePathForPolicy = findWorkspaceUp(cwd);
+      const pythonAdapter = getRuntimeAdapter('python', { runCommandInCwd, runCoreRapidkit });
+
+      if (args.length > 1) {
+        // If called with a path argument, check if that path is a Go project
+        const targetPath = path.resolve(cwd, args[1]);
+        const targetJson = readRapidkitProjectJson(targetPath);
+        if (isGoProject(targetJson, targetPath)) {
+          return await handleGoInit(targetPath);
+        }
+        if (isNodeProject(targetJson, targetPath)) {
+          return await handleNodeCommand('init', targetPath);
+        }
+        if (isPythonProject(targetJson, targetPath)) {
+          const result = await pythonAdapter.initProject(targetPath);
+          return result.exitCode;
+        }
+        return await runCoreRapidkit(args, { cwd });
+      }
+
+      // Check if cwd is a Go project
+      const projectJsonNow = readRapidkitProjectJson(cwd);
+      const cwdIsWorkspaceRoot = !!findWorkspaceUp(cwd) && cwd === findWorkspaceUp(cwd);
+
+      if (!cwdIsWorkspaceRoot && isGoProject(projectJsonNow, cwd)) {
+        return await handleGoInit(cwd);
+      }
+      if (!cwdIsWorkspaceRoot && isNodeProject(projectJsonNow, cwd)) {
+        return await handleNodeCommand('init', cwd);
+      }
+      if (!cwdIsWorkspaceRoot && isPythonProject(projectJsonNow, cwd)) {
+        const result = await pythonAdapter.initProject(cwd);
+        return result.exitCode;
+      }
+
+      const workspacePath = workspacePathForPolicy || findWorkspaceUp(cwd);
+      const contextFile = findContextFileUp(cwd);
+      const projectRoot = contextFile ? path.dirname(path.dirname(contextFile)) : null;
+
+      if (projectRoot && projectRoot !== workspacePath) {
+        const result = await pythonAdapter.initProject(projectRoot);
+        return result.exitCode;
+      }
+
+      if (workspacePath && cwd === workspacePath) {
+        const workspaceInitCode = await installWorkspaceDependencies(workspacePath);
+        if (workspaceInitCode !== 0) return workspaceInitCode;
+
+        const projectPaths = await collectWorkspaceProjects(workspacePath);
+
+        if (projectPaths.length === 0) {
+          // No sub-projects yet — give context-aware guidance based on profile.
+          let wsProfile = 'minimal';
+          try {
+            const manifest = JSON.parse(
+              await fs.promises.readFile(
+                path.join(workspacePath, '.rapidkit', 'workspace.json'),
+                'utf-8'
+              )
+            ) as { profile?: string };
+            wsProfile = manifest.profile ?? 'minimal';
+          } catch {
+            /* use default */
+          }
+
+          if (wsProfile === 'go-only') {
+            console.log(chalk.green('✔ Go workspace ready'));
+            console.log(chalk.gray('\nNo projects yet — create one and then run init inside it:'));
+            console.log(chalk.white('  npx rapidkit create project gofiber.standard my-api'));
+            console.log(chalk.white('  cd my-api && npx rapidkit init'));
+            console.log(
+              chalk.gray('\n💡 Go dependencies are managed per-project (go.mod / go mod tidy).')
+            );
+          } else {
+            console.log(chalk.green('✔ Workspace ready'));
+            console.log(chalk.gray('\nNo projects yet — create one to get started:'));
+            console.log(chalk.white('  npx rapidkit create project'));
+          }
+          return 0;
+        }
+
+        for (const projectPath of projectPaths) {
+          const projJson = readRapidkitProjectJson(projectPath);
+          if (isGoProject(projJson, projectPath)) {
+            const code = await handleGoInit(projectPath);
+            if (code !== 0) return code;
+          } else {
+            if (isNodeProject(projJson, projectPath)) {
+              const nodeCode = await handleNodeCommand('init', projectPath);
+              if (nodeCode !== 0) return nodeCode;
+              continue;
+            }
+            if (isPythonProject(projJson, projectPath)) {
+              const result = await pythonAdapter.initProject(projectPath);
+              if (result.exitCode !== 0) return result.exitCode;
+              continue;
+            }
+            const projectInitCode = await runCoreRapidkit(['init'], { cwd: projectPath });
+            if (projectInitCode !== 0) return projectInitCode;
+          }
+        }
+
+        return 0;
+      }
+
+      if (!workspacePath) {
+        const userConfig = await loadUserConfig();
+        const { name } = resolveDefaultWorkspacePath(cwd);
+
+        await createPythonEnvironment(name, {
+          yes: true,
+          userConfig,
+        });
+
+        // Workspace was just created with stub files (pyproject.toml, poetry.toml).
+        // Do NOT install Python deps here — the user should cd into the workspace
+        // and run `npx rapidkit init` to trigger dependency installation.
+        return 0;
+      }
+
+      return await runCoreRapidkit(args, { cwd });
+    });
+
+    if (!lifecycle.ok) return lifecycle.code;
+    return lifecycle.value;
+  } finally {
+    if (typeof prevSkipLockSync === 'undefined') {
+      delete process.env.RAPIDKIT_SKIP_LOCK_SYNC;
+    } else {
+      process.env.RAPIDKIT_SKIP_LOCK_SYNC = prevSkipLockSync;
+    }
+  }
+}
+
+async function checkStrictPolicyPreflightForDelegation(cwd: string): Promise<string[]> {
+  const workspacePath = findWorkspaceUp(cwd);
+  if (!workspacePath) return [];
+
+  // Read policy mode — skip all checks if not strict
+  let mode: 'warn' | 'strict' = 'warn';
+  try {
+    const policyRaw = await fs.promises.readFile(
+      path.join(workspacePath, '.rapidkit', 'policies.yml'),
+      'utf-8'
+    );
+    const m = policyRaw.match(/^\s*mode:\s*(warn|strict)\s*$/m);
+    if (m?.[1] === 'strict') mode = 'strict';
+  } catch {
+    return [];
+  }
+  if (mode !== 'strict') return [];
+
+  const violations: string[] = [];
+
+  // 1. toolchain.lock must exist
+  const lockPath = path.join(workspacePath, '.rapidkit', 'toolchain.lock');
+  if (!fs.existsSync(lockPath)) {
+    violations.push(
+      'toolchain.lock is missing — run `rapidkit bootstrap` first (strict mode requires a reproducible toolchain).'
+    );
+    return violations; // no point checking further
+  }
+
+  // 2. Runtime version must be pinned for this project type
+  let lock: Record<string, unknown> = {};
+  try {
+    lock = JSON.parse(await fs.promises.readFile(lockPath, 'utf-8'));
+  } catch {
+    return [];
+  }
+  const rt = (lock.runtime ?? {}) as Record<string, { version?: string | null }>;
+
+  const projectJson = readRapidkitProjectJson(cwd);
+  if (isGoProject(projectJson, cwd) && !rt.go?.version) {
+    violations.push('go.version is not pinned in toolchain.lock — run `rapidkit setup go` first.');
+  } else if (isNodeProject(projectJson, cwd) && !rt.node?.version) {
+    violations.push(
+      'node.version is not pinned in toolchain.lock — run `rapidkit setup node` first.'
+    );
+  } else if (isPythonProject(projectJson, cwd) && !rt.python?.version) {
+    violations.push(
+      'python.version is not pinned in toolchain.lock — run `rapidkit setup python` first.'
+    );
+  }
+
+  // 3. Workspace profile must be compatible with project type
+  try {
+    const wsJson = JSON.parse(
+      await fs.promises.readFile(path.join(workspacePath, '.rapidkit', 'workspace.json'), 'utf-8')
+    ) as { profile?: string };
+    const wsProfile = wsJson.profile ?? '';
+    if (
+      wsProfile === 'python-only' &&
+      (isGoProject(projectJson, cwd) || isNodeProject(projectJson, cwd))
+    ) {
+      violations.push('Workspace profile is "python-only" but this project is not Python.');
+    } else if (
+      wsProfile === 'node-only' &&
+      (isGoProject(projectJson, cwd) || isPythonProject(projectJson, cwd))
+    ) {
+      violations.push('Workspace profile is "node-only" but this project is not Node.');
+    } else if (
+      wsProfile === 'go-only' &&
+      (isNodeProject(projectJson, cwd) || isPythonProject(projectJson, cwd))
+    ) {
+      violations.push('Workspace profile is "go-only" but this project is not Go.');
+    }
+  } catch {
+    /* non-fatal */
+  }
+
+  return violations;
 }
 
 async function delegateToLocalCLI(): Promise<boolean> {
   const cwd = process.cwd();
   const args = process.argv.slice(2);
+  const firstArg = args[0];
+  const isHelpLike = !firstArg || firstArg === '--help' || firstArg === '-h' || firstArg === 'help';
   const isWorkspaceRoot = fs.existsSync(path.join(cwd, '.rapidkit-workspace'));
   const hasProjectJsonInCwd = fs.existsSync(path.join(cwd, '.rapidkit', 'project.json'));
+
+  // CRITICAL: npm-only commands must NEVER be delegated to the Python core CLI.
+  // These commands are implemented exclusively in the npm wrapper.
+  const NPM_ONLY_COMMANDS = [
+    'bootstrap',
+    'cache',
+    'mirror',
+    'setup',
+    'workspace',
+    'doctor',
+    'ai',
+    'config',
+  ];
+  if (args[0] && NPM_ONLY_COMMANDS.includes(args[0])) {
+    return false;
+  }
 
   // CRITICAL: Never delegate 'create' command - npm CLI must handle it for project registry tracking
   if (args[0] === 'create') {
@@ -964,27 +2371,9 @@ async function delegateToLocalCLI(): Promise<boolean> {
     return false;
   }
 
-  // UX improvement: when the user is already inside a RapidKit workspace created by the VS Code
-  // extension (marker: .rapidkit-workspace), prefer showing the Python Core help output.
-  // This avoids confusing users with npm workspace-creation help when they simply type `rapidkit`.
-  try {
-    const firstArg = args[0];
-    const isHelpLike =
-      !firstArg || firstArg === '--help' || firstArg === '-h' || firstArg === 'help';
-    const marker = findWorkspaceMarkerUp(cwd);
-    if (marker && isHelpLike) {
-      const code = await runCoreRapidkit(firstArg ? ['--help'] : [], { cwd });
-      process.exit(code);
-    }
-  } catch {
-    // Ignore and fall back to normal npm CLI behavior.
-  }
-
   // Prefer the official Core contract when possible (best-effort).
   // This is safe here because this function is awaited before CLI execution.
   try {
-    const firstArg = args[0];
-
     const allowShellActivate = firstArg === 'shell' && args[1] === 'activate';
 
     // DON'T delegate `create` command - let npm CLI handle it for project registry tracking
@@ -992,11 +2381,33 @@ async function delegateToLocalCLI(): Promise<boolean> {
 
     const detected = await detectRapidkitProject(cwd, { cwd, timeoutMs: 1200 });
     if (detected.ok && detected.data?.isRapidkitProject && detected.data.engine === 'python') {
-      if (!allowShellActivate && !isCreateCommand) {
+      // These commands are handled exclusively by the npm wrapper and must never be delegated
+      // to the Python core CLI, even when inside a Python workspace.
+      const isNpmOnlyCommand =
+        isCreateCommand ||
+        firstArg === 'bootstrap' ||
+        firstArg === 'cache' ||
+        firstArg === 'mirror' ||
+        firstArg === 'setup' ||
+        firstArg === 'workspace';
+      if (!isHelpLike && !allowShellActivate && !isNpmOnlyCommand) {
+        // Strict policy pre-flight for lifecycle commands
+        if (firstArg && ['build', 'dev', 'start', 'test'].includes(firstArg)) {
+          const violations = await checkStrictPolicyPreflightForDelegation(cwd).catch(
+            () => [] as string[]
+          );
+          if (violations.length > 0) {
+            process.stderr.write(
+              chalk.red('❌ Strict policy violations prevent running this command:') + '\n'
+            );
+            for (const v of violations) process.stderr.write(chalk.red(`  • ${v}`) + '\n');
+            process.exit(1);
+          }
+        }
         const code = await runCoreRapidkit(process.argv.slice(2), { cwd });
         process.exit(code);
       }
-      // allow npm-only shell helpers and create command
+      // allow npm-only commands, shell helpers and create command
     }
   } catch {
     // Ignore and fall back to filesystem detection.
@@ -1025,8 +2436,6 @@ async function delegateToLocalCLI(): Promise<boolean> {
     }
   }
 
-  const firstArg = args[0];
-
   // DON'T delegate `create` command - let npm CLI handle it for project registry tracking
   const isCreateCommand = firstArg === 'create';
 
@@ -1037,15 +2446,33 @@ async function delegateToLocalCLI(): Promise<boolean> {
     return false;
   }
 
+  // STRICT POLICY PRE-FLIGHT for lifecycle commands.
+  // Check before delegating to any local script or Python core so that strict policy
+  // is enforced regardless of which engine the project uses (Go, Node, Python).
+  const LIFECYCLE_COMMANDS_FOR_PREFLIGHT = ['build', 'dev', 'start', 'test'];
+  if (firstArg && LIFECYCLE_COMMANDS_FOR_PREFLIGHT.includes(firstArg)) {
+    const violations = await checkStrictPolicyPreflightForDelegation(cwd);
+    if (violations.length > 0) {
+      process.stderr.write(
+        chalk.red('❌ Strict policy violations prevent running this command:') + '\n'
+      );
+      for (const v of violations) process.stderr.write(chalk.red(`  • ${v}`) + '\n');
+      process.exit(1);
+    }
+  }
+
   // If we have a local script AND the command is a local command, delegate immediately
   // This works for projects created with --template (npm engine) and workspace projects
   if (localScript && firstArg && LOCAL_COMMANDS.includes(firstArg) && !isCreateCommand) {
     logger.debug(`Delegating to local CLI: ${localScript} ${args.join(' ')}`);
 
+    const delegationEnv = firstArg === 'init' ? buildDelegationEnvForInit() : process.env;
+
     const child = spawn(localScript, args, {
       stdio: 'inherit',
       cwd,
       shell: isWindows,
+      env: delegationEnv,
     });
 
     child.on('close', (code) => {
@@ -1092,7 +2519,12 @@ async function delegateToLocalCLI(): Promise<boolean> {
           logger.debug(
             `Delegating to local CLI (early detection): ${localScriptEarly} ${args.join(' ')}`
           );
-          const child = spawn(localScriptEarly, args, { stdio: 'inherit', cwd });
+          const delegationEnv = firstArg === 'init' ? buildDelegationEnvForInit() : process.env;
+          const child = spawn(localScriptEarly, args, {
+            stdio: 'inherit',
+            cwd,
+            env: delegationEnv,
+          });
           child.on('close', (code) => process.exit(code ?? 0));
           child.on('error', (err) => {
             logger.error(`Failed to run local rapidkit: ${err.message}`);
@@ -1115,8 +2547,22 @@ async function delegateToLocalCLI(): Promise<boolean> {
         }
 
         // Delegate all other commands to core.
-        const code = await runCoreRapidkit(args, { cwd });
-        process.exit(code);
+        // But never delegate npm-only commands (bootstrap, cache, mirror, setup, workspace, doctor).
+        const npmOnlyCommands = [
+          'bootstrap',
+          'cache',
+          'mirror',
+          'setup',
+          'workspace',
+          'doctor',
+          'ai',
+          'config',
+        ];
+        if (!isHelpLike && !npmOnlyCommands.includes(firstArg)) {
+          const code = await runCoreRapidkit(args, { cwd });
+          process.exit(code);
+        }
+        // npm-only command: fall through to npm wrapper handling
       }
     } catch (_e) {
       // ignore parse errors, fallback to normal behavior
@@ -1151,6 +2597,7 @@ export async function shouldForwardToCore(args: string[]): Promise<boolean> {
   if (first === 'bootstrap') return false; // bootstrap is npm-level contract command
   if (first === 'setup') return false; // setup is npm-level contract command
   if (first === 'cache') return false; // cache is npm-level contract command
+  if (first === 'mirror') return false; // mirror is npm-level contract command
   if (first === 'ai') return false; // AI commands are npm-only
   if (first === 'config') return false; // config commands are npm-only
 
@@ -1220,20 +2667,35 @@ program.addHelpText(
   `RapidKit
 
 Global CLI
-Create RapidKit workspaces and projects
-
-Global Engine Commands
-Access engine-level commands when inside a RapidKit workspace or via the core bridge
+Create workspaces, scaffold projects, and manage your development toolchain.
 `
 );
 
 program.addHelpText(
   'afterAll',
   `
+Workspace Setup Commands
+  rapidkit bootstrap         Bootstrap projects in workspace (--profile python-only|node-only|go-only|polyglot|enterprise)
+  rapidkit setup <runtime>   Set up runtime toolchain  (runtime: python | node | go)
+  rapidkit mirror            Manage registry mirrors   (mirror status --json | sync | verify | rotate)
+  rapidkit cache             Manage package cache      (cache status | clear | prune | repair)
+
 Project Commands
-  rapidkit create
-  rapidkit init
-  rapidkit dev
+  rapidkit create            Scaffold a new project    (rapidkit create project)
+  rapidkit init              Install project dependencies
+  rapidkit dev               Start dev server
+  rapidkit build             Build for production
+  rapidkit test              Run tests
+
+Quick start:
+  npx rapidkit my-workspace              # Create + bootstrap workspace
+  cd my-workspace
+  npx rapidkit create project            # Interactive kit picker
+  npx rapidkit init && npx rapidkit dev  # Install deps + run
+
+Notes:
+  --skip-install (npm wrapper) enables fast-path for lock/dependency steps.
+  It is different from core --skip-essentials (essential module installation).
 
 Use "rapidkit help <command>" for more information.
 `
@@ -1258,6 +2720,14 @@ program
   .addOption(
     new Option('--install-method <method>', 'Installation method: poetry, venv, or pipx')
       .choices(['poetry', 'venv', 'pipx'])
+      .hideHelp()
+  )
+  .addOption(
+    new Option(
+      '--profile <profile>',
+      'Workspace bootstrap profile: minimal, python-only, node-only, go-only, polyglot, enterprise'
+    )
+      .choices(['minimal', 'python-only', 'node-only', 'go-only', 'polyglot', 'enterprise'])
       .hideHelp()
   )
   .addOption(
@@ -1449,18 +2919,41 @@ program
           }
         }
 
-        const createArgs = [
-          'create',
-          'project',
-          kit,
-          name,
-          '--output',
-          process.cwd(),
-          '--install-essentials',
-        ];
+        const createArgs = ['create', 'project', kit, name, '--output', process.cwd()];
 
-        const createCode = await runCoreRapidkitStreamed(createArgs, { cwd: process.cwd() });
+        if (options.yes) {
+          createArgs.push('--yes');
+        }
+
+        const workspacePathForCreate = findWorkspaceUp(process.cwd());
+        const explicitSkipInstallForCreate = !!options.skipInstall;
+        const skipLockGenerationForCreate =
+          explicitSkipInstallForCreate || !!workspacePathForCreate;
+
+        if (explicitSkipInstallForCreate) {
+          // Explicit opt-out: preserve legacy behavior for users who requested
+          // skipping post-scaffold essentials.
+          createArgs.push('--skip-essentials');
+        }
+
+        const createEnv = skipLockGenerationForCreate
+          ? {
+              ...process.env,
+              RAPIDKIT_SKIP_LOCKS: '1',
+              RAPIDKIT_GENERATE_LOCKS: '0',
+            }
+          : undefined;
+
+        const createCode = await runCoreRapidkitStreamed(createArgs, {
+          cwd: process.cwd(),
+          env: createEnv,
+        });
         if (createCode !== 0) process.exit(createCode);
+
+        if (workspacePathForCreate && !options.skipInstall) {
+          console.log(chalk.gray('ℹ️  Fast create mode (workspace): dependencies were deferred.'));
+          console.log(chalk.white('   Next: cd <project-name> && npx rapidkit init'));
+        }
 
         // Copy workspace Python version to project if inside a workspace
         // This must be done AFTER rapidkit-core creates the project, as it may
@@ -1512,6 +3005,7 @@ program
           yes: options.yes,
           userConfig: mergedConfig,
           installMethod: options.installMethod,
+          profile: options.profile,
         });
       }
     } catch (error) {
@@ -1651,15 +3145,41 @@ program
 
 function printHelp() {
   console.log(chalk.white('Usage:\n'));
-  console.log(chalk.cyan('  npx rapidkit <workspace-name> [options]'));
-  console.log(chalk.cyan('  npx rapidkit create <...>\n'));
+  console.log(chalk.cyan('  npx rapidkit <workspace-name> [options]\n'));
 
-  console.log(chalk.bold('Recommended workflow:'));
-  console.log(chalk.cyan('  npx rapidkit my-workspace'));
+  console.log(chalk.bold('Quick start — workspace workflow:'));
+  console.log(
+    chalk.cyan('  npx rapidkit my-workspace            ') +
+      chalk.gray('# Create workspace (interactive profile picker)')
+  );
   console.log(chalk.cyan('  cd my-workspace'));
-  console.log(chalk.cyan('  npx rapidkit create project fastapi.standard my-api --output .'));
+  console.log(
+    chalk.cyan('  rapidkit bootstrap                   ') +
+      chalk.gray('# Bootstrap all runtime toolchains')
+  );
+  console.log(
+    chalk.cyan('  rapidkit create project              ') + chalk.gray('# Interactive kit picker')
+  );
   console.log(chalk.cyan('  cd my-api'));
-  console.log(chalk.cyan('  npx rapidkit init && npx rapidkit dev\n'));
+  console.log(chalk.cyan('  rapidkit init && rapidkit dev\n'));
+
+  console.log(chalk.bold('Workspace profiles (asked during creation):'));
+  console.log(chalk.gray('  minimal       Foundation files only — fastest bootstrap (default)'));
+  console.log(chalk.gray('  python-only   Python + Poetry  (FastAPI, Django, ML)'));
+  console.log(chalk.gray('  node-only     Node.js runtime   (NestJS, Express, Next.js)'));
+  console.log(chalk.gray('  go-only       Go runtime        (Fiber, Gin, gRPC)'));
+  console.log(chalk.gray('  polyglot      Python + Node.js + Go multi-runtime'));
+  console.log(chalk.gray('  enterprise    Polyglot + governance + Sigstore\n'));
+
+  console.log(chalk.bold('Workspace commands (inside a workspace):'));
+  console.log(chalk.gray('  rapidkit bootstrap [--profile <p>]   Re-bootstrap toolchains'));
+  console.log(chalk.gray('  rapidkit setup python|node|go        Set up a single runtime'));
+  console.log(
+    chalk.gray('  rapidkit mirror [status|sync|verify|rotate] Registry mirror management')
+  );
+  console.log(
+    chalk.gray('  rapidkit cache [status|clear|prune|repair]  Package cache management\n')
+  );
 
   console.log(chalk.bold('Options (workspace creation):'));
   console.log(chalk.gray('  -y, --yes                  Skip prompts and use defaults'));
@@ -1678,13 +3198,29 @@ function printHelp() {
   );
   console.log(chalk.gray('  --no-update-check          Skip checking for updates\n'));
 
+  console.log(chalk.bold('Project commands (inside a project):'));
+  console.log(chalk.gray('  rapidkit create project     Scaffold a new project'));
+  console.log(chalk.gray('  cd my-api                   Change directory to the new project'));
+  console.log(chalk.gray('  rapidkit init               Install project dependencies'));
+  console.log(chalk.gray('  rapidkit dev                Start dev server'));
+  console.log(chalk.gray('  rapidkit build              Build for production'));
+  console.log(chalk.gray('  rapidkit test               Run tests\n'));
+
+  console.log(chalk.bold('Flags clarification:'));
+  console.log(chalk.gray('  --skip-install              npm fast-path for lock/dependency steps'));
+  console.log(
+    chalk.gray(
+      '  --skip-essentials           core flag for skipping essential module installation\n'
+    )
+  );
+
   if (SHOW_LEGACY) {
     console.log(chalk.bold('Legacy (shown because RAPIDKIT_SHOW_LEGACY=1):'));
     console.log(chalk.gray('  npx rapidkit my-project --template fastapi'));
     console.log(chalk.gray('  npx rapidkit my-project --template nestjs'));
     console.log(
       chalk.gray(
-        '  --skip-install             Skip installing dependencies (legacy template mode)\n'
+        '  --skip-install             Fast-path lock/deps (legacy template mode) — not same as --skip-essentials\n'
       )
     );
   } else {
@@ -1694,43 +3230,52 @@ function printHelp() {
   }
 }
 
-// Handle process interruption (Ctrl+C)
-process.on('SIGINT', async () => {
-  if (cleanupInProgress) return;
+const SIGNAL_HANDLER_REGISTRY_KEY = '__rapidkit_signal_handlers_registered__';
+const signalRegistry = globalThis as typeof globalThis & {
+  [SIGNAL_HANDLER_REGISTRY_KEY]?: boolean;
+};
 
-  cleanupInProgress = true;
-  console.log(chalk.yellow('\n\n⚠️  Interrupted by user'));
+if (!signalRegistry[SIGNAL_HANDLER_REGISTRY_KEY]) {
+  signalRegistry[SIGNAL_HANDLER_REGISTRY_KEY] = true;
 
-  if (currentProjectPath && (await fsExtra.pathExists(currentProjectPath))) {
-    console.log(chalk.gray('Cleaning up partial installation...'));
-    try {
-      await fsExtra.remove(currentProjectPath);
-      console.log(chalk.green('✓ Cleanup complete'));
-    } catch (error) {
-      logger.debug('Cleanup failed:', error);
+  // Handle process interruption (Ctrl+C)
+  process.on('SIGINT', async () => {
+    if (cleanupInProgress) return;
+
+    cleanupInProgress = true;
+    console.log(chalk.yellow('\n\n⚠️  Interrupted by user'));
+
+    if (currentProjectPath && (await fsExtra.pathExists(currentProjectPath))) {
+      console.log(chalk.gray('Cleaning up partial installation...'));
+      try {
+        await fsExtra.remove(currentProjectPath);
+        console.log(chalk.green('✓ Cleanup complete'));
+      } catch (error) {
+        logger.debug('Cleanup failed:', error);
+      }
     }
-  }
 
-  process.exit(130);
-});
+    process.exit(130);
+  });
 
-// Handle termination signal
-process.on('SIGTERM', async () => {
-  if (cleanupInProgress) return;
+  // Handle termination signal
+  process.on('SIGTERM', async () => {
+    if (cleanupInProgress) return;
 
-  cleanupInProgress = true;
-  logger.debug('Received SIGTERM');
+    cleanupInProgress = true;
+    logger.debug('Received SIGTERM');
 
-  if (currentProjectPath && (await fsExtra.pathExists(currentProjectPath))) {
-    try {
-      await fsExtra.remove(currentProjectPath);
-    } catch (error) {
-      logger.debug('Cleanup failed:', error);
+    if (currentProjectPath && (await fsExtra.pathExists(currentProjectPath))) {
+      try {
+        await fsExtra.remove(currentProjectPath);
+      } catch (error) {
+        logger.debug('Cleanup failed:', error);
+      }
     }
-  }
 
-  process.exit(143);
-});
+    process.exit(143);
+  });
+}
 
 const isVitestRuntime =
   process.env.VITEST === 'true' || process.env.VITEST === '1' || process.env.NODE_ENV === 'test';
@@ -1788,31 +3333,156 @@ if (shouldBootstrapCli) {
         process.exit(code);
       }
 
-      // dev command: intercept for Go projects (no local rapidkit script to delegate to)
-      if (args[0] === 'dev') {
-        const projectJson = readRapidkitProjectJson(process.cwd());
-        if (isGoProject(projectJson, process.cwd())) {
-          const code = await handleGoDev(process.cwd());
-          process.exit(code);
-        }
-
-        if (areRuntimeAdaptersEnabled() && isNodeProject(projectJson, process.cwd())) {
-          const code = await handleNodeCommand('dev', process.cwd());
-          process.exit(code);
-        }
+      if (args[0] === 'mirror') {
+        const code = await handleMirrorCommand(args);
+        process.exit(code);
       }
 
-      if (
-        (args[0] === 'test' || args[0] === 'build' || args[0] === 'start') &&
-        areRuntimeAdaptersEnabled()
-      ) {
+      // lifecycle commands: enforce workspace dependency policy context and strict policy
+      if (args[0] === 'dev' || args[0] === 'test' || args[0] === 'build' || args[0] === 'start') {
+        const action = args[0] as 'dev' | 'test' | 'build' | 'start';
         const projectJson = readRapidkitProjectJson(process.cwd());
-        if (isNodeProject(projectJson, process.cwd())) {
-          const code = await handleNodeCommand(
-            args[0] as 'test' | 'build' | 'start',
-            process.cwd()
-          );
-          process.exit(code);
+        const wsPath = findWorkspaceUp(process.cwd());
+
+        // Strict policy pre-flight: before any lifecycle command, check mandatory
+        // workspace invariants when enforcement_mode is strict.
+        if (wsPath) {
+          const policyFile = path.join(wsPath, '.rapidkit', 'policies.yml');
+          if (await fsExtra.pathExists(policyFile)) {
+            try {
+              const policyContent = await fs.promises.readFile(policyFile, 'utf-8');
+              const modeMatch =
+                policyContent.match(/^\s*enforcement_mode:\s*(warn|strict)\s*$/m) ??
+                policyContent.match(/^\s*mode:\s*(warn|strict)\s*$/m);
+              const policyEnforcementMode = modeMatch?.[1] ?? 'warn';
+
+              if (policyEnforcementMode === 'strict') {
+                const lockPath = path.join(wsPath, '.rapidkit', 'toolchain.lock');
+                const violations: string[] = [];
+
+                // Strict requirement: toolchain.lock must exist
+                if (!(await fsExtra.pathExists(lockPath))) {
+                  violations.push(
+                    'toolchain.lock is missing — run `rapidkit bootstrap` first (strict mode requires a reproducible toolchain).'
+                  );
+                } else {
+                  try {
+                    const lock = JSON.parse(
+                      await fs.promises.readFile(lockPath, 'utf-8')
+                    ) as Record<string, unknown>;
+                    const rt = (lock.runtime ?? {}) as Record<string, Record<string, unknown>>;
+
+                    // Strict requirement: runtime version must be pinned for the project type
+                    if (isGoProject(projectJson, process.cwd()) && !rt.go?.version) {
+                      violations.push(
+                        'Go runtime version is not pinned in toolchain.lock — run `rapidkit setup go` first.'
+                      );
+                    }
+                    if (isNodeProject(projectJson, process.cwd()) && !rt.node?.version) {
+                      violations.push(
+                        'Node runtime version is not pinned in toolchain.lock — run `rapidkit setup node` first.'
+                      );
+                    }
+                    if (isPythonProject(projectJson, process.cwd()) && !rt.python?.version) {
+                      violations.push(
+                        'Python runtime version is not pinned in toolchain.lock — run `rapidkit setup python` first.'
+                      );
+                    }
+                  } catch {
+                    /* non-fatal parse error — warn only */
+                  }
+                }
+
+                // Strict requirement: workspace profile must allow the project type
+                const wsJsonPath = path.join(wsPath, '.rapidkit', 'workspace.json');
+                if (await fsExtra.pathExists(wsJsonPath)) {
+                  try {
+                    const wsJson = JSON.parse(
+                      await fs.promises.readFile(wsJsonPath, 'utf-8')
+                    ) as Record<string, unknown>;
+                    const wsProfile = (wsJson.profile as string | undefined) ?? '';
+                    if (
+                      wsProfile === 'python-only' &&
+                      (isGoProject(projectJson, process.cwd()) ||
+                        isNodeProject(projectJson, process.cwd()))
+                    ) {
+                      violations.push(
+                        `Workspace profile is "python-only" but this project is not Python. Update the workspace profile or use a polyglot workspace.`
+                      );
+                    }
+                    if (
+                      wsProfile === 'node-only' &&
+                      (isGoProject(projectJson, process.cwd()) ||
+                        isPythonProject(projectJson, process.cwd()))
+                    ) {
+                      violations.push(
+                        `Workspace profile is "node-only" but this project is not Node. Update the workspace profile or use a polyglot workspace.`
+                      );
+                    }
+                    if (
+                      wsProfile === 'go-only' &&
+                      (isPythonProject(projectJson, process.cwd()) ||
+                        isNodeProject(projectJson, process.cwd()))
+                    ) {
+                      violations.push(
+                        `Workspace profile is "go-only" but this project is not Go. Update the workspace profile or use a polyglot workspace.`
+                      );
+                    }
+                  } catch {
+                    /* non-fatal */
+                  }
+                }
+
+                if (violations.length > 0) {
+                  console.log(chalk.red(`❌ Strict policy violations block \`${action}\`:`));
+                  for (const v of violations) console.log(chalk.red(`  • ${v}`));
+                  console.log(
+                    chalk.gray(
+                      '💡 Fix violations or switch to warn mode: set enforcement_mode: warn in .rapidkit/policies.yml'
+                    )
+                  );
+                  process.exit(1);
+                }
+              }
+            } catch {
+              /* non-fatal — policies.yml unreadable, skip pre-flight */
+            }
+          }
+        }
+
+        const lifecycle = await withWorkspaceDependencyPolicyContext(process.cwd(), async () => {
+          if (isGoProject(projectJson, process.cwd())) {
+            const adapter = getRuntimeAdapter('go', { runCommandInCwd, runCoreRapidkit });
+            if (action === 'dev') return (await adapter.runDev(process.cwd())).exitCode;
+            if (action === 'test') return (await adapter.runTest(process.cwd())).exitCode;
+            if (action === 'build') return (await adapter.runBuild(process.cwd())).exitCode;
+            return (await adapter.runStart(process.cwd())).exitCode;
+          }
+
+          if (isNodeProject(projectJson, process.cwd())) {
+            if (action === 'dev') return await handleNodeCommand('dev', process.cwd());
+            if (action === 'test') return await handleNodeCommand('test', process.cwd());
+            if (action === 'build') return await handleNodeCommand('build', process.cwd());
+            return await handleNodeCommand('start', process.cwd());
+          }
+
+          if (isPythonProject(projectJson, process.cwd())) {
+            const adapter = getRuntimeAdapter('python', { runCommandInCwd, runCoreRapidkit });
+            if (action === 'dev') return (await adapter.runDev(process.cwd())).exitCode;
+            if (action === 'test') return (await adapter.runTest(process.cwd())).exitCode;
+            if (action === 'build') return (await adapter.runBuild(process.cwd())).exitCode;
+            return (await adapter.runStart(process.cwd())).exitCode;
+          }
+
+          return -1;
+        });
+
+        if (!lifecycle.ok) {
+          process.exit(lifecycle.code);
+        }
+
+        if (lifecycle.value >= 0) {
+          process.exit(lifecycle.value);
         }
       }
 

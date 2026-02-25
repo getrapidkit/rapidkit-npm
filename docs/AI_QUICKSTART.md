@@ -30,7 +30,7 @@ Select option 1, provide your OpenAI API key, and you're done! 🎉
 
 1. Visit [OpenAI Platform](https://platform.openai.com/api-keys)
 2. Click "Create new secret key"
-3. Copy your key (starts with `sk-proj-...`)
+3. Copy your key
 
 ### Step 2: Configure Key (30 seconds)
 
@@ -41,10 +41,10 @@ npx rapidkit config set-api-key
 
 Or set as environment variable:
 ```bash
-export OPENAI_API_KEY="sk-proj-..."
+export OPENAI_API_KEY="<YOUR_OPENAI_API_KEY>"
 ```
 
-### Step 3: Generate Embeddings (1 minute, $0.50)
+### Step 3: Generate Embeddings (typically about a minute, provider-cost dependent)
 
 ```bash
 npx rapidkit ai generate-embeddings
@@ -54,10 +54,10 @@ You'll see:
 ```
 🤖 Generating AI embeddings for RapidKit modules...
 📡 Fetching modules from RapidKit...
-✓ Found 27 modules
+✓ Found <N> modules
 
-💰 Estimated cost: ~$0.500
-   (Based on 27 modules at $0.02/1M tokens)
+💰 Estimated cost: shown by CLI at runtime
+   (depends on current provider pricing and module count)
 
 ? Generate embeddings now? Yes
 ```
@@ -203,11 +203,11 @@ npx rapidkit config show
 
 | Item | Cost | When |
 |------|------|------|
-| Setup (embeddings) | ~$0.50 | One-time only |
-| Per query | ~$0.0002 | Every query |
-| 1,000 queries | ~$0.20 | After setup |
+| Setup (embeddings) | Varies | One-time only |
+| Per query | Varies | Every query |
+| Ongoing usage | Varies | After setup |
 
-**Total to get started: $0.50** (lasts forever!)
+**Note:** pricing changes over time. Check your provider dashboard for current rates.
 
 ## ❓ Troubleshooting
 

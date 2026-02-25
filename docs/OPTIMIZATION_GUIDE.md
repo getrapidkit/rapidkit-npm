@@ -1,4 +1,11 @@
-# create-rapidkit Optimization Suggestions
+# Optimization Guide
+
+> Optimization ideas and implementation patterns for the RapidKit npm CLI codebase.
+>
+> For end-user documentation, use:
+> - `../README.md`
+> - `docs/OPEN_SOURCE_USER_SCENARIOS.md`
+> - `docs/AI_QUICKSTART.md`
 
 ## 1. Performance Optimizations
 

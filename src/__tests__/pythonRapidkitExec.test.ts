@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import * as fsExtra from 'fs-extra';
 import { execa } from 'execa';
+import { EventEmitter } from 'events';
+
+const { spawnMock } = vi.hoisted(() => ({
+  spawnMock: vi.fn(),
+}));
 
 vi.mock('execa', () => ({
   execa: vi.fn(),
@@ -17,6 +22,10 @@ vi.mock('fs-extra', async () => {
     ensureDir: vi.fn(),
   };
 });
+
+vi.mock('child_process', () => ({
+  spawn: spawnMock,
+}));
 
 const mockExeca = execa as unknown as Mock;
 const mockFs = fsExtra as unknown as {
@@ -60,6 +69,23 @@ Commands:
     it('returns empty set if nothing found', () => {
       const res = bridge.__test__.parseCoreCommandsFromHelp('nothing here');
       expect(res.size).toBe(0);
+    });
+
+    it('ignores section headers/options and keeps command names', () => {
+      const help = `
+Usage: rapidkit [OPTIONS] COMMAND [ARGS]...
+
+Commands:
+  list      list kits
+  --help    show help
+Options:
+  -h, --help  Show this message and exit.
+rapidkit deploy
+`;
+      const res = bridge.__test__.parseCoreCommandsFromHelp(help);
+      expect(res.has('list')).toBe(true);
+      expect(res.has('--help')).toBe(false);
+      expect(res.has('Options')).toBe(false);
     });
   });
 
@@ -174,6 +200,78 @@ describe('public API', () => {
     const code = await bridge.runCoreRapidkit(['list']);
     expect(code).toBe(1);
   });
+
+  it('runCoreRapidkitStreamed maps known RapidKitError to friendly message', async () => {
+    mockExeca.mockImplementation(async (_cmd: string, args?: string[]) => {
+      if (args?.[0] === '--version') return { exitCode: 0, stdout: 'Python 3.11', stderr: '' };
+      if (args?.[0] === '-c' && args?.[1]?.includes('sysconfig'))
+        return { exitCode: 0, stdout: '', stderr: '' };
+      if (args?.[0] === '-c' && args?.[1]?.includes("find_spec('rapidkit')"))
+        return { exitCode: 0, stdout: '1', stderr: '' };
+      if (args?.[0] === '-m' && args?.[1] === 'rapidkit') {
+        return { exitCode: 0, stdout: '{"version":"1.0.0"}', stderr: '' };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    mockFs.pathExists.mockResolvedValue(false);
+
+    const child = new EventEmitter() as EventEmitter & { stderr: EventEmitter };
+    child.stderr = new EventEmitter();
+    spawnMock.mockImplementation(() => {
+      setImmediate(() => {
+        child.stderr.emit(
+          'data',
+          Buffer.from("RapidKitError: Directory '/tmp/demo' exists and force is not set")
+        );
+        child.emit('close', 2);
+      });
+      return child;
+    });
+
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    const code = await bridge.runCoreRapidkitStreamed(['create', 'demo']);
+    expect(code).toBe(2);
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Directory "demo" already exists')
+    );
+
+    stderrSpy.mockRestore();
+  });
+
+  it('runCoreRapidkitStreamed returns 1 when spawn emits error', async () => {
+    mockExeca.mockImplementation(async (_cmd: string, args?: string[]) => {
+      if (args?.[0] === '--version') return { exitCode: 0, stdout: 'Python 3.11', stderr: '' };
+      if (args?.[0] === '-c' && args?.[1]?.includes('sysconfig'))
+        return { exitCode: 0, stdout: '', stderr: '' };
+      if (args?.[0] === '-c' && args?.[1]?.includes("find_spec('rapidkit')"))
+        return { exitCode: 0, stdout: '1', stderr: '' };
+      if (args?.[0] === '-m' && args?.[1] === 'rapidkit') {
+        return { exitCode: 0, stdout: '{"version":"1.0.0"}', stderr: '' };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    mockFs.pathExists.mockResolvedValue(false);
+
+    const child = new EventEmitter() as EventEmitter & { stderr: EventEmitter };
+    child.stderr = new EventEmitter();
+    spawnMock.mockImplementation(() => {
+      setImmediate(() => {
+        child.emit('error', new Error('spawn failed'));
+      });
+      return child;
+    });
+
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    const code = await bridge.runCoreRapidkitStreamed(['list']);
+    expect(code).toBe(1);
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining('failed to run the Python core engine: spawn failed')
+    );
+
+    stderrSpy.mockRestore();
+  });
 });
 
 describe('resolveRapidkitPython', () => {
@@ -285,6 +383,30 @@ describe('getCachedCoreTopLevelCommands', () => {
 
     const res = await bridge.getCachedCoreTopLevelCommands();
     expect(res?.has('list')).toBe(true);
+  });
+
+  it('returns null when cache is stale', async () => {
+    mockFs.pathExists.mockResolvedValue(true);
+    mockFs.readJson.mockResolvedValue({
+      schema_version: 1,
+      fetched_at: Date.now() - 25 * 60 * 60 * 1000,
+      commands: ['list'],
+    });
+
+    const res = await bridge.getCachedCoreTopLevelCommands();
+    expect(res).toBeNull();
+  });
+
+  it('returns null when cache has empty commands', async () => {
+    mockFs.pathExists.mockResolvedValue(true);
+    mockFs.readJson.mockResolvedValue({
+      schema_version: 1,
+      fetched_at: Date.now(),
+      commands: [],
+    });
+
+    const res = await bridge.getCachedCoreTopLevelCommands();
+    expect(res).toBeNull();
   });
 });
 

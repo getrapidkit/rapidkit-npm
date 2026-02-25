@@ -5,7 +5,15 @@ import * as fsExtra from 'fs-extra';
 import { execa } from 'execa';
 import { BOOTSTRAP_CORE_COMMANDS_SET } from './bootstrapCoreCommands';
 
-export type PythonCommand = 'python3' | 'python';
+export type PythonCommand = 'python3' | 'python' | 'py';
+
+function pythonCommandCandidates(): PythonCommand[] {
+  return process.platform === 'win32' ? ['python', 'py', 'python3'] : ['python3', 'python'];
+}
+
+function pythonLauncherArgs(cmd: string, args: string[]): string[] {
+  return cmd === 'py' ? ['-3', ...args] : args;
+}
 
 type ExecOpts = {
   cwd?: string;
@@ -37,22 +45,28 @@ class BridgeError extends Error {
 function formatBridgeError(err: unknown): string {
   if (err instanceof BridgeError) {
     switch (err.code) {
-      case 'PYTHON_NOT_FOUND':
+      case 'PYTHON_NOT_FOUND': {
+        const expectedCmd = process.platform === 'win32' ? 'python' : 'python3';
         return (
-          'RapidKit (npm) could not find Python (python3/python) on your PATH.\n' +
-          'Install Python 3.10+ and ensure `python3` is available, then retry.\n' +
+          'RapidKit (npm) could not find Python (python3/python/py) on your PATH.\n' +
+          `Install Python 3.10+ and ensure \`${expectedCmd}\` is available, then retry.\n` +
           'Tip: if you are inside a RapidKit project, use the local ./rapidkit launcher.'
         );
+      }
       case 'BRIDGE_VENV_CREATE_FAILED':
         return (
           'RapidKit (npm) failed to create its bridge virtual environment.\n' +
-          'Ensure Python venv support is installed (e.g., python3-venv).\n' +
+          (process.platform === 'win32'
+            ? 'Ensure Python is installed with venv support.\n'
+            : 'Ensure Python venv support is installed (e.g., python3-venv).\n') +
           `Details: ${err.message}`
         );
       case 'BRIDGE_PIP_BOOTSTRAP_FAILED':
         return (
           'RapidKit (npm) could not bootstrap pip inside the bridge virtual environment.\n' +
-          'Install python3-venv/python3-pip and retry.\n' +
+          (process.platform === 'win32'
+            ? 'Ensure pip is available for your Python installation and retry.\n'
+            : 'Install python3-venv/python3-pip and retry.\n') +
           `Details: ${err.message}`
         );
       case 'BRIDGE_PIP_UPGRADE_FAILED':
@@ -146,10 +160,10 @@ async function tryRapidkit(cmd: PythonCommand): Promise<boolean> {
     // Ask the Python interpreter where its 'scripts' directory is and where its rapidkit script would live.
     const scriptPathRes = await execa(
       cmd,
-      [
+      pythonLauncherArgs(cmd, [
         '-c',
         "import sysconfig, os; print(os.path.join(sysconfig.get_path('scripts'), 'rapidkit'))",
-      ],
+      ]),
       { reject: false, stdio: 'pipe', timeout: 2000 }
     );
     const scriptPath = (scriptPathRes.stdout ?? '').toString().trim();
@@ -199,7 +213,10 @@ async function tryRapidkit(cmd: PythonCommand): Promise<boolean> {
     debug('probing importlib.find_spec("rapidkit")');
     const probe = await execa(
       cmd,
-      ['-c', "import importlib.util; print(1 if importlib.util.find_spec('rapidkit') else 0)"],
+      pythonLauncherArgs(cmd, [
+        '-c',
+        "import importlib.util; print(1 if importlib.util.find_spec('rapidkit') else 0)",
+      ]),
       {
         reject: false,
         stdio: 'pipe',
@@ -220,11 +237,15 @@ async function tryRapidkit(cmd: PythonCommand): Promise<boolean> {
   // Fallback: try invoking `python -m rapidkit --version --json` with a longer timeout.
   try {
     debug('probing python -m rapidkit');
-    const res = await execa(cmd, ['-m', 'rapidkit', '--version', '--json'], {
-      reject: false,
-      stdio: 'pipe',
-      timeout: 8000,
-    });
+    const res = await execa(
+      cmd,
+      pythonLauncherArgs(cmd, ['-m', 'rapidkit', '--version', '--json']),
+      {
+        reject: false,
+        stdio: 'pipe',
+        timeout: 8000,
+      }
+    );
     debug(`-m probe exitCode=${res.exitCode}`);
     if (res.exitCode === 0) return true;
   } catch (err) {
@@ -468,9 +489,13 @@ async function resolveRapidkitRunner(cwd?: string): Promise<RapidkitRunner> {
 
 async function pickSystemPython(): Promise<PythonCommand | null> {
   // Try standard Python commands
-  for (const cmd of ['python3', 'python'] as const) {
+  for (const cmd of pythonCommandCandidates()) {
     try {
-      await execa(cmd, ['--version'], { reject: false, stdio: 'pipe', timeout: 2000 });
+      await execa(cmd, pythonLauncherArgs(cmd, ['--version']), {
+        reject: false,
+        stdio: 'pipe',
+        timeout: 2000,
+      });
       return cmd;
     } catch {
       // try next
@@ -491,14 +516,18 @@ async function checkRapidkitCoreAvailable(): Promise<boolean> {
   };
 
   // Method 1: Try standard Python commands with import
-  for (const cmd of ['python3', 'python', 'python3.10', 'python3.11', 'python3.12']) {
+  for (const cmd of ['python3', 'python', 'py', 'python3.10', 'python3.11', 'python3.12']) {
     try {
       debug(`Method 1: trying ${cmd} import`);
-      const result = await execa(cmd, ['-c', 'import rapidkit_core; print(1)'], {
-        reject: false,
-        stdio: 'pipe',
-        timeout: 3000,
-      });
+      const result = await execa(
+        cmd,
+        pythonLauncherArgs(cmd, ['-c', 'import rapidkit_core; print(1)']),
+        {
+          reject: false,
+          stdio: 'pipe',
+          timeout: 3000,
+        }
+      );
       if (result.exitCode === 0 && result.stdout?.trim() === '1') {
         debug(`✓ Found via ${cmd} import`);
         return true;
@@ -509,14 +538,18 @@ async function checkRapidkitCoreAvailable(): Promise<boolean> {
   }
 
   // Method 2: Try python -m pip show
-  for (const cmd of ['python3', 'python']) {
+  for (const cmd of ['python3', 'python', 'py']) {
     try {
       debug(`Method 2: trying ${cmd} -m pip show`);
-      const result = await execa(cmd, ['-m', 'pip', 'show', 'rapidkit-core'], {
-        reject: false,
-        stdio: 'pipe',
-        timeout: 3000,
-      });
+      const result = await execa(
+        cmd,
+        pythonLauncherArgs(cmd, ['-m', 'pip', 'show', 'rapidkit-core']),
+        {
+          reject: false,
+          stdio: 'pipe',
+          timeout: 3000,
+        }
+      );
       if (result.exitCode === 0 && result.stdout?.includes('Name: rapidkit-core')) {
         debug(`✓ Found via ${cmd} -m pip show`);
         return true;
@@ -594,10 +627,10 @@ async function checkRapidkitCoreAvailable(): Promise<boolean> {
   }
 
   // Method 5: Check user site-packages
-  for (const cmd of ['python3', 'python']) {
+  for (const cmd of ['python3', 'python', 'py']) {
     try {
       debug(`Method 5: checking ${cmd} user site`);
-      const result = await execa(cmd, ['-m', 'site', '--user-site'], {
+      const result = await execa(cmd, pythonLauncherArgs(cmd, ['-m', 'site', '--user-site']), {
         reject: false,
         stdio: 'pipe',
         timeout: 3000,
@@ -772,7 +805,7 @@ async function ensureBridgeVenv(pythonCmd: PythonCommand): Promise<string> {
   try {
     await fsExtra.ensureDir(path.dirname(venvDir));
     try {
-      await runBootstrap(pythonCmd, ['-m', 'venv', venvDir], 60_000);
+      await runBootstrap(pythonCmd, pythonLauncherArgs(pythonCmd, ['-m', 'venv', venvDir]), 60_000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new BridgeError('BRIDGE_VENV_CREATE_FAILED', msg);
@@ -842,14 +875,14 @@ export async function resolveRapidkitPython(): Promise<
   if (process.env.RAPIDKIT_BRIDGE_FORCE_VENV === '1') {
     const system = await pickSystemPython();
     if (!system) {
-      throw new BridgeError('PYTHON_NOT_FOUND', 'No Python interpreter found (python3/python).');
+      throw new BridgeError('PYTHON_NOT_FOUND', 'No Python interpreter found (python3/python/py).');
     }
     const pythonPath = await ensureBridgeVenv(system);
     return { kind: 'venv', pythonPath };
   }
 
   // Prefer system python if it already has rapidkit available.
-  for (const cmd of ['python3', 'python'] as const) {
+  for (const cmd of pythonCommandCandidates()) {
     if (await tryRapidkit(cmd)) {
       return { kind: 'system', cmd };
     }
@@ -858,7 +891,7 @@ export async function resolveRapidkitPython(): Promise<
   // Otherwise bootstrap a cached venv and install rapidkit-core there.
   const system = await pickSystemPython();
   if (!system) {
-    throw new BridgeError('PYTHON_NOT_FOUND', 'No Python interpreter found (python3/python).');
+    throw new BridgeError('PYTHON_NOT_FOUND', 'No Python interpreter found (python3/python/py).');
   }
   const pythonPath = await ensureBridgeVenv(system);
   return { kind: 'venv', pythonPath };

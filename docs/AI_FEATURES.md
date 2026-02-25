@@ -31,23 +31,24 @@ npx rapidkit ai recommend "user authentication with social login"
 **Step 2:** Configure API key
 ```bash
 npx rapidkit config set-api-key
-# Or: export OPENAI_API_KEY="sk-proj-..."
+# Or (non-interactive environments):
+export OPENAI_API_KEY="<YOUR_OPENAI_API_KEY>"
 ```
 
-**Step 3:** Generate embeddings (one-time, ~$0.50)
+**Step 3:** Generate embeddings (one-time, provider-cost dependent)
 ```bash
 npx rapidkit ai generate-embeddings
 
 # Output:
 # 🤖 Generating AI embeddings for RapidKit modules...
 # 📡 Fetching modules from RapidKit...
-# ✓ Found 27 modules
+# ✓ Found <N> modules
 #
-# 💰 Estimated cost: ~$0.500
-#    (Based on 27 modules at $0.02/1M tokens)
+# 💰 Estimated cost: shown by CLI at runtime
+#    (depends on provider pricing, model, and module count)
 #
 # ? Generate embeddings now? Yes
-# ✔ Generated embeddings for 27 modules
+# ✔ Generated embeddings for <N> modules
 # ✅ Embeddings generated successfully!
 ```
 
@@ -104,26 +105,23 @@ $ npx rapidkit ai recommend "I need user authentication with email"
 
 ## 💰 Pricing
 
-### One-Time Setup Cost
+### One-Time Setup Cost (Estimates)
 | Item | Cost | Notes |
 |------|------|-------|
-| Generate embeddings | ~$0.50 | One-time only, lasts forever |
-| Update embeddings | ~$0.50 | Only when RapidKit adds new modules |
+| Generate embeddings | Varies | One-time only, depends on model and module count |
+| Update embeddings | Varies | Only when catalog changes |
 
-### Per-Query Cost (After Setup)
+### Per-Query Cost (After Setup, Estimates)
 | Usage | Cost | Notes |
 |-------|------|-------|
-| Single query | ~$0.0002 | Practically free |
-| 100 queries | ~$0.02 | 2 cents |
-| 1,000 queries | ~$0.20 | 20 cents |
-| 10,000 queries | ~$2.00 | 2 dollars |
+| Single query | Very low | Depends on provider/model |
+| 100 queries | Low | Depends on provider/model |
+| 1,000 queries | Moderate | Depends on provider/model |
+| 10,000 queries | Higher | Depends on provider/model |
 
-**Total Cost Example:**
-- Setup: $0.50 (one time)
-- 1,000 queries: $0.20
-- **Total: $0.70** for unlimited module discovery!
+**Important:** Provider pricing and limits change over time. Always validate current pricing/limits in the provider dashboard before budgeting.
 
-💡 **Tip:** After initial setup (~$0.50), you can make thousands of queries for pennies.
+💡 **Tip:** Embeddings are generated once and reused, so ongoing query cost is typically much lower than initial setup.
 
 ## 🔧 Configuration
 
@@ -135,8 +133,6 @@ npx rapidkit config show
 ### Set API Key
 ```bash
 npx rapidkit config set-api-key
-# or with option
-npx rapidkit config set-api-key --key sk-proj-...
 ```
 
 ### Remove API Key
@@ -209,7 +205,7 @@ npx rapidkit config ai disable
 - Model: `text-embedding-3-small` (OpenAI)
 - Dimension: 1536 vectors
 - Accuracy: 92%+ match scores
-- Cost: $0.02 per 1M tokens (~50 tokens per module)
+- Cost: provider-dependent (check current provider pricing)
 
 **Performance:**
 - First query: ~200ms (embedding generation)
@@ -240,7 +236,7 @@ rapidkit ai recommend "API gateway with rate limiting"
 
 ## 🔒 Security
 
-- API keys stored in `~/.rapidkit/config.json`
+- API keys stored in `$HOME/.rapidkit/config.json`
 - File permissions: `600` (owner read/write only)
 - Never committed to git (`.rapidkit/` in `.gitignore`)
 - Environment variable supported (`OPENAI_API_KEY`)
@@ -282,7 +278,7 @@ npx rapidkit ai recommend "database"
 npx rapidkit config set-api-key
 
 # Or set environment variable:
-export OPENAI_API_KEY="sk-proj-..."
+export OPENAI_API_KEY="<YOUR_OPENAI_API_KEY>"
 ```
 
 ### "Invalid API key" or "401 Error"
@@ -309,15 +305,14 @@ npx rapidkit config show
 4. **Wait:** Rate limits reset automatically
 
 **Rate Limits:**
-- Free tier: 40,000 tokens/min, 200 requests/day
-- Tier 1: 1,000,000 tokens/min, higher daily limits
-- Tier 2+: Even higher limits
+- Limits vary by provider account tier and can change over time
+- Check your provider dashboard for current request/token limits
 
 ### "Failed to fetch modules from Python Core"
 
 **Cause:** RapidKit Python not installed or not in PATH
 
-**Impact:** Uses fallback catalog (11 modules instead of 27+)
+**Impact:** Uses fallback catalog instead of the full runtime catalog
 
 **Solution (optional):**
 ```bash
@@ -377,9 +372,9 @@ npx rapidkit config show
 
 # Output shows:
 # - AI enabled: true/false
-# - API key: sk-proj-...****
+# - API key: <masked>
 # - Embeddings status: exists/not found
-# - Module count: 27 modules
+# - Module count: <N> modules
 ```
 
 ### Still Having Issues?
@@ -418,7 +413,6 @@ npx rapidkit config show
 | Command | Description | Example |
 |---------|-------------|---------|
 | `rapidkit config set-api-key` | Set OpenAI API key (interactive) | `rapidkit config set-api-key` |
-| `rapidkit config set-api-key --key <KEY>` | Set API key directly | `rapidkit config set-api-key --key sk-proj-...` |
 | `rapidkit config show` | Show current config | `rapidkit config show` |
 | `rapidkit config remove-api-key` | Remove API key | `rapidkit config remove-api-key` |
 | `rapidkit config ai enable` | Enable AI features | `rapidkit config ai enable` |

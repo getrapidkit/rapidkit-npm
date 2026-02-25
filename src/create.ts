@@ -49,10 +49,53 @@ async function writeWorkspaceGitignore(workspacePath: string): Promise<void> {
   );
 }
 
+/**
+ * Write minimal pyproject.toml + poetry.toml stubs for workspaces created with
+ * Python-free profiles (go-only, node-only, minimal).  These stubs carry no
+ * dependencies — Poetry creates them instantly without touching the network.
+ *
+ * Having the files ensures that `rapidkit bootstrap --profile python-only`
+ * (or any Python-requiring profile) can simply run `poetry install --no-root`
+ * + `poetry add rapidkit-core` on the existing project without needing to
+ * re-initialise from scratch.
+ */
+async function writePyprojectStub(workspacePath: string, workspaceName: string): Promise<void> {
+  const safe = workspaceName.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+
+  // poetry.toml — local config: keep venv inside the project (same as full workspaces)
+  await fsExtra.outputFile(
+    path.join(workspacePath, 'poetry.toml'),
+    '[virtualenvs]\nin-project = true\n',
+    'utf-8'
+  );
+
+  // pyproject.toml — minimal valid Poetry project with rapidkit-core declared.
+  // rapidkit-core is listed so that when the user upgrades to a Python profile
+  // (via `rapidkit bootstrap --profile python-only`), a plain
+  // `poetry install --no-root` is enough — no separate `poetry add` needed.
+  await fsExtra.outputFile(
+    path.join(workspacePath, 'pyproject.toml'),
+    `[tool.poetry]\n` +
+      `name = "${safe}"\n` +
+      `version = "0.1.0"\n` +
+      `description = "RapidKit workspace"\n` +
+      `authors = []\n` +
+      `package-mode = false\n\n` +
+      `[tool.poetry.dependencies]\n` +
+      `python = "^3.10"\n` +
+      `rapidkit-core = "*"\n\n` +
+      `[build-system]\n` +
+      `requires = ["poetry-core"]\n` +
+      `build-backend = "poetry.core.masonry.api"\n`,
+    'utf-8'
+  );
+}
+
 function buildWorkspaceManifest(
   workspaceName: string,
   installMethod: InstallMethod,
-  pythonVersion?: string
+  pythonVersion?: string,
+  profile?: string
 ): string {
   return JSON.stringify(
     {
@@ -61,7 +104,7 @@ function buildWorkspaceManifest(
       rapidkit_version: getVersion(),
       created_at: new Date().toISOString(),
       created_by: 'rapidkit-npm',
-      profile: 'minimal',
+      profile: profile || 'minimal',
       engine: {
         install_method: installMethod,
         python_version: pythonVersion || null,
@@ -72,7 +115,12 @@ function buildWorkspaceManifest(
   );
 }
 
-function buildToolchainLock(installMethod: InstallMethod, pythonVersion?: string): string {
+function buildToolchainLock(
+  installMethod: InstallMethod,
+  pythonVersion?: string,
+  nodeVersion?: string,
+  goVersion?: string
+): string {
   return JSON.stringify(
     {
       schema_version: '1.0',
@@ -84,10 +132,10 @@ function buildToolchainLock(installMethod: InstallMethod, pythonVersion?: string
           install_method: installMethod,
         },
         node: {
-          version: process.version,
+          version: nodeVersion || process.version,
         },
         go: {
-          version: null,
+          version: goVersion || null,
         },
       },
     },
@@ -99,6 +147,7 @@ function buildToolchainLock(installMethod: InstallMethod, pythonVersion?: string
 function buildPoliciesYaml(): string {
   return `version: "1.0"
 mode: warn
+dependency_sharing_mode: isolated
 rules:
   enforce_workspace_marker: true
   enforce_toolchain_lock: false
@@ -120,16 +169,27 @@ async function writeWorkspaceFoundationFiles(
   workspacePath: string,
   workspaceName: string,
   installMethod: InstallMethod,
-  pythonVersion?: string
+  pythonVersion?: string,
+  profile?: string
 ): Promise<void> {
+  // Detect Go version silently at creation time so toolchain.lock is accurate
+  let goVersion: string | undefined;
+  try {
+    const { stdout: goOut } = await execa('go', ['version'], { timeout: 3000, stdio: 'pipe' });
+    const gm = goOut.match(/go(\d+\.\d+(?:\.\d+)?)/i);
+    goVersion = gm ? gm[1] : undefined;
+  } catch {
+    /* Go not installed — leave null */
+  }
+
   await fsExtra.outputFile(
     path.join(workspacePath, '.rapidkit', 'workspace.json'),
-    buildWorkspaceManifest(workspaceName, installMethod, pythonVersion),
+    buildWorkspaceManifest(workspaceName, installMethod, pythonVersion, profile),
     'utf-8'
   );
   await fsExtra.outputFile(
     path.join(workspacePath, '.rapidkit', 'toolchain.lock'),
-    buildToolchainLock(installMethod, pythonVersion),
+    buildToolchainLock(installMethod, pythonVersion, process.version, goVersion),
     'utf-8'
   );
   await fsExtra.outputFile(
@@ -255,7 +315,7 @@ async function ensurePipxAvailable(spinner: Ora, yes: boolean): Promise<PipxInvo
     );
     throw new InstallationError(
       'Verify pipx after install',
-      new Error(`${msg}\n\nTry reopening your terminal or run: python3 -m pipx ensurepath`)
+      new Error(`${msg}\n\nTry reopening your terminal or run: ${pythonCmd} -m pipx ensurepath`)
     );
   }
 }
@@ -400,7 +460,7 @@ exit /b 1
 `;
 }
 
-async function writeWorkspaceLauncher(
+export async function writeWorkspaceLauncher(
   workspacePath: string,
   installMethod: InstallMethod
 ): Promise<void> {
@@ -425,6 +485,8 @@ interface CreateProjectOptions {
   yes?: boolean;
   userConfig?: UserConfig;
   installMethod?: InstallMethod;
+  /** Bootstrap profile written into .rapidkit/workspace.json (e.g. 'python-only', 'go-only'). */
+  profile?: string;
 }
 
 export async function createProject(
@@ -443,6 +505,7 @@ export async function createProject(
     yes = false,
     userConfig = {},
     installMethod: providedInstallMethod,
+    profile,
   } = options;
 
   // Default to 'rapidkit' directory
@@ -466,38 +529,257 @@ export async function createProject(
     return;
   }
 
-  // Step 1: Choose Python version and install method (or auto-select with --yes)
-  const pythonAnswers: { pythonVersion: string; installMethod: InstallMethod } = yes
-    ? {
-        pythonVersion: userConfig.pythonVersion || '3.10',
-        // Prefer CLI flag, then user config, then default to poetry (recommended).
-        installMethod:
-          providedInstallMethod ||
-          (userConfig.defaultInstallMethod as InstallMethod | undefined) ||
-          'poetry',
-      }
-    : ((await inquirer.prompt([
+  // Step 0: Choose workspace profile (if not already provided by caller)
+  // Profiles that don't involve Python skip the Python-specific prompts.
+  const PYTHON_PROFILES = new Set(['python-only', 'polyglot', 'enterprise']);
+  let resolvedProfile: string = profile || '';
+
+  if (!yes && !profile) {
+    const { selectedProfile } = (await inquirer.prompt([
+      {
+        type: 'rawlist',
+        name: 'selectedProfile',
+        message: 'Select workspace profile:',
+        choices: [
+          {
+            name: 'minimal     — Foundation files only (fastest bootstrap, mixed projects)',
+            value: 'minimal',
+          },
+          {
+            name: 'python-only — Python + Poetry (FastAPI, Django, ML pipelines)',
+            value: 'python-only',
+          },
+          {
+            name: 'node-only   — Node.js runtime (NestJS, Express, Next.js)',
+            value: 'node-only',
+          },
+          {
+            name: 'go-only     — Go runtime (Fiber, Gin, gRPC, microservices)',
+            value: 'go-only',
+          },
+          {
+            name: 'polyglot    — Python + Node.js + Go multi-runtime workspace',
+            value: 'polyglot',
+          },
+          {
+            name: 'enterprise  — Polyglot + governance + Sigstore verification',
+            value: 'enterprise',
+          },
+        ],
+        default: 1,
+      },
+    ])) as { selectedProfile: string };
+    resolvedProfile = selectedProfile;
+  } else if (!resolvedProfile) {
+    resolvedProfile = 'minimal';
+  }
+
+  // Profiles that need Python prompts: python-only, polyglot, enterprise.
+  // For minimal/node-only/go-only we skip Python-specific questions and auto-detect.
+  const needsPythonPrompts = !yes && PYTHON_PROFILES.has(resolvedProfile);
+
+  // Step 1: Choose Python version and install method (or auto-select with --yes / non-Python profile)
+  const pythonAnswers: { pythonVersion: string; installMethod: InstallMethod } = needsPythonPrompts
+    ? ((await inquirer.prompt([
         {
-          type: 'list',
+          type: 'rawlist',
           name: 'pythonVersion',
           message: 'Select Python version for RapidKit:',
           choices: ['3.10', '3.11', '3.12'],
-          default: userConfig.pythonVersion || '3.10',
+          default: 1,
         },
         {
-          type: 'list',
+          type: 'rawlist',
           name: 'installMethod',
-          message: 'How would you like to install RapidKit?',
+          message: 'How would you like to manage the workspace environment?',
           choices: [
             { name: '🎯 Poetry (Recommended - includes virtual env)', value: 'poetry' },
             { name: '📦 pip with venv (Standard)', value: 'venv' },
             { name: '🔧 pipx (Global isolated install)', value: 'pipx' },
           ],
-          // Poetry is recommended as default
-          default: userConfig.defaultInstallMethod || 'poetry',
+          default: 1,
         },
-      ])) as { pythonVersion: string; installMethod: InstallMethod });
+      ])) as { pythonVersion: string; installMethod: InstallMethod })
+    : await (async () => {
+        const resolvedMethod: InstallMethod =
+          providedInstallMethod ||
+          (userConfig.defaultInstallMethod as InstallMethod | undefined) ||
+          (await (async (): Promise<InstallMethod> => {
+            try {
+              await execa('poetry', ['--version'], { timeout: 3000 });
+              return 'poetry';
+            } catch {
+              logger.warn(
+                'Poetry not found — auto-selecting venv. Pass --install-method poetry to override.'
+              );
+              return 'venv';
+            }
+          })());
+        return {
+          pythonVersion: userConfig.pythonVersion || '3.10',
+          installMethod: resolvedMethod,
+        };
+      })();
 
+  // ── Lite workspace fast path ─────────────────────────────────────────────────
+  // Profiles that don't involve a Python engine skip Poetry/venv/pipx entirely.
+  // Go kits are 100% npm-level. Node-only workspaces can scaffold Go projects or
+  // await a lazy Python install on first `create project nestjs.standard`.
+  // Minimal workspaces are bootstrapped on-demand as well.
+  // Only go-only is truly Python-free: Go kits (gofiber, gogin) run entirely
+  // through npm and never call the Python engine.  node-only / minimal use
+  // nestjs.standard which depends on rapidkit-core (Python), so they follow
+  // the full Python install path.
+  const PYTHON_FREE_PROFILES = new Set(['go-only', 'node-only', 'minimal']);
+
+  if (PYTHON_FREE_PROFILES.has(resolvedProfile)) {
+    const spinner2 = ora('Creating workspace').start();
+    try {
+      await fsExtra.ensureDir(projectPath);
+      spinner2.succeed('Directory created');
+
+      // Workspace marker + foundation files (no Python version recorded).
+      // installMethod = 'venv' so that installWorkspaceDependencies skips Python
+      // dep installation for lite profiles on bare `rapidkit init`.
+      // pyproject.toml + poetry.toml stubs are written so that when the user
+      // later runs `rapidkit bootstrap --profile python-only`, Poetry can pick
+      // them up and install deps without re-initialising the project.
+      await writeWorkspaceMarker(projectPath, name, 'venv', undefined);
+      await writeWorkspaceFoundationFiles(projectPath, name, 'venv', undefined, resolvedProfile);
+      await writeWorkspaceGitignore(projectPath);
+      // Write pyproject.toml + poetry.toml stubs — zero network, no venv created.
+      await writePyprojectStub(projectPath, name);
+
+      // Lean README for Python-free workspaces
+      const profileLabel: Record<string, string> = {
+        'go-only': 'Go-only',
+        'node-only': 'Node.js-only',
+        minimal: 'Minimal',
+      };
+      await fsExtra.outputFile(
+        path.join(projectPath, 'README.md'),
+        `# ${name}\n\nRapidKit **${profileLabel[resolvedProfile]}** workspace.\n\n` +
+          `## Quick start\n\n` +
+          `\`\`\`bash\n` +
+          (resolvedProfile === 'go-only'
+            ? `npx rapidkit create project gofiber.standard my-api\n` +
+              `cd my-api && npx rapidkit init && npx rapidkit dev\n`
+            : resolvedProfile === 'node-only'
+              ? `npx rapidkit create project nestjs.standard my-app\n` +
+                `cd my-app && npx rapidkit init && npx rapidkit dev\n`
+              : `npx rapidkit create project\ncd <project-name> && npx rapidkit init && npx rapidkit dev\n`) +
+          `\`\`\`\n`,
+        'utf-8'
+      );
+
+      // Git init
+      if (!skipGit) {
+        spinner2.start('Initializing git repository');
+        try {
+          await execa('git', ['init'], { cwd: projectPath });
+          await execa('git', ['add', '.'], { cwd: projectPath });
+          await execa('git', ['commit', '-m', 'Initial commit: RapidKit workspace'], {
+            cwd: projectPath,
+          });
+          spinner2.succeed('Git repository initialized');
+        } catch {
+          spinner2.warn('Could not initialize git repository');
+        }
+      }
+
+      // Register in shared registry for VS Code Extension
+      try {
+        const { registerWorkspace } = await import('./workspace.js');
+        await registerWorkspace(projectPath, name);
+      } catch {
+        /* silent — registry is optional */
+      }
+
+      // Profile-specific success message
+      console.log(chalk.green('\n✨ Workspace created!\n'));
+      console.log(chalk.cyan('📂 Location:'), chalk.white(projectPath));
+      console.log(chalk.cyan('\n🚀 Get started:\n'));
+      console.log(chalk.white(`   cd ${name}`));
+
+      if (resolvedProfile === 'go-only') {
+        console.log(chalk.white('   npx rapidkit create project gofiber.standard my-api'));
+        console.log(chalk.white('   cd my-api && npx rapidkit init && npx rapidkit dev\n'));
+        console.log(
+          chalk.gray('💡 No Python required — Go kits run entirely through the npm package.')
+        );
+        try {
+          const { stdout: goOut } = await execa('go', ['version'], { timeout: 3000 });
+          const goMatch = goOut.match(/go version go(\d+\.\d+(?:\.\d+)?)/);
+          const goVer = goMatch ? goMatch[1] : 'unknown';
+          console.log(
+            chalk.gray(
+              `🐹 Go ${goVer} detected — ready for gofiber.standard / gogin.standard projects`
+            )
+          );
+        } catch {
+          console.log(
+            chalk.yellow('\n⚠️  Go is not installed — install it from https://go.dev/dl/')
+          );
+        }
+      } else if (resolvedProfile === 'node-only') {
+        console.log(chalk.white('   npx rapidkit create project nestjs.standard my-app'));
+        console.log(chalk.white('   cd my-app && npx rapidkit init && npx rapidkit dev\n'));
+        console.log(
+          chalk.gray(
+            '💡 Python engine will be installed automatically on first `create project nestjs.standard`.'
+          )
+        );
+      } else {
+        // minimal
+        console.log(chalk.white('   npx rapidkit create project'));
+        console.log(chalk.white('   cd <project-name> && npx rapidkit init && npx rapidkit dev\n'));
+        console.log(
+          chalk.gray(
+            '💡 Bootstrap a specific runtime any time: rapidkit bootstrap --profile python-only|node-only|go-only'
+          )
+        );
+      }
+      console.log('');
+    } catch (_err) {
+      spinner2.fail('Failed to create workspace');
+      console.error(chalk.red('\n❌ Error:'), _err);
+      throw _err;
+    }
+    return; // ← skip Python env setup entirely
+  }
+
+  // ── Python pre-check (only for python-required profiles) ───────────────────
+  // go-only / node-only / minimal users have already returned above without
+  // needing Python at all. Only python-only / polyglot / enterprise reach here.
+  {
+    const pythonCmd = getPythonCommand();
+    let pythonAvailable = false;
+    try {
+      await execa(pythonCmd, ['--version'], { timeout: 5000 });
+      pythonAvailable = true;
+    } catch {
+      try {
+        await execa('python', ['--version'], { timeout: 5000 });
+        pythonAvailable = true;
+      } catch {
+        pythonAvailable = false;
+      }
+    }
+
+    if (!pythonAvailable) {
+      console.log(
+        chalk.red(`\n❌ Python 3.10+ is required for the "${resolvedProfile}" profile.\n`)
+      );
+      console.log(chalk.cyan('💡 How to install Python:\n'));
+      console.log(chalk.white('   Ubuntu / Debian:  sudo apt install python3.10'));
+      console.log(chalk.white('   macOS (Homebrew): brew install python@3.10'));
+      console.log(chalk.white('   Windows:          https://python.org/downloads\n'));
+      console.log(chalk.gray(`   After installing Python, run:  npx rapidkit ${name}\n`));
+      process.exit(1);
+    }
+  }
+
+  // ── Python-required profiles (python-only / polyglot / enterprise) ──────────
   logger.step(1, 3, 'Setting up RapidKit environment');
   const spinner = ora('Creating directory').start();
 
@@ -546,11 +828,16 @@ export async function createProject(
       projectPath,
       name,
       pythonAnswers.installMethod,
-      actualPythonVersion || pythonAnswers.pythonVersion
+      actualPythonVersion || pythonAnswers.pythonVersion,
+      resolvedProfile || profile
     );
 
     // Create .gitignore regardless of git initialization (matches VS Code extension behavior).
     await writeWorkspaceGitignore(projectPath);
+
+    // Write pyproject.toml stub with rapidkit-core declared so that poetry install
+    // --no-root can resolve everything in one pass (avoids the slow `poetry add` step).
+    await writePyprojectStub(projectPath, name);
 
     // Install RapidKit based on method
     if (pythonAnswers.installMethod === 'poetry') {
@@ -727,16 +1014,15 @@ async function findRealPython(pythonVersion: string): Promise<string | null> {
   const candidates: string[] = [];
 
   // 1. Try pyenv versions directly (bypass shims)
-  try {
-    const { stdout } = await execa('pyenv', ['root']);
-    const pyenvRoot = stdout.trim();
-    // Try specific version first
-    candidates.push(path.join(pyenvRoot, 'versions', `${pythonVersion}.*`, 'bin', 'python'));
-    // Try major.minor pattern
-    const [major, minor] = pythonVersion.split('.');
-    candidates.push(path.join(pyenvRoot, 'versions', `${major}.${minor}.*`, 'bin', 'python'));
-  } catch {
-    // pyenv not available or failed
+  if (process.platform !== 'win32') {
+    try {
+      // Prefer the concrete interpreter selected by pyenv for this shell.
+      const { stdout } = await execa('pyenv', ['which', 'python']);
+      const pyenvPython = stdout.trim();
+      if (pyenvPython) candidates.push(pyenvPython);
+    } catch {
+      // pyenv not available or failed
+    }
   }
 
   // 2. Try direct python commands
@@ -747,32 +1033,34 @@ async function findRealPython(pythonVersion: string): Promise<string | null> {
     'python'
   );
 
+  if (process.platform === 'win32') {
+    candidates.push('py');
+  }
+
   // 3. Try common installation paths
-  candidates.push(
-    `/usr/bin/python${pythonVersion}`,
-    `/usr/bin/python3`,
-    `/usr/local/bin/python${pythonVersion}`,
-    `/usr/local/bin/python3`
-  );
+  if (process.platform !== 'win32') {
+    candidates.push(
+      `/usr/bin/python${pythonVersion}`,
+      `/usr/bin/python3`,
+      `/usr/local/bin/python${pythonVersion}`,
+      `/usr/local/bin/python3`
+    );
+  }
 
   // Test each candidate
   for (const candidate of candidates) {
     try {
-      // Expand glob if present
-      let pythonPath = candidate;
-      if (candidate.includes('*')) {
-        const globMatch = await execa('sh', ['-c', `ls -d ${candidate} 2>/dev/null | head -1`]);
-        pythonPath = globMatch.stdout.trim();
-        if (!pythonPath) continue;
-        pythonPath = path.join(pythonPath.split('/').slice(0, -1).join('/'), '../bin/python');
-      }
-
-      const { stdout } = await execa(pythonPath, ['--version'], { timeout: 2000 });
+      const versionArgs = candidate === 'py' ? ['-3', '--version'] : ['--version'];
+      const probeArgs =
+        candidate === 'py'
+          ? ['-3', '-c', 'import sys; sys.exit(0)']
+          : ['-c', 'import sys; sys.exit(0)'];
+      const { stdout } = await execa(candidate, versionArgs, { timeout: 2000 });
       const version = stdout.match(/Python (\d+\.\d+)/)?.[1];
       if (version && parseFloat(version) >= parseFloat(pythonVersion)) {
         // Verify this Python actually works (not a broken shim)
-        await execa(pythonPath, ['-c', 'import sys; sys.exit(0)'], { timeout: 2000 });
-        return pythonPath;
+        await execa(candidate, probeArgs, { timeout: 2000 });
+        return candidate;
       }
     } catch {
       continue;
@@ -804,126 +1092,165 @@ async function installWithPoetry(
   }
 
   spinner.start('Initializing Poetry project');
-  await execa('poetry', ['init', '--no-interaction', '--python', `^${pythonVersion}`], {
-    cwd: projectPath,
-  });
 
-  spinner.succeed('Poetry project initialized');
-
-  // Set package-mode = false since this is a workspace, not a package
-  // Poetry 2.2+ uses PEP 621 format with [project] instead of [tool.poetry]
+  // If a pyproject.toml stub was pre-written (contains rapidkit-core), skip
+  // `poetry init` entirely.  The stub already declares the dependency, so
+  // `poetry install --no-root` below will resolve everything in one pass.
   const pyprojectPath = path.join(projectPath, 'pyproject.toml');
-  const pyprojectContent = await fsPromises.readFile(pyprojectPath, 'utf-8');
+  const existingPyprojectContent = (await fsExtra.pathExists(pyprojectPath))
+    ? await fsPromises.readFile(pyprojectPath, 'utf-8')
+    : '';
+  const hasPrewrittenStub = existingPyprojectContent.includes('rapidkit-core');
 
-  let updatedContent = pyprojectContent;
+  if (!hasPrewrittenStub) {
+    await execa('poetry', ['init', '--no-interaction', '--python', `^${pythonVersion}`], {
+      cwd: projectPath,
+    });
 
-  // Try to add package-mode = false in the right place
-  if (updatedContent.includes('[tool.poetry]')) {
-    // Old format - add after [tool.poetry]
-    updatedContent = updatedContent.replace('[tool.poetry]', '[tool.poetry]\npackage-mode = false');
-  } else if (updatedContent.includes('[project]')) {
-    // New PEP 621 format - add before [build-system]
-    if (updatedContent.includes('[build-system]')) {
+    spinner.succeed('Poetry project initialized');
+
+    // Set package-mode = false since this is a workspace, not a package
+    // Poetry 2.2+ uses PEP 621 format with [project] instead of [tool.poetry]
+    const pyprojectContent = await fsPromises.readFile(pyprojectPath, 'utf-8');
+
+    let updatedContent = pyprojectContent;
+
+    // Try to add package-mode = false in the right place
+    if (updatedContent.includes('[tool.poetry]')) {
+      // Old format - add after [tool.poetry]
       updatedContent = updatedContent.replace(
-        '[build-system]',
-        '\n[tool.poetry]\npackage-mode = false\n\n[build-system]'
+        '[tool.poetry]',
+        '[tool.poetry]\npackage-mode = false'
       );
-    } else {
-      // Add at the end if no build-system section
-      updatedContent += '\n\n[tool.poetry]\npackage-mode = false\n';
+    } else if (updatedContent.includes('[project]')) {
+      // New PEP 621 format - add before [build-system]
+      if (updatedContent.includes('[build-system]')) {
+        updatedContent = updatedContent.replace(
+          '[build-system]',
+          '\n[tool.poetry]\npackage-mode = false\n\n[build-system]'
+        );
+      } else {
+        // Add at the end if no build-system section
+        updatedContent += '\n\n[tool.poetry]\npackage-mode = false\n';
+      }
     }
+
+    await fsPromises.writeFile(pyprojectPath, updatedContent, 'utf-8');
+  } else {
+    spinner.succeed('Poetry project initialized');
   }
 
-  await fsPromises.writeFile(pyprojectPath, updatedContent, 'utf-8');
-
-  // Configure Poetry to use the real Python we found and create in-project virtualenv
+  // Configure in-project venv (write poetry.toml before creating the venv).
   spinner.start('Configuring Poetry');
   try {
     // Use --local to avoid affecting global Poetry config
     await execa('poetry', ['config', 'virtualenvs.in-project', 'true', '--local'], {
       cwd: projectPath,
     });
-
-    // If we found a specific Python, tell Poetry to use it
-    if (realPython) {
-      try {
-        await execa('poetry', ['env', 'use', realPython], { cwd: projectPath });
-        logger.debug(`Poetry configured to use: ${realPython}`);
-      } catch (envError) {
-        // Non-fatal - Poetry will use its default Python discovery
-        logger.debug(`Could not set Poetry env to ${realPython}: ${envError}`);
-      }
-    }
     spinner.succeed('Poetry configured');
   } catch (_error) {
-    // Not a fatal error; continue with installation. Some Poetry versions or environments may not support this.
+    // Not a fatal error; continue with installation.
     spinner.warn('Could not configure Poetry virtualenvs.in-project');
   }
 
-  // Create the virtualenv first with poetry install (this ensures in-project venv is created)
+  // Pre-create the virtualenv with `python -m venv` BEFORE telling Poetry which
+  // Python to use.  This is critical: if we call `poetry env use <python>` first,
+  // Poetry bootstraps its own venv (slow network call); then overwriting it with
+  // `python -m venv .venv` leaves a "foreign" venv that causes
+  // `poetry install --no-root` to fail.
+  //
+  // Correct order:
+  //   1. python -m venv .venv          (instant, no network)
+  //   2. poetry env use .venv/bin/python (points Poetry at the ready venv)
+  //   3. poetry install --no-root       (near-instant — venv already exists)
   spinner.start('Creating virtualenv');
+  const pythonBin = realPython || getPythonCommand();
+  let venvPythonBin: string = path.join(
+    projectPath,
+    '.venv',
+    process.platform === 'win32' ? 'Scripts' : 'bin',
+    process.platform === 'win32' ? 'python.exe' : 'python'
+  );
   try {
-    await execa('poetry', ['install', '--no-root'], { cwd: projectPath, timeout: 30000 });
+    await execa(pythonBin, ['-m', 'venv', '.venv'], { cwd: projectPath, timeout: 60000 });
     spinner.succeed('Virtualenv created');
   } catch (venvError) {
-    logger.debug(`Failed to create virtualenv: ${venvError}`);
-    spinner.warn('Could not create virtualenv, proceeding with add command');
+    logger.debug(`python -m venv failed: ${venvError}`);
+    // Non-fatal: fall through and let Poetry attempt its own venv creation.
+    spinner.warn('Could not pre-create virtualenv, Poetry will try');
+    venvPythonBin = realPython || getPythonCommand(); // fallback: point to system Python
   }
 
+  // Tell Poetry to use the venv we just created (or the system Python as fallback).
+  try {
+    await execa('poetry', ['env', 'use', venvPythonBin || getPythonCommand()], {
+      cwd: projectPath,
+    });
+    logger.debug(`Poetry env set to: ${venvPythonBin}`);
+  } catch (envError) {
+    // Non-fatal — Poetry will discover the in-project .venv on its own.
+    logger.debug(`Could not set Poetry env: ${envError}`);
+  }
+
+  // Install rapidkit-core into the virtualenv.
+  //
+  // Fast path (pre-written stub, production): `pip install rapidkit-core` is
+  // ~3-4x faster than Poetry's SAT resolver (`poetry install --no-root` or
+  // `poetry add`) because pip skips full dependency solving.
+  //
+  // Legacy / test paths still go through Poetry so existing behaviour is preserved.
   spinner.start('Installing RapidKit');
-  if (testMode) {
-    // Test mode: Install from local path (configured via environment or config file)
-    const localPath = getTestRapidKitPath(userConfig || {});
-    if (!localPath) {
-      throw new InstallationError(
-        'Test mode installation',
-        new Error('No local RapidKit path configured. Set RAPIDKIT_DEV_PATH environment variable.')
+
+  if (hasPrewrittenStub && !testMode) {
+    // Production fast path — use pip directly.
+    const localRapidKitPath = getTestRapidKitPath(userConfig || {});
+    const hasLocalRapidKitPath = localRapidKitPath
+      ? await fsExtra.pathExists(localRapidKitPath)
+      : false;
+    const installTarget: string =
+      hasLocalRapidKitPath && localRapidKitPath ? localRapidKitPath : 'rapidkit-core';
+
+    if (localRapidKitPath && !hasLocalRapidKitPath) {
+      logger.warn(
+        `RAPIDKIT_DEV_PATH is set but path does not exist: ${localRapidKitPath}. Falling back to PyPI.`
       );
     }
-    logger.debug(`Installing from local path: ${localPath}`);
-    spinner.text = 'Installing RapidKit from local path (test mode)';
-    await execa('poetry', ['add', localPath], { cwd: projectPath });
-  } else {
-    // Production: Install from PyPI
-    spinner.text = 'Installing RapidKit from PyPI';
 
+    spinner.text = hasLocalRapidKitPath
+      ? 'Installing RapidKit from local path'
+      : 'Installing RapidKit from PyPI';
     let installSuccess = false;
-    let lastError: unknown = null;
+    let lastPipError: unknown = null;
 
-    // Try up to 3 times with increasing timeouts
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        await execa('poetry', ['add', 'rapidkit-core'], {
+        await execa(venvPythonBin, ['-m', 'pip', 'install', installTarget, '--quiet'], {
           cwd: projectPath,
-          timeout: 60000 * attempt, // 60s, 120s, 180s
+          timeout: 180000,
         });
         installSuccess = true;
         break;
-      } catch (error) {
-        lastError = error;
-        logger.debug(`Poetry add attempt ${attempt} failed: ${error}`);
-
+      } catch (err) {
+        lastPipError = err;
+        logger.debug(`pip install rapidkit-core attempt ${attempt} failed: ${err}`);
         if (attempt < 3) {
           spinner.text = `Retrying installation (attempt ${attempt + 1}/3)`;
-          await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2s between retries
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         }
       }
     }
 
     if (!installSuccess) {
-      // All attempts failed - provide helpful error
       const errorMsg =
-        (lastError as Error & { stderr?: string })?.stderr ||
-        (lastError as Error)?.message ||
+        (lastPipError as Error & { stderr?: string })?.stderr ||
+        (lastPipError as Error)?.message ||
         'Unknown error';
-      logger.debug(`All Poetry install attempts failed. Last error: ${errorMsg}`);
-
-      // Check if it's a network/PyPI issue vs other issues
+      logger.debug(`All pip install attempts failed. Last error: ${errorMsg}`);
       if (errorMsg.includes('Could not find') || errorMsg.includes('No matching distribution')) {
         throw new RapidKitNotAvailableError();
       } else {
         throw new InstallationError(
-          'Install rapidkit-core with Poetry',
+          'Install rapidkit-core with pip',
           new Error(
             `Failed to install rapidkit-core after 3 attempts.\n` +
               `Error: ${errorMsg}\n\n` +
@@ -933,6 +1260,88 @@ async function installWithPoetry(
               `  3. Use venv method instead: npx rapidkit ${path.basename(projectPath)} --install-method=venv`
           )
         );
+      }
+    }
+  } else {
+    // Test mode OR legacy (no pre-written stub) — use original Poetry flow.
+    // Sync lockfile + install deps into the (now-existing) venv.  With an
+    // already-present .venv this is near-instant for an empty project.
+    spinner.text = 'Syncing Poetry environment';
+    try {
+      await execa('poetry', ['install', '--no-root'], { cwd: projectPath, timeout: 120000 });
+      spinner.succeed('Poetry environment synced');
+    } catch (venvError) {
+      logger.debug(`poetry install --no-root failed: ${venvError}`);
+      spinner.warn('Could not sync Poetry environment, proceeding with add command');
+    }
+
+    spinner.start('Installing RapidKit');
+    if (testMode) {
+      // Test mode: Install from local path (configured via environment or config file)
+      const localPath = getTestRapidKitPath(userConfig || {});
+      if (!localPath) {
+        throw new InstallationError(
+          'Test mode installation',
+          new Error(
+            'No local RapidKit path configured. Set RAPIDKIT_DEV_PATH environment variable.'
+          )
+        );
+      }
+      logger.debug(`Installing from local path: ${localPath}`);
+      spinner.text = 'Installing RapidKit from local path (test mode)';
+      await execa('poetry', ['add', localPath], { cwd: projectPath });
+    } else {
+      // Legacy / fallback: no pre-written stub — add rapidkit-core explicitly.
+      // Production: Install from PyPI
+      spinner.text = 'Installing RapidKit from PyPI';
+
+      let installSuccess = false;
+      let lastError: unknown = null;
+
+      // Try up to 3 times with increasing timeouts
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await execa('poetry', ['add', 'rapidkit-core'], {
+            cwd: projectPath,
+            timeout: 60000 * attempt, // 60s, 120s, 180s
+          });
+          installSuccess = true;
+          break;
+        } catch (error) {
+          lastError = error;
+          logger.debug(`Poetry add attempt ${attempt} failed: ${error}`);
+
+          if (attempt < 3) {
+            spinner.text = `Retrying installation (attempt ${attempt + 1}/3)`;
+            await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2s between retries
+          }
+        }
+      }
+
+      if (!installSuccess) {
+        // All attempts failed - provide helpful error
+        const errorMsg =
+          (lastError as Error & { stderr?: string })?.stderr ||
+          (lastError as Error)?.message ||
+          'Unknown error';
+        logger.debug(`All Poetry install attempts failed. Last error: ${errorMsg}`);
+
+        // Check if it's a network/PyPI issue vs other issues
+        if (errorMsg.includes('Could not find') || errorMsg.includes('No matching distribution')) {
+          throw new RapidKitNotAvailableError();
+        } else {
+          throw new InstallationError(
+            'Install rapidkit-core with Poetry',
+            new Error(
+              `Failed to install rapidkit-core after 3 attempts.\n` +
+                `Error: ${errorMsg}\n\n` +
+                `Possible solutions:\n` +
+                `  1. Check your internet connection\n` +
+                `  2. Try installing manually: cd ${path.basename(projectPath)} && poetry add rapidkit-core\n` +
+                `  3. Use venv method instead: npx rapidkit ${path.basename(projectPath)} --install-method=venv`
+            )
+          );
+        }
       }
     }
   }
@@ -1184,6 +1593,8 @@ export async function registerWorkspaceAtPath(
     yes?: boolean;
     installMethod?: InstallMethod;
     pythonVersion?: string;
+    /** Bootstrap profile written into .rapidkit/workspace.json. */
+    profile?: string;
   }
 ) {
   const {
@@ -1195,11 +1606,21 @@ export async function registerWorkspaceAtPath(
     pythonVersion = '3.10',
   } = options || {};
 
-  // Choose install method (Poetry is now default, recommended)
+  // Choose install method: explicit flag wins; otherwise probe for poetry and fall back to venv.
   const method: InstallMethod =
     (installMethod as InstallMethod) ||
     (userConfig.defaultInstallMethod as InstallMethod) ||
-    'poetry';
+    (await (async (): Promise<InstallMethod> => {
+      try {
+        await execa('poetry', ['--version'], { timeout: 3000 });
+        return 'poetry';
+      } catch {
+        logger.warn(
+          'Poetry not found — auto-selecting venv. Pass --install-method poetry to override.'
+        );
+        return 'venv';
+      }
+    })());
 
   // Create marker and gitignore
   await writeWorkspaceMarker(workspacePath, path.basename(workspacePath), method);
@@ -1208,13 +1629,16 @@ export async function registerWorkspaceAtPath(
     workspacePath,
     path.basename(workspacePath),
     method,
-    pythonVersion
+    pythonVersion,
+    options?.profile
   );
 
   const spinner = ora('Registering workspace').start();
 
   try {
     if (method === 'poetry') {
+      // Write pyproject.toml stub so installWithPoetry can skip poetry init + poetry add.
+      await writePyprojectStub(workspacePath, path.basename(workspacePath));
       await installWithPoetry(workspacePath, pythonVersion, spinner, testMode, userConfig, yes);
     } else if (method === 'venv') {
       await installWithVenv(workspacePath, pythonVersion, spinner, testMode, userConfig);

@@ -220,4 +220,130 @@ describe('Phase 3 commands - CLI process integration', () => {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it('applies dependency policy context across dev/test/build/start lifecycle commands', () => {
+    const dist = ensureDistBuilt();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rapidkit-lifecycle-policy-'));
+    const workspaceDir = path.join(tempDir, 'workspace');
+    const projectDir = path.join(workspaceDir, 'node-app');
+
+    try {
+      fs.mkdirSync(path.join(projectDir, '.rapidkit'), { recursive: true });
+      fs.mkdirSync(path.join(workspaceDir, '.rapidkit'), { recursive: true });
+      fs.writeFileSync(path.join(workspaceDir, '.rapidkit-workspace'), '{}');
+      fs.writeFileSync(
+        path.join(workspaceDir, '.rapidkit', 'policies.yml'),
+        [
+          'version: "1.0"',
+          'mode: warn',
+          'dependency_sharing_mode: shared-runtime-caches',
+          'rules:',
+          '  enforce_workspace_marker: true',
+          '',
+        ].join('\n')
+      );
+
+      fs.writeFileSync(
+        path.join(projectDir, '.rapidkit', 'project.json'),
+        JSON.stringify({ runtime: 'node', kit_name: 'nestjs.standard' }, null, 2)
+      );
+      fs.writeFileSync(
+        path.join(projectDir, 'package.json'),
+        JSON.stringify(
+          {
+            name: 'node-app',
+            version: '1.0.0',
+            private: true,
+            scripts: {
+              dev: "node -e \"console.log('MODE:' + (process.env.RAPIDKIT_DEP_SHARING_MODE || ''))\"",
+              test: "node -e \"console.log('MODE:' + (process.env.RAPIDKIT_DEP_SHARING_MODE || ''))\"",
+              build:
+                "node -e \"console.log('MODE:' + (process.env.RAPIDKIT_DEP_SHARING_MODE || ''))\"",
+              start:
+                "node -e \"console.log('MODE:' + (process.env.RAPIDKIT_DEP_SHARING_MODE || ''))\"",
+            },
+          },
+          null,
+          2
+        )
+      );
+
+      for (const command of ['dev', 'test', 'build', 'start']) {
+        const run = spawnSync(process.execPath, [dist, command], {
+          cwd: projectDir,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            RAPIDKIT_ENABLE_RUNTIME_ADAPTERS: '1',
+          },
+        });
+
+        expect(run.status).toBe(0);
+        const output = `${run.stdout || ''}\n${run.stderr || ''}`;
+        expect(output).toContain('MODE:shared-runtime-caches');
+      }
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('fails fast on invalid dependency_sharing_mode for lifecycle commands', () => {
+    const dist = ensureDistBuilt();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rapidkit-lifecycle-policy-invalid-'));
+    const workspaceDir = path.join(tempDir, 'workspace');
+    const projectDir = path.join(workspaceDir, 'node-app');
+
+    try {
+      fs.mkdirSync(path.join(projectDir, '.rapidkit'), { recursive: true });
+      fs.mkdirSync(path.join(workspaceDir, '.rapidkit'), { recursive: true });
+      fs.writeFileSync(path.join(workspaceDir, '.rapidkit-workspace'), '{}');
+      fs.writeFileSync(
+        path.join(workspaceDir, '.rapidkit', 'policies.yml'),
+        [
+          'version: "1.0"',
+          'mode: warn',
+          'dependency_sharing_mode: invalid-mode',
+          'rules:',
+          '  enforce_workspace_marker: true',
+          '',
+        ].join('\n')
+      );
+
+      fs.writeFileSync(
+        path.join(projectDir, '.rapidkit', 'project.json'),
+        JSON.stringify({ runtime: 'node', kit_name: 'nestjs.standard' }, null, 2)
+      );
+      fs.writeFileSync(
+        path.join(projectDir, 'package.json'),
+        JSON.stringify(
+          {
+            name: 'node-app',
+            version: '1.0.0',
+            private: true,
+            scripts: {
+              dev: 'node -e "console.log(\'SHOULD_NOT_RUN\')"',
+            },
+          },
+          null,
+          2
+        )
+      );
+
+      const run = spawnSync(process.execPath, [dist, 'dev'], {
+        cwd: projectDir,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          RAPIDKIT_ENABLE_RUNTIME_ADAPTERS: '1',
+        },
+      });
+
+      expect(run.status).toBe(1);
+      const output = `${run.stdout || ''}\n${run.stderr || ''}`;
+      expect(output).toContain('Invalid dependency_sharing_mode');
+      expect(output).not.toContain('SHOULD_NOT_RUN');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });

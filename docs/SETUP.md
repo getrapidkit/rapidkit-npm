@@ -1,6 +1,13 @@
 # Setup & Workflow
 
-This doc is a quick command reference for contributors.
+This doc is a quick command reference for developing and validating the RapidKit npm CLI.
+
+> Development and validation reference for the RapidKit npm CLI.
+>
+> If you are an end user, start with:
+> - `../README.md`
+> - `docs/OPEN_SOURCE_USER_SCENARIOS.md`
+> - `docs/doctor-command.md`
 
 ## Prereqs
 

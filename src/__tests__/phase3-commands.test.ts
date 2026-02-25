@@ -1,4 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtemp, mkdir, rm, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import path from 'path';
+import { createHash, createSign, generateKeyPairSync } from 'crypto';
+import { createServer } from 'http';
+import type { AddressInfo } from 'net';
 
 const adapterCheckPrereqs = vi.fn();
 const adapterDoctorHints = vi.fn();
@@ -20,7 +26,10 @@ vi.mock('../utils/cache.js', () => ({
 }));
 
 describe('Phase 3 command contract handlers', () => {
+  let originalCwd = process.cwd();
+
   beforeEach(() => {
+    originalCwd = process.cwd();
     vi.resetModules();
     vi.clearAllMocks();
 
@@ -38,8 +47,13 @@ describe('Phase 3 command contract handlers', () => {
   });
 
   afterEach(() => {
+    process.chdir(originalCwd);
     vi.restoreAllMocks();
     delete process.env.RAPIDKIT_ENABLE_RUNTIME_ADAPTERS;
+    delete process.env.RAPIDKIT_BOOTSTRAP_CI;
+    delete process.env.RAPIDKIT_OFFLINE_MODE;
+    delete process.env.RAPIDKIT_SIGSTORE_MOCK;
+    delete process.env.RAPIDKIT_ENV;
   });
 
   describe('bootstrap', () => {
@@ -60,6 +74,274 @@ describe('Phase 3 command contract handlers', () => {
       const code = await index.handleBootstrapCommand(['bootstrap'], initRunner);
 
       expect(code).toBe(1);
+    });
+
+    it('blocks bootstrap in strict mode when required lock file is missing', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-bootstrap-strict-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(
+        path.join(rapidkitDir, 'workspace.json'),
+        JSON.stringify({ profile: 'minimal' }, null, 2),
+        'utf-8'
+      );
+      await writeFile(
+        path.join(rapidkitDir, 'policies.yml'),
+        [
+          'version: "1.0"',
+          'mode: strict',
+          'rules:',
+          '  enforce_workspace_marker: true',
+          '  enforce_toolchain_lock: true',
+          '  disallow_untrusted_tool_sources: false',
+          '',
+        ].join('\n'),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+
+      const index = await import('../index.js');
+      const initRunner = vi.fn().mockResolvedValue(0);
+      const code = await index.handleBootstrapCommand(['bootstrap'], initRunner);
+
+      expect(code).toBe(1);
+      expect(initRunner).not.toHaveBeenCalled();
+
+      const fsExtra = await import('fs-extra');
+      const latestReport = path.join(
+        workspaceRoot,
+        '.rapidkit',
+        'reports',
+        'bootstrap-compliance.latest.json'
+      );
+      await expect(fsExtra.pathExists(latestReport)).resolves.toBe(true);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('fails fast when dependency_sharing_mode policy value is invalid', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-bootstrap-policy-schema-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(
+        path.join(rapidkitDir, 'workspace.json'),
+        JSON.stringify({ profile: 'minimal' }, null, 2),
+        'utf-8'
+      );
+      await writeFile(
+        path.join(rapidkitDir, 'policies.yml'),
+        [
+          'version: "1.0"',
+          'mode: warn',
+          'dependency_sharing_mode: super-shared',
+          'rules:',
+          '  enforce_workspace_marker: true',
+          '  enforce_toolchain_lock: false',
+          '  disallow_untrusted_tool_sources: false',
+          '',
+        ].join('\n'),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+
+      const index = await import('../index.js');
+      const initRunner = vi.fn().mockResolvedValue(0);
+      const code = await index.handleBootstrapCommand(['bootstrap'], initRunner);
+
+      expect(code).toBe(1);
+      expect(initRunner).not.toHaveBeenCalled();
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('forwards bootstrap path args and writes compliance report on success', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-bootstrap-report-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(
+        path.join(rapidkitDir, 'workspace.json'),
+        JSON.stringify({ profile: 'polyglot' }, null, 2),
+        'utf-8'
+      );
+      await writeFile(
+        path.join(rapidkitDir, 'policies.yml'),
+        [
+          'version: "1.0"',
+          'mode: warn',
+          'rules:',
+          '  enforce_workspace_marker: true',
+          '  enforce_toolchain_lock: false',
+          '  disallow_untrusted_tool_sources: false',
+          '',
+        ].join('\n'),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+
+      const index = await import('../index.js');
+      const initRunner = vi.fn().mockResolvedValue(0);
+      const code = await index.handleBootstrapCommand(
+        ['bootstrap', './apps/api', '--ci', '--offline', '--profile=polyglot'],
+        initRunner
+      );
+
+      expect(code).toBe(0);
+      expect(initRunner).toHaveBeenCalledWith(['init', './apps/api']);
+      expect(process.env.RAPIDKIT_BOOTSTRAP_CI).toBe('1');
+      expect(process.env.RAPIDKIT_OFFLINE_MODE).toBe('1');
+
+      const fsExtra = await import('fs-extra');
+      const latestReport = path.join(
+        workspaceRoot,
+        '.rapidkit',
+        'reports',
+        'bootstrap-compliance.latest.json'
+      );
+      await expect(fsExtra.pathExists(latestReport)).resolves.toBe(true);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('blocks strict offline bootstrap when mirror requirements are missing', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-bootstrap-offline-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(
+        path.join(rapidkitDir, 'workspace.json'),
+        JSON.stringify({ profile: 'enterprise' }, null, 2),
+        'utf-8'
+      );
+      await writeFile(
+        path.join(rapidkitDir, 'policies.yml'),
+        [
+          'version: "1.0"',
+          'mode: strict',
+          'rules:',
+          '  enforce_workspace_marker: true',
+          '  enforce_toolchain_lock: false',
+          '  disallow_untrusted_tool_sources: false',
+          '  enforce_compatibility_matrix: false',
+          '  require_mirror_lock_for_offline: true',
+          '',
+        ].join('\n'),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+
+      const index = await import('../index.js');
+      const initRunner = vi.fn().mockResolvedValue(0);
+      const code = await index.handleBootstrapCommand(
+        ['bootstrap', '--profile=enterprise', '--ci', '--offline'],
+        initRunner
+      );
+
+      expect(code).toBe(1);
+      expect(initRunner).not.toHaveBeenCalled();
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('passes strict enterprise bootstrap when mirror and compatibility artifacts exist', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-bootstrap-enterprise-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const mirrorSourceDir = path.join(workspaceRoot, 'mirror-source');
+      const artifactSource = path.join(mirrorSourceDir, 'rapidkit-core.whl');
+      const artifactContent = 'rapidkit-core-binary-content';
+      const artifactSha256 = createHash('sha256').update(artifactContent).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await mkdir(mirrorSourceDir, { recursive: true });
+      await writeFile(artifactSource, artifactContent, 'utf-8');
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(path.join(rapidkitDir, 'toolchain.lock'), '{}', 'utf-8');
+      await writeFile(
+        path.join(rapidkitDir, 'workspace.json'),
+        JSON.stringify({ profile: 'enterprise' }, null, 2),
+        'utf-8'
+      );
+      await writeFile(
+        path.join(rapidkitDir, 'policies.yml'),
+        [
+          'version: "1.0"',
+          'mode: strict',
+          'rules:',
+          '  enforce_workspace_marker: true',
+          '  enforce_toolchain_lock: true',
+          '  disallow_untrusted_tool_sources: false',
+          '  enforce_compatibility_matrix: true',
+          '  require_mirror_lock_for_offline: true',
+          '',
+        ].join('\n'),
+        'utf-8'
+      );
+      await writeFile(
+        path.join(rapidkitDir, 'compatibility-matrix.json'),
+        JSON.stringify({ runtimes: { node: { major: 20 } } }, null, 2),
+        'utf-8'
+      );
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-only',
+            artifacts: [
+              {
+                id: 'rapidkit-core-wheel',
+                source: path.relative(workspaceRoot, artifactSource),
+                target: 'rapidkit-core/rapidkit-core.whl',
+                sha256: artifactSha256,
+                required: true,
+              },
+            ],
+            retention: {
+              keepLast: 10,
+            },
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+
+      const index = await import('../index.js');
+      const initRunner = vi.fn().mockResolvedValue(0);
+      const code = await index.handleBootstrapCommand(
+        ['bootstrap', '--profile=enterprise', '--ci', '--offline'],
+        initRunner
+      );
+
+      expect(code).toBe(0);
+      expect(initRunner).toHaveBeenCalledWith(['init']);
+
+      const fsExtra = await import('fs-extra');
+      const mirrorLockPath = path.join(rapidkitDir, 'mirror.lock');
+      await expect(fsExtra.pathExists(mirrorLockPath)).resolves.toBe(true);
+
+      const lockRaw = await fsExtra.readFile(mirrorLockPath, 'utf-8');
+      const lockData = JSON.parse(lockRaw) as {
+        artifacts?: Array<{ id: string; sha256: string }>;
+      };
+      expect(Array.isArray(lockData.artifacts)).toBe(true);
+      expect(lockData.artifacts?.some((artifact) => artifact.id === 'rapidkit-core-wheel')).toBe(
+        true
+      );
+
+      await rm(workspaceRoot, { recursive: true, force: true });
     });
   });
 
@@ -131,6 +413,1017 @@ describe('Phase 3 command contract handlers', () => {
     });
   });
 
+  describe('mirror', () => {
+    it('shows mirror status inside workspace', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-mirror-status-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+
+      const code = await index.handleMirrorCommand(['mirror', 'status']);
+
+      expect(code).toBe(0);
+      const fsExtra = await import('fs-extra');
+      await expect(
+        fsExtra.pathExists(path.join(rapidkitDir, 'reports', 'mirror-ops.latest.json'))
+      ).resolves.toBe(true);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('outputs JSON for mirror status when --json is provided', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-mirror-status-json-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      await mkdir(rapidkitDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+      const code = await index.handleMirrorCommand(['mirror', 'status', '--json']);
+
+      expect(code).toBe(0);
+      expect(stdoutSpy).toHaveBeenCalled();
+      const output = stdoutSpy.mock.calls.map((call) => String(call[0])).join('');
+      const parsed = JSON.parse(output) as { command: string; action: string; result: string };
+      expect(parsed.command).toBe('mirror');
+      expect(parsed.action).toBe('status');
+      expect(parsed.result).toBe('ok');
+
+      stdoutSpy.mockRestore();
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('runs mirror sync lifecycle and writes lock', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-mirror-sync-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const sourceDir = path.join(workspaceRoot, 'mirror-source');
+      const sourceFile = path.join(sourceDir, 'artifact.tgz');
+      const sourceContent = 'mirror-artifact-content';
+      const sourceSha = createHash('sha256').update(sourceContent).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(sourceFile, sourceContent, 'utf-8');
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            artifacts: [
+              {
+                id: 'artifact-1',
+                source: path.relative(workspaceRoot, sourceFile),
+                target: 'pkg/artifact.tgz',
+                sha256: sourceSha,
+                required: true,
+              },
+            ],
+            retention: { keepLast: 5 },
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+      expect(code).toBe(0);
+
+      const fsExtra = await import('fs-extra');
+      await expect(fsExtra.pathExists(path.join(rapidkitDir, 'mirror.lock'))).resolves.toBe(true);
+      await expect(
+        fsExtra.pathExists(path.join(rapidkitDir, 'reports', 'mirror-ops.latest.json'))
+      ).resolves.toBe(true);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('prefetches remote mirror artifact with checksum pinning', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-mirror-prefetch-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const content = 'prefetched-artifact-content';
+      const sha = createHash('sha256').update(content).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(path.join(rapidkitDir, 'trusted-sources.lock'), 'localhost\n', 'utf-8');
+
+      const server = createServer((_req, res) => {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.end(content);
+      });
+
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+      const address = server.address() as AddressInfo;
+      const artifactUrl = `http://localhost:${address.port}/artifact.bin`;
+
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            artifacts: [
+              {
+                id: 'remote-artifact',
+                url: artifactUrl,
+                target: 'prefetch/artifact.bin',
+                sha256: sha,
+                required: true,
+              },
+            ],
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+
+      expect(code).toBe(0);
+
+      const fsExtra = await import('fs-extra');
+      const prefetchedFile = path.join(
+        rapidkitDir,
+        'mirror',
+        'artifacts',
+        'prefetch',
+        'artifact.bin'
+      );
+      await expect(fsExtra.pathExists(prefetchedFile)).resolves.toBe(true);
+
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve()))
+      );
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('retries prefetch and records provenance attempts', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-mirror-prefetch-retry-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const content = 'prefetch-retry-content';
+      const sha = createHash('sha256').update(content).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(path.join(rapidkitDir, 'trusted-sources.lock'), 'localhost\n', 'utf-8');
+
+      let requestCount = 0;
+      const server = createServer((_req, res) => {
+        requestCount += 1;
+        if (requestCount === 1) {
+          res.statusCode = 503;
+          res.end('temporary-failure');
+          return;
+        }
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.end(content);
+      });
+
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+      const address = server.address() as AddressInfo;
+      const artifactUrl = `http://localhost:${address.port}/artifact-retry.bin`;
+
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            prefetch: {
+              retries: 2,
+              backoffMs: 5,
+              timeoutMs: 2000,
+            },
+            artifacts: [
+              {
+                id: 'remote-retry-artifact',
+                url: artifactUrl,
+                target: 'prefetch-retry/artifact.bin',
+                sha256: sha,
+                required: true,
+              },
+            ],
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+
+      expect(code).toBe(0);
+      expect(requestCount).toBeGreaterThanOrEqual(2);
+
+      const fsExtra = await import('fs-extra');
+      const lockRaw = await fsExtra.readFile(path.join(rapidkitDir, 'mirror.lock'), 'utf-8');
+      const lock = JSON.parse(lockRaw) as {
+        artifacts?: Array<{
+          id: string;
+          provenance?: { attempts?: number; sourceType?: string };
+        }>;
+      };
+
+      const entry = lock.artifacts?.find((artifact) => artifact.id === 'remote-retry-artifact');
+      expect(entry).toBeTruthy();
+      expect(entry?.provenance?.sourceType).toBe('url');
+      expect((entry?.provenance?.attempts || 0) >= 2).toBe(true);
+
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve()))
+      );
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('verifies cryptographic attestation for mirrored artifact', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-mirror-attest-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const sourceDir = path.join(workspaceRoot, 'attest-source');
+      const sourceFile = path.join(sourceDir, 'artifact-attested.bin');
+      const sourceContent = 'attested-content';
+      const sourceSha = createHash('sha256').update(sourceContent).digest('hex');
+
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      const signer = createSign('sha256');
+      signer.update(Buffer.from(sourceContent, 'utf-8'));
+      signer.end();
+      const signature = signer.sign(privateKey).toString('base64');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(sourceFile, sourceContent, 'utf-8');
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-public.pem'),
+        publicKey.export({ type: 'spki', format: 'pem' }),
+        'utf-8'
+      );
+
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            security: { requireAttestation: true },
+            artifacts: [
+              {
+                id: 'attested-artifact',
+                source: path.relative(workspaceRoot, sourceFile),
+                target: 'attested/artifact.bin',
+                sha256: sourceSha,
+                required: true,
+                attestation: {
+                  signature,
+                  publicKeyPath: '.rapidkit/mirror-public.pem',
+                  algorithm: 'sha256',
+                },
+              },
+            ],
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+      expect(code).toBe(0);
+
+      const fsExtra = await import('fs-extra');
+      const lockRaw = await fsExtra.readFile(path.join(rapidkitDir, 'mirror.lock'), 'utf-8');
+      const lock = JSON.parse(lockRaw) as {
+        artifacts?: Array<{ id: string; attestation?: { detached?: { verified?: boolean } } }>;
+      };
+      const entry = lock.artifacts?.find((artifact) => artifact.id === 'attested-artifact');
+      expect(entry?.attestation?.detached?.verified).toBe(true);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('fails when attestation is required but missing', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-mirror-attest-required-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const sourceDir = path.join(workspaceRoot, 'attest-required-source');
+      const sourceFile = path.join(sourceDir, 'artifact.bin');
+      const sourceContent = 'no-attestation-content';
+      const sourceSha = createHash('sha256').update(sourceContent).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(sourceFile, sourceContent, 'utf-8');
+
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            security: { requireAttestation: true },
+            artifacts: [
+              {
+                id: 'unsigned-artifact',
+                source: path.relative(workspaceRoot, sourceFile),
+                target: 'unsigned/artifact.bin',
+                sha256: sourceSha,
+                required: true,
+              },
+            ],
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+      expect(code).toBe(1);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('verifies Sigstore attestation via cosign integration path (mocked)', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-mirror-sigstore-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const sourceDir = path.join(workspaceRoot, 'sigstore-source');
+      const sourceFile = path.join(sourceDir, 'artifact.bin');
+      const sourceContent = 'sigstore-content';
+      const sourceSha = createHash('sha256').update(sourceContent).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(sourceFile, sourceContent, 'utf-8');
+      await writeFile(path.join(rapidkitDir, 'artifact.sig'), 'dummy-signature', 'utf-8');
+
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            security: { requireSigstore: true, requireTransparencyLog: true },
+            artifacts: [
+              {
+                id: 'sigstore-artifact',
+                source: path.relative(workspaceRoot, sourceFile),
+                target: 'sigstore/artifact.bin',
+                sha256: sourceSha,
+                required: true,
+                attestation: {
+                  signature: Buffer.from('detached').toString('base64'),
+                  publicKeyPath: '.rapidkit/mirror-public.pem',
+                  sigstore: {
+                    signaturePath: '.rapidkit/artifact.sig',
+                    identity: 'release@getrapidkit.dev',
+                    issuer: 'https://token.actions.githubusercontent.com',
+                  },
+                },
+              },
+            ],
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      // Detached attestation inputs (valid) for existing checks
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      const signer = createSign('sha256');
+      signer.update(Buffer.from(sourceContent, 'utf-8'));
+      signer.end();
+      const detachedSignature = signer.sign(privateKey).toString('base64');
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-public.pem'),
+        publicKey.export({ type: 'spki', format: 'pem' }),
+        'utf-8'
+      );
+
+      const configRaw = await (
+        await import('fs-extra')
+      ).readFile(path.join(rapidkitDir, 'mirror-config.json'), 'utf-8');
+      const config = JSON.parse(configRaw) as Record<string, unknown>;
+      const artifacts = config.artifacts as Array<Record<string, unknown>>;
+      const attestation = artifacts[0].attestation as Record<string, unknown>;
+      attestation.signature = detachedSignature;
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(config, null, 2),
+        'utf-8'
+      );
+
+      process.env.RAPIDKIT_SIGSTORE_MOCK = 'success';
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+      expect(code).toBe(0);
+
+      const fsExtra = await import('fs-extra');
+      const lockRaw = await fsExtra.readFile(path.join(rapidkitDir, 'mirror.lock'), 'utf-8');
+      const lock = JSON.parse(lockRaw) as {
+        artifacts?: Array<{
+          id: string;
+          attestation?: { sigstore?: { verified?: boolean; tlogVerified?: boolean } };
+        }>;
+      };
+      const entry = lock.artifacts?.find((artifact) => artifact.id === 'sigstore-artifact');
+      expect(entry?.attestation?.sigstore?.verified).toBe(true);
+      expect(entry?.attestation?.sigstore?.tlogVerified).toBe(true);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('fails when Sigstore is required but missing', async () => {
+      const workspaceRoot = await mkdtemp(
+        path.join(tmpdir(), 'rapidkit-mirror-sigstore-required-')
+      );
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const sourceDir = path.join(workspaceRoot, 'sigstore-required-source');
+      const sourceFile = path.join(sourceDir, 'artifact.bin');
+      const sourceContent = 'sigstore-required-content';
+      const sourceSha = createHash('sha256').update(sourceContent).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(sourceFile, sourceContent, 'utf-8');
+
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            security: { requireSigstore: true },
+            artifacts: [
+              {
+                id: 'unsigned-sigstore-artifact',
+                source: path.relative(workspaceRoot, sourceFile),
+                target: 'sigstore-required/artifact.bin',
+                sha256: sourceSha,
+                required: true,
+                attestation: {
+                  signature: Buffer.from('placeholder').toString('base64'),
+                  publicKeyPath: '.rapidkit/nonexistent.pem',
+                },
+              },
+            ],
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+      expect(code).toBe(1);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('passes Sigstore governance allowlists in prod environment', async () => {
+      const workspaceRoot = await mkdtemp(
+        path.join(tmpdir(), 'rapidkit-mirror-sigstore-policy-pass-')
+      );
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const sourceDir = path.join(workspaceRoot, 'sigstore-policy-pass-source');
+      const sourceFile = path.join(sourceDir, 'artifact.bin');
+      const sourceContent = 'sigstore-policy-pass-content';
+      const sourceSha = createHash('sha256').update(sourceContent).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(sourceFile, sourceContent, 'utf-8');
+
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      const signer = createSign('sha256');
+      signer.update(Buffer.from(sourceContent, 'utf-8'));
+      signer.end();
+      const detachedSignature = signer.sign(privateKey).toString('base64');
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-public.pem'),
+        publicKey.export({ type: 'spki', format: 'pem' }),
+        'utf-8'
+      );
+      await writeFile(path.join(rapidkitDir, 'artifact.sig'), 'dummy-signature', 'utf-8');
+
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            security: {
+              requireSigstore: true,
+              governance: {
+                policies: {
+                  prod: {
+                    allowedIdentities: ['release@getrapidkit.dev'],
+                    allowedIssuers: ['https://token.actions.githubusercontent.com'],
+                    allowedRekorUrls: ['https://rekor.sigstore.dev'],
+                    requireTransparencyLog: true,
+                  },
+                },
+              },
+            },
+            artifacts: [
+              {
+                id: 'sigstore-policy-pass-artifact',
+                source: path.relative(workspaceRoot, sourceFile),
+                target: 'sigstore-policy-pass/artifact.bin',
+                sha256: sourceSha,
+                required: true,
+                attestation: {
+                  signature: detachedSignature,
+                  publicKeyPath: '.rapidkit/mirror-public.pem',
+                  sigstore: {
+                    signaturePath: '.rapidkit/artifact.sig',
+                    identity: 'release@getrapidkit.dev',
+                    issuer: 'https://token.actions.githubusercontent.com',
+                    rekorUrl: 'https://rekor.sigstore.dev',
+                  },
+                },
+              },
+            ],
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.env.RAPIDKIT_SIGSTORE_MOCK = 'success';
+      process.env.RAPIDKIT_ENV = 'prod';
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+      expect(code).toBe(0);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('fails Sigstore governance allowlists in prod environment', async () => {
+      const workspaceRoot = await mkdtemp(
+        path.join(tmpdir(), 'rapidkit-mirror-sigstore-policy-fail-')
+      );
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const sourceDir = path.join(workspaceRoot, 'sigstore-policy-fail-source');
+      const sourceFile = path.join(sourceDir, 'artifact.bin');
+      const sourceContent = 'sigstore-policy-fail-content';
+      const sourceSha = createHash('sha256').update(sourceContent).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(sourceFile, sourceContent, 'utf-8');
+
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      const signer = createSign('sha256');
+      signer.update(Buffer.from(sourceContent, 'utf-8'));
+      signer.end();
+      const detachedSignature = signer.sign(privateKey).toString('base64');
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-public.pem'),
+        publicKey.export({ type: 'spki', format: 'pem' }),
+        'utf-8'
+      );
+      await writeFile(path.join(rapidkitDir, 'artifact.sig'), 'dummy-signature', 'utf-8');
+
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            security: {
+              requireSigstore: true,
+              governance: {
+                policies: {
+                  prod: {
+                    allowedIdentities: ['release@getrapidkit.dev'],
+                    allowedIssuers: ['https://token.actions.githubusercontent.com'],
+                  },
+                },
+              },
+            },
+            artifacts: [
+              {
+                id: 'sigstore-policy-fail-artifact',
+                source: path.relative(workspaceRoot, sourceFile),
+                target: 'sigstore-policy-fail/artifact.bin',
+                sha256: sourceSha,
+                required: true,
+                attestation: {
+                  signature: detachedSignature,
+                  publicKeyPath: '.rapidkit/mirror-public.pem',
+                  sigstore: {
+                    signaturePath: '.rapidkit/artifact.sig',
+                    identity: 'intruder@getrapidkit.dev',
+                    issuer: 'https://token.actions.githubusercontent.com',
+                  },
+                },
+              },
+            ],
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.env.RAPIDKIT_SIGSTORE_MOCK = 'success';
+      process.env.RAPIDKIT_ENV = 'prod';
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+      expect(code).toBe(1);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('accepts verified signed governance bundle and enforces its policy', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-governance-bundle-pass-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const sourceDir = path.join(workspaceRoot, 'governance-bundle-source');
+      const sourceFile = path.join(sourceDir, 'artifact.bin');
+      const sourceContent = 'governance-bundle-content';
+      const sourceSha = createHash('sha256').update(sourceContent).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(sourceFile, sourceContent, 'utf-8');
+
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      await writeFile(path.join(rapidkitDir, 'sigstore.sig'), 'dummy-signature', 'utf-8');
+
+      const governancePayload = {
+        policies: {
+          prod: {
+            allowedIdentities: ['release@getrapidkit.dev'],
+            allowedIssuers: ['https://token.actions.githubusercontent.com'],
+            allowedRekorUrls: ['https://rekor.sigstore.dev'],
+            requireTransparencyLog: true,
+          },
+        },
+      };
+      const governanceRaw = JSON.stringify(governancePayload, null, 2);
+      const governancePath = path.join(rapidkitDir, 'governance-policy.json');
+      await writeFile(governancePath, governanceRaw, 'utf-8');
+
+      const governanceSigner = createSign('sha256');
+      governanceSigner.update(governanceRaw);
+      governanceSigner.end();
+      const governanceSignature = governanceSigner.sign(privateKey).toString('base64');
+      await writeFile(
+        path.join(rapidkitDir, 'governance-policy.sig'),
+        governanceSignature,
+        'utf-8'
+      );
+      await writeFile(
+        path.join(rapidkitDir, 'governance-public.pem'),
+        publicKey.export({ type: 'spki', format: 'pem' }),
+        'utf-8'
+      );
+
+      const { privateKey: detachedPriv, publicKey: detachedPub } = generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+      });
+      const signer = createSign('sha256');
+      signer.update(Buffer.from(sourceContent, 'utf-8'));
+      signer.end();
+      const detachedSignature = signer.sign(detachedPriv).toString('base64');
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-public.pem'),
+        detachedPub.export({ type: 'spki', format: 'pem' }),
+        'utf-8'
+      );
+
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            security: {
+              requireSigstore: true,
+              requireSignedGovernance: true,
+              governanceBundle: {
+                policyPath: '.rapidkit/governance-policy.json',
+                signaturePath: '.rapidkit/governance-policy.sig',
+                publicKeyPath: '.rapidkit/governance-public.pem',
+                algorithm: 'sha256',
+              },
+            },
+            artifacts: [
+              {
+                id: 'governance-bundle-artifact',
+                source: path.relative(workspaceRoot, sourceFile),
+                target: 'governance-bundle/artifact.bin',
+                sha256: sourceSha,
+                required: true,
+                attestation: {
+                  signature: detachedSignature,
+                  publicKeyPath: '.rapidkit/mirror-public.pem',
+                  sigstore: {
+                    signaturePath: '.rapidkit/sigstore.sig',
+                    identity: 'release@getrapidkit.dev',
+                    issuer: 'https://token.actions.githubusercontent.com',
+                    rekorUrl: 'https://rekor.sigstore.dev',
+                  },
+                },
+              },
+            ],
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.env.RAPIDKIT_SIGSTORE_MOCK = 'success';
+      process.env.RAPIDKIT_ENV = 'prod';
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+      expect(code).toBe(0);
+
+      const fsExtra = await import('fs-extra');
+      await expect(
+        fsExtra.pathExists(path.join(rapidkitDir, 'reports', 'transparency-evidence.latest.json'))
+      ).resolves.toBe(true);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('blocks when signed governance bundle is required but signature is invalid', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-governance-bundle-fail-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const sourceDir = path.join(workspaceRoot, 'governance-bundle-fail-source');
+      const sourceFile = path.join(sourceDir, 'artifact.bin');
+      const sourceContent = 'governance-bundle-fail-content';
+      const sourceSha = createHash('sha256').update(sourceContent).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(sourceFile, sourceContent, 'utf-8');
+      await writeFile(
+        path.join(rapidkitDir, 'governance-policy.json'),
+        JSON.stringify({ policies: { prod: {} } }, null, 2),
+        'utf-8'
+      );
+      await writeFile(
+        path.join(rapidkitDir, 'governance-policy.sig'),
+        'invalid-signature',
+        'utf-8'
+      );
+
+      const { publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      await writeFile(
+        path.join(rapidkitDir, 'governance-public.pem'),
+        publicKey.export({ type: 'spki', format: 'pem' }),
+        'utf-8'
+      );
+
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            security: {
+              requireSignedGovernance: true,
+              governanceBundle: {
+                policyPath: '.rapidkit/governance-policy.json',
+                signaturePath: '.rapidkit/governance-policy.sig',
+                publicKeyPath: '.rapidkit/governance-public.pem',
+              },
+            },
+            artifacts: [
+              {
+                id: 'governance-fail-artifact',
+                source: path.relative(workspaceRoot, sourceFile),
+                target: 'governance-fail/artifact.bin',
+                sha256: sourceSha,
+                required: true,
+              },
+            ],
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+      expect(code).toBe(1);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('exports transparency evidence to file sink', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-evidence-file-sink-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const sourceDir = path.join(workspaceRoot, 'evidence-file-source');
+      const sourceFile = path.join(sourceDir, 'artifact.bin');
+      const sourceContent = 'evidence-file-content';
+      const sourceSha = createHash('sha256').update(sourceContent).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(sourceFile, sourceContent, 'utf-8');
+      await writeFile(path.join(rapidkitDir, 'artifact.sig'), 'dummy-signature', 'utf-8');
+
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      const signer = createSign('sha256');
+      signer.update(Buffer.from(sourceContent, 'utf-8'));
+      signer.end();
+      const detachedSignature = signer.sign(privateKey).toString('base64');
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-public.pem'),
+        publicKey.export({ type: 'spki', format: 'pem' }),
+        'utf-8'
+      );
+
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            security: {
+              requireSigstore: true,
+              evidenceExport: {
+                enabled: true,
+                target: 'file',
+                filePath: '.rapidkit/reports/siem-evidence.ndjson',
+                failOnError: true,
+              },
+            },
+            artifacts: [
+              {
+                id: 'evidence-file-artifact',
+                source: path.relative(workspaceRoot, sourceFile),
+                target: 'evidence-file/artifact.bin',
+                sha256: sourceSha,
+                required: true,
+                attestation: {
+                  signature: detachedSignature,
+                  publicKeyPath: '.rapidkit/mirror-public.pem',
+                  sigstore: {
+                    signaturePath: '.rapidkit/artifact.sig',
+                    identity: 'release@getrapidkit.dev',
+                    issuer: 'https://token.actions.githubusercontent.com',
+                  },
+                },
+              },
+            ],
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.env.RAPIDKIT_SIGSTORE_MOCK = 'success';
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+      expect(code).toBe(0);
+
+      const fsExtra = await import('fs-extra');
+      const sinkPath = path.join(rapidkitDir, 'reports', 'siem-evidence.ndjson');
+      await expect(fsExtra.pathExists(sinkPath)).resolves.toBe(true);
+
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+
+    it('exports transparency evidence to HTTP webhook sink', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-evidence-http-sink-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+      const sourceDir = path.join(workspaceRoot, 'evidence-http-source');
+      const sourceFile = path.join(sourceDir, 'artifact.bin');
+      const sourceContent = 'evidence-http-content';
+      const sourceSha = createHash('sha256').update(sourceContent).digest('hex');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(path.join(workspaceRoot, '.rapidkit-workspace'), '{}', 'utf-8');
+      await writeFile(sourceFile, sourceContent, 'utf-8');
+      await writeFile(path.join(rapidkitDir, 'artifact.sig'), 'dummy-signature', 'utf-8');
+
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      const signer = createSign('sha256');
+      signer.update(Buffer.from(sourceContent, 'utf-8'));
+      signer.end();
+      const detachedSignature = signer.sign(privateKey).toString('base64');
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-public.pem'),
+        publicKey.export({ type: 'spki', format: 'pem' }),
+        'utf-8'
+      );
+
+      let received = false;
+      const webhook = createServer((req, res) => {
+        if (req.method === 'POST') {
+          received = true;
+        }
+        req.resume();
+        res.statusCode = 200;
+        res.end('ok');
+      });
+
+      await new Promise<void>((resolve) => webhook.listen(0, '127.0.0.1', () => resolve()));
+      const address = webhook.address() as AddressInfo;
+      const endpoint = `http://127.0.0.1:${address.port}/siem`;
+
+      await writeFile(
+        path.join(rapidkitDir, 'mirror-config.json'),
+        JSON.stringify(
+          {
+            enabled: true,
+            mode: 'offline-first',
+            security: {
+              requireSigstore: true,
+              evidenceExport: {
+                enabled: true,
+                target: 'http',
+                endpoint,
+                failOnError: true,
+                timeoutMs: 3000,
+              },
+            },
+            artifacts: [
+              {
+                id: 'evidence-http-artifact',
+                source: path.relative(workspaceRoot, sourceFile),
+                target: 'evidence-http/artifact.bin',
+                sha256: sourceSha,
+                required: true,
+                attestation: {
+                  signature: detachedSignature,
+                  publicKeyPath: '.rapidkit/mirror-public.pem',
+                  sigstore: {
+                    signaturePath: '.rapidkit/artifact.sig',
+                    identity: 'release@getrapidkit.dev',
+                    issuer: 'https://token.actions.githubusercontent.com',
+                  },
+                },
+              },
+            ],
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+
+      process.env.RAPIDKIT_SIGSTORE_MOCK = 'success';
+      process.chdir(workspaceRoot);
+      const index = await import('../index.js');
+      const code = await index.handleMirrorCommand(['mirror', 'sync']);
+      expect(code).toBe(0);
+      expect(received).toBe(true);
+
+      await new Promise<void>((resolve, reject) =>
+        webhook.close((error) => (error ? reject(error) : resolve()))
+      );
+      await rm(workspaceRoot, { recursive: true, force: true });
+    });
+  });
+
   describe('core forwarding boundary', () => {
     it('keeps bootstrap/setup/cache npm-local and never forwards to core', async () => {
       const index = await import('../index.js');
@@ -138,6 +1431,7 @@ describe('Phase 3 command contract handlers', () => {
       await expect(index.shouldForwardToCore(['bootstrap'])).resolves.toBe(false);
       await expect(index.shouldForwardToCore(['setup', 'python'])).resolves.toBe(false);
       await expect(index.shouldForwardToCore(['cache', 'status'])).resolves.toBe(false);
+      await expect(index.shouldForwardToCore(['mirror', 'status'])).resolves.toBe(false);
     });
   });
 });

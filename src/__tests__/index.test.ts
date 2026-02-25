@@ -39,7 +39,7 @@ describe('CLI Entry Point', () => {
       expect(stdout).toContain('Global CLI');
 
       // Core sections
-      expect(stdout).toContain('Global Engine Commands');
+      expect(stdout).toContain('Workspace Setup Commands');
       expect(stdout).toContain('Project Commands');
 
       // Known commands
@@ -47,12 +47,19 @@ describe('CLI Entry Point', () => {
       expect(stdout).toContain('rapidkit init');
       expect(stdout).toContain('rapidkit dev');
       expect(stdout).toContain('rapidkit help');
+      expect(stdout).toContain('mirror status --json | sync | verify | rotate');
+      expect(stdout).toContain('cache status | clear | prune | repair');
 
-      // Legacy flags should NOT appear
+      // Legacy options should remain hidden from option list
       expect(stdout).not.toContain('--template');
-      expect(stdout).not.toContain('--skip-install');
       expect(stdout).not.toContain('--skip-git');
       expect(stdout).not.toContain('--dry-run');
+
+      // Clarification note must be visible in help text
+      expect(stdout).toContain(
+        '--skip-install (npm wrapper) enables fast-path for lock/dependency steps.'
+      );
+      expect(stdout).toContain('core --skip-essentials');
     });
 
     it('should not show legacy flags even when legacy env is enabled', async () => {
@@ -61,16 +68,42 @@ describe('CLI Entry Point', () => {
       });
 
       expect(stdout).not.toContain('--template');
-      expect(stdout).not.toContain('--skip-install');
+      expect(stdout).toContain('core --skip-essentials');
     });
 
     it('should display the same help output with -h flag', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '-h']);
 
       expect(stdout).toContain('RapidKit');
-      expect(stdout).toContain('Global Engine Commands');
+      expect(stdout).toContain('Workspace Setup Commands');
       expect(stdout).toContain('Project Commands');
       expect(stdout).toContain('rapidkit help');
+    });
+
+    it('should keep workspace help command variants aligned with supported actions', async () => {
+      const { stdout } = await execa('node', [CLI_PATH, '--help']);
+
+      expect(stdout).toContain(
+        'rapidkit mirror            Manage registry mirrors   (mirror status --json | sync | verify | rotate)'
+      );
+      expect(stdout).toContain(
+        'rapidkit cache             Manage package cache      (cache status | clear | prune | repair)'
+      );
+    });
+
+    it('should match workspace setup help block snapshot', async () => {
+      const { stdout } = await execa('node', [CLI_PATH, '--help']);
+      const block = stdout.match(/Workspace Setup Commands[\s\S]*?Project Commands/);
+
+      expect(block?.[0].replace(/\r/g, '')).toMatchInlineSnapshot(`
+        "Workspace Setup Commands
+          rapidkit bootstrap         Bootstrap projects in workspace (--profile python-only|node-only|go-only|polyglot|enterprise)
+          rapidkit setup <runtime>   Set up runtime toolchain  (runtime: python | node | go)
+          rapidkit mirror            Manage registry mirrors   (mirror status --json | sync | verify | rotate)
+          rapidkit cache             Manage package cache      (cache status | clear | prune | repair)
+
+        Project Commands"
+      `);
     });
   });
 

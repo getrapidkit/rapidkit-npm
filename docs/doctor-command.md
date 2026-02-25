@@ -62,7 +62,7 @@ npx rapidkit doctor --workspace
 🩺 RapidKit Health Check
 
 Workspace: my-workspace
-Path: /home/user/my-workspace
+Path: <workspace-path>/my-workspace
 
 System Tools:
 
@@ -78,13 +78,13 @@ System Tools:
 📦 Projects (2):
 
 ✅ Project: my-api
-   Path: /home/user/my-workspace/my-api
+   Path: <workspace-path>/my-workspace/my-api
    ✅ Virtual environment: Active
    ✅ RapidKit Core: 0.2.2rc1
    ✅ Dependencies: Installed
 
 ⚠️  Project: auth-service
-   Path: /home/user/my-workspace/auth-service
+   Path: <workspace-path>/my-workspace/auth-service
    ❌ Virtual environment: Not found
    ❌ RapidKit Core: Not installed
    ⚠️  Dependencies: Not verified

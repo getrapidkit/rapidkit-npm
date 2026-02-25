@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 RapidKit CLI
+# 🚀 RapidKit NPM CLI
 
 ### Build Production-Ready APIs in Seconds
 
@@ -14,8 +14,8 @@ Clean architecture • Zero boilerplate • Instant deployment.
 [![GitHub Stars](https://img.shields.io/github/stars/getrapidkit/rapidkit-npm.svg?style=flat-square)](https://github.com/getrapidkit/rapidkit-npm/stargazers)
 
 ```bash
-# 1. Create a workspace — shared Python env for all your projects
-npx rapidkit init
+# 1. Creates my-workspace/ with minimal profile — no prompts, no mkdir needed
+npx rapidkit my-workspace
 cd my-workspace
 
 # 2. Scaffold a project inside the workspace
@@ -27,8 +27,10 @@ npx rapidkit init && npx rapidkit dev
 # ✅ Production-ready API running at http://localhost:8000
 ```
 
-> **Workspace approach:** one shared Python environment hosts multiple projects (FastAPI, NestJS, or both).
-> Each project gets its own folder, clean architecture, Docker, and CI/CD — but shares a single `~150 MB` venv.
+> **`npx rapidkit init` is context-aware** — it detects where you are and does the right thing:
+> - 📁 **Outside any workspace** → creates `my-workspace/` with stub `pyproject.toml`/`poetry.toml` (minimal profile, zero prompts, no Python install yet)
+> - 🏠 **Inside workspace root** → installs Python deps + creates `.venv` / launchers (skipped for `go-only`)
+> - 🗂️ **Inside project folder** → installs project dependencies (Python / Node / Go)
 
 Using Node.js/NestJS? Use this direct kit command (inside or outside a workspace):
 
@@ -119,30 +121,55 @@ cd my-api && npx rapidkit init && npx rapidkit dev
 
 ## 🚀 Quick Start
 
-### Option 0: Fastest Start (`npx rapidkit init`)
+### Option 0: Fastest Start — `npx rapidkit init`
 
-Use this when you want the quickest complete flow (workspace + project + run):
+`npx rapidkit init` is the **one command** that works in every context:
+
+| Where you run it | What it does |
+|------------------|---------------|
+| **Empty folder** | Creates workspace with stub `pyproject.toml`/`poetry.toml` (no Python install yet) |
+| **Workspace root** | Installs Python deps + launchers (`go-only` skips; `go mod tidy` per child project) |
+| **Project folder** | Installs project dependencies (Python / Node / Go) |
 
 ```bash
-cd ~/my-empty-folder
-
-# Creates my-workspace/ with a shared Python environment
+# Step 1: creates my-workspace/ automatically (minimal profile, zero prompts)
 npx rapidkit init
 cd my-workspace
 
-# Scaffold a project (interactive, or pass kit + name directly)
-npx rapidkit create project fastapi.standard my-api
+# Step 2: scaffold a project (interactive kit picker)
+npx rapidkit create project
 cd my-api
 
-# Install project deps & start dev server
-npx rapidkit init && npx rapidkit dev
+# Step 3: install deps and run
+npx rapidkit init   # detected: inside project folder → installs project deps
+npx rapidkit dev
 # ✅ http://localhost:8000
 ```
 
-This is the recommended quickest onboarding path for most users.
-`npx rapidkit init` is context-aware and auto-detects plain folders, workspace roots, and project directories.
+> Want to choose a profile (python-only, node-only, go-only …) or pick a workspace name?
+> Use `npx rapidkit my-workspace` instead — it shows an interactive wizard.
 
 **Why workspace?** All projects under `my-workspace/` share one Python virtualenv — so adding a second or third service costs almost no extra disk space, and the RapidKit Core version stays consistent across all of them.
+
+### Option 0b: Named Workspace with Profile Picker
+
+Use this when you want to choose a specific profile or name:
+
+```bash
+npx rapidkit my-workspace   # interactive: name + profile picker
+cd my-workspace
+
+# Profile options shown during creation:
+# ❯ minimal        — Foundation files only (fastest, mixed projects)
+#   python-only    — Python + Poetry (FastAPI, Django, ML)
+#   node-only      — Node.js runtime (NestJS, Express, Next.js)
+#   go-only        — Go runtime (Fiber, Gin, gRPC)
+#   polyglot       — Python + Node.js + Go multi-runtime
+#   enterprise     — Polyglot + governance + Sigstore
+
+npx rapidkit create project fastapi.standard my-api
+cd my-api && npx rapidkit init && npx rapidkit dev
+```
 
 Prefer direct kit selection (works both inside and outside a workspace):
 
@@ -343,17 +370,22 @@ Choose the right mode for your use case:
 ```
 my-workspace/
 ├── .rapidkit-workspace      # Workspace marker file
-├── .venv/                   # Shared Python environment
-├── poetry.lock              # Locked dependencies
-├── poetry.toml              # Poetry configuration
-├── pyproject.toml           # Workspace Python config
-├── rapidkit                 # CLI script (Unix)
-├── rapidkit.cmd             # CLI script (Windows)
+├── pyproject.toml           # Workspace Python config (stub on creation; rapidkit-core declared)
+├── poetry.toml              # Poetry config (virtualenvs.in-project = true)
+├── poetry.lock              # Created on first `npx rapidkit init` (not go-only)
+├── .venv/                   # Created on first `npx rapidkit init` (not go-only)
+├── rapidkit                 # CLI launcher Unix  (created on first `npx rapidkit init`)
+├── rapidkit.cmd             # CLI launcher Windows (created on first `npx rapidkit init`)
 ├── README.md
 ├── my-api/                  # FastAPI project
 ├── my-service/              # NestJS project
 └── my-admin/                # Another project
 ```
+
+> **Profile notes:**
+> - `go-only` — `.venv`, `poetry.lock`, launchers are never created (Go kits need no Python engine).
+> - `minimal` / `node-only` — Python deps + launchers are created on first `npx rapidkit init` inside the workspace root.
+> - `python-only` / `polyglot` / `enterprise` — Python deps + launchers are created immediately at workspace creation.
 
 #### FastAPI Project (DDD Architecture)
 
@@ -589,6 +621,48 @@ npx rapidkit --version                    # Show version
 npx rapidkit --help                       # Show help
 ```
 
+> ℹ️ Flag semantics for project creation:
+> - `--skip-install` (npm wrapper) enables fast-path lock/dependency behavior.
+> - `--skip-essentials` (core flag) skips essential module installation.
+> - They are intentionally different and should not be treated as interchangeable.
+
+### Workspace Operations
+
+RapidKit also ships enterprise workspace contracts for bootstrap, setup, cache lifecycle, and mirror/governance flows.
+
+```bash
+# Wrapper contracts
+npx rapidkit bootstrap                    # Workspace bootstrap flow (profile + policy aware)
+npx rapidkit setup python                 # Python runtime setup/prereq check
+npx rapidkit setup node                   # Node runtime setup/prereq check
+npx rapidkit setup go                     # Go runtime setup/prereq check
+npx rapidkit cache status                 # Cache status overview
+npx rapidkit cache clear                  # Clear workspace caches
+npx rapidkit cache prune                  # Prune stale cache entries
+npx rapidkit cache repair                 # Attempt cache repair / self-heal
+npx rapidkit mirror                       # Mirror status (default action)
+npx rapidkit mirror sync                  # Sync mirror artifacts and lock state
+npx rapidkit mirror verify                # Verify mirror/offline integrity
+npx rapidkit mirror rotate                # Rotate mirror metadata/artifacts
+```
+
+> ℹ️ `setup` requires a runtime argument: `python`, `node`, or `go`.
+> Running `npx rapidkit mirror` without subcommands shows status only.
+> ℹ️ Running `npx rapidkit bootstrap` inside a workspace (without `--profile`) shows an interactive
+> profile picker in TTY mode, pre-selecting the current workspace profile. Press Enter to keep it,
+> or choose a new profile. In CI/JSON/non-TTY mode it stays non-interactive and uses workspace.json.
+
+Policy and governance coverage in this phase includes:
+- `dependency_sharing_mode` policy: `isolated`, `shared-runtime-caches`, `shared-node-deps`
+- bootstrap profiles: `minimal`, `go-only`, `python-only`, `polyglot`, `enterprise`
+- signed governance bundle verification and Sigstore/Cosign verification path
+- transparency evidence retention and export under `.rapidkit/reports/`
+
+Typical report artifacts generated by governance/mirror/compliance workflows:
+- `.rapidkit/reports/bootstrap-compliance*.json`
+- `.rapidkit/reports/mirror-ops*.json`
+- `.rapidkit/reports/transparency-evidence*.json`
+
 `npx rapidkit create workspace` interactive prompts:
 - Without a name: asks workspace name, author name, Python version, and install method.
 - With a name: asks author name, Python version, and install method.
@@ -607,9 +681,11 @@ npx rapidkit format    # Format code
 ```
 
 `npx rapidkit init` behavior:
-- In a plain folder: creates `my-workspace` (or `my-workspace-<n>` if needed) and initializes it.
-- In a workspace root: initializes workspace dependencies, then initializes all detected child projects.
-- In a project inside a workspace: initializes only that project.
+- In a plain folder: creates `my-workspace/` (minimal profile, zero prompts) with stub `pyproject.toml` + `poetry.toml`. No Python install at this stage.
+- In a workspace root:
+  - `go-only` profile → shows guidance, nothing installed (Go deps are per-project).
+  - All other profiles → installs Python dependencies (`poetry install`), creates `.venv/` and launcher scripts, then initializes all detected child projects.
+- In a project inside a workspace: initializes only that project (`go mod tidy` / `npm install` / `poetry install` depending on type).
 
 Quick examples:
 
@@ -658,6 +734,10 @@ npx rapidkit create --no-update-check     # Skip version check
 |---------|-------------|---------|
 | `create workspace` | Create workspace | Anywhere |
 | `create project` | Create project | Anywhere |
+| `bootstrap` | Profile/policy-aware workspace bootstrap | Workspace |
+| `setup` | Runtime setup/prereq check (`python|node|go`) | Anywhere |
+| `cache` | Workspace cache lifecycle (`status/clear/prune/repair`) | Workspace |
+| `mirror` | Mirror lifecycle (`status/sync/verify/rotate`) | Workspace |
 | `init` | Context-aware dependency setup | Folder / workspace / project |
 | `dev` | Start dev server | Inside project |
 | `test` | Run tests | Inside project |

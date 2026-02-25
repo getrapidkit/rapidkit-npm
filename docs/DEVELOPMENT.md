@@ -1,5 +1,12 @@
 # Development Guide
 
+> Maintenance reference for the RapidKit npm CLI.
+>
+> If you are an end user (project/workspace usage), use:
+> - `docs/SETUP.md`
+> - `docs/README.md`
+> - top-level `README.md`
+
 This package is the RapidKit npm CLI (Node/TypeScript) that bootstraps and invokes the Python Core.
 
 ## Prereqs
@@ -24,7 +31,7 @@ npm run build
 
 ### User configuration file
 
-Create `~/.rapidkitrc.json` to set defaults:
+Create `$HOME/.rapidkitrc.json` to set defaults:
 
 ```json
 {
@@ -46,7 +53,7 @@ Use a local RapidKit Core checkout for development/testing:
 ```bash
 export RAPIDKIT_DEV_PATH=/path/to/local/rapidkit
 
-# Or add to ~/.rapidkitrc.json:
+# Or add to $HOME/.rapidkitrc.json:
 # { "testRapidKitPath": "/path/to/local/rapidkit" }
 
 npx rapidkit my-workspace --test-mode
@@ -137,7 +144,7 @@ Bridge + Core integration:
 - `RAPIDKIT_CORE_PYTHON_PACKAGE` - Override Core install target for the Python bridge (path or package spec)
 - `RAPIDKIT_BRIDGE_FORCE_VENV=1` - Force using the cached bridge venv even if system Python has Core
 - `RAPIDKIT_BRIDGE_UPGRADE_PIP=1` - Upgrade pip inside the bridge venv during bootstrap
-- `XDG_CACHE_HOME` - Cache root used by the bridge (defaults to `~/.cache` on Linux)
+- `XDG_CACHE_HOME` - Cache root used by the bridge (defaults to `$HOME/.cache` on Linux)
 
 Scenario script toggles:
 

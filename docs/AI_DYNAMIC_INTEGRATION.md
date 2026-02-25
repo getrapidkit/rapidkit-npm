@@ -7,11 +7,11 @@
 
 ## 🎯 Summary
 
-AI system is now **fully dynamic** and fetches module list from **RapidKit Python Core** instead of hardcoded catalog.
+AI system uses a **dynamic runtime catalog** and fetches module metadata from **RapidKit Python Core** instead of relying only on hardcoded entries.
 
 ### Before (Static):
 ```typescript
-// ❌ Hardcoded 11 modules
+// ❌ Hardcoded fixed subset
 export const MODULE_CATALOG = [
   { id: 'authentication-core', ... },
   // ... 10 more
@@ -41,8 +41,8 @@ AI Recommender
 getModuleCatalog()
     ↓
     ├─ Try: rapidkit modules list --json
-    │   └─ Success: Return Python modules (27 modules)
-    │   └─ Fail: Return fallback catalog (11 modules)
+    │   └─ Success: Return Python modules (runtime count)
+    │   └─ Fail: Return fallback catalog (baseline subset)
     ↓
 Generate Embeddings
     ↓
@@ -147,14 +147,14 @@ After 5 min:
 
 ```
 Try Python Core:
-├─ Success → Use 27 modules ✅
-├─ Python not in PATH → Use 11 fallback modules ⚠️
-├─ Command timeout → Use 11 fallback modules ⚠️
-└─ Parse error → Use 11 fallback modules ⚠️
+├─ Success → Use runtime module catalog ✅
+├─ Python not in PATH → Use fallback subset ⚠️
+├─ Command timeout → Use fallback subset ⚠️
+└─ Parse error → Use fallback subset ⚠️
 ```
 
 **Fallback catalog:**
-- 11 core modules (hardcoded)
+- Baseline core modules (hardcoded subset)
 - Authentication, database, payment, etc.
 - Enough for basic recommendations
 
@@ -165,12 +165,12 @@ Try Python Core:
 **Now dynamic:**
 
 ```bash
-# Old: Generated from hardcoded 11 modules
+# Old: Generated from fixed hardcoded subset
 npx tsx src/ai/generate-embeddings.ts
 
 # New: Fetches from Python Core first
-# → Gets 27 modules
-# → Generates embeddings for all 27
+# → Gets runtime module catalog
+# → Generates embeddings for all discovered modules
 # → Saves to data/modules-embeddings.json
 ```
 
@@ -186,7 +186,7 @@ npx tsx src/ai/generate-embeddings.ts
       "name": "Authentication Core",
       "embedding": [0.123, -0.456, ...]
     }
-    // ... 27 modules (from Python)
+    // ... runtime modules (from Python)
   ]
 }
 ```
@@ -202,9 +202,9 @@ $ rapidkit ai recommend "I need user authentication"
 
 # Behind the scenes:
 # 1. Calls: rapidkit modules list --json
-# 2. Gets: 27 modules from Python Core
+# 2. Gets runtime module catalog from Python Core
 # 3. Generates query embedding
-# 4. Compares with 27 module embeddings
+# 4. Compares with catalog embeddings
 # 5. Returns top 5 recommendations
 
 📦 Recommended Modules:
@@ -223,9 +223,9 @@ $ rapidkit ai recommend "payment processing"
 
 # Console output:
 ⚠️  RapidKit Python Core not found in PATH
-   Using fallback module catalog (11 modules)
+  Using fallback module catalog (baseline subset)
 
-# Still works! Uses hardcoded 11 modules
+# Still works! Uses hardcoded fallback subset
 📦 Recommended Modules:
 1. stripe-payment ⭐ (95% match)
 ...
@@ -269,7 +269,7 @@ When Python Core adds new modules:
 ### ✅ Single Source of Truth
 ```
 Module Registry:
-├─ Python Core: 27 modules (source of truth)
+├─ Python Core: runtime catalog (source of truth)
 ├─ npm AI: Reads from Python (always synced)
 └─ No duplicate data
 ```
@@ -277,7 +277,7 @@ Module Registry:
 ### ✅ Graceful Fallback
 ```
 If Python unavailable:
-├─ Still works (11 fallback modules)
+├─ Still works (fallback subset)
 ├─ User informed (console warning)
 ├─ No crashes or errors
 └─ Can upgrade to Python later
@@ -322,7 +322,7 @@ which rapidkit  # Should return path
 # Test recommendation
 rapidkit ai recommend "authentication"
 
-# Should show: Using 27 modules from Python Core
+# Should show: using runtime catalog from Python Core
 ```
 
 ### Test 2: Without Python Core
@@ -334,7 +334,7 @@ export PATH=/tmp:$PATH
 # Test recommendation
 rapidkit ai recommend "authentication"
 
-# Should show: ⚠️ Using fallback catalog (11 modules)
+# Should show: ⚠️ Using fallback catalog (baseline subset)
 ```
 
 ### Test 3: Cache Behavior
@@ -357,10 +357,10 @@ time rapidkit ai recommend "payment"  # ~10 seconds (cache expired)
 
 | Feature | Before (Static) | After (Dynamic) |
 |---------|----------------|-----------------|
-| **Module Count** | 11 (hardcoded) | 27 (from Python) |
+| **Module Count** | Fixed subset | Runtime catalog |
 | **Updates** | Manual code change | Automatic |
 | **Sync** | Manual | Automatic |
-| **Fallback** | ❌ None | ✅ 11 modules |
+| **Fallback** | ❌ None | ✅ Baseline subset |
 | **Cache** | ❌ None | ✅ 5-minute TTL |
 | **Python Required** | ❌ No | ⚠️ Recommended |
 | **Performance** | Fast (hardcoded) | Fast (cached) |
@@ -369,13 +369,13 @@ time rapidkit ai recommend "payment"  # ~10 seconds (cache expired)
 
 ## 🚀 Next Steps
 
-### Phase 1 (Current): ✅ Dynamic Fetching
+### Current Stage: ✅ Dynamic Fetching
 - ✅ Fetch from Python Core
 - ✅ Cache with TTL
 - ✅ Fallback to hardcoded
 - ✅ Error handling
 
-### Phase 2 (Future): Module Installation
+### Next Stage: Module Installation
 ```bash
 rapidkit ai recommend "authentication"
 # → Shows recommendations
@@ -384,7 +384,7 @@ rapidkit ai recommend "authentication"
 # → Python Core installs module
 ```
 
-### Phase 3 (Future): Real-time Sync
+### Future Stage: Real-time Sync
 ```bash
 # Watch Python modules directory
 # Auto-regenerate embeddings when modules change
@@ -397,7 +397,7 @@ rapidkit ai recommend "authentication"
 
 **What Changed:**
 - ✅ AI now reads from Python Core dynamically
-- ✅ 27 modules instead of 11 hardcoded
+- ✅ Runtime catalog instead of a fixed hardcoded subset
 - ✅ Always up-to-date
 - ✅ Fallback if Python not available
 - ✅ 5-minute cache for performance
@@ -410,7 +410,7 @@ rapidkit ai recommend "authentication"
 - ✅ Backward compatible
 
 **Result:**
-- 🎉 Fully dynamic
+- 🎉 Runtime-driven catalog
 - 🎉 Single source of truth
 - 🎉 Production-ready
 - 🎉 Zero breaking changes

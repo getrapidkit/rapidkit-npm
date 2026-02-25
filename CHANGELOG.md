@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-02-25
+
+### Added
+- 🪟 Added Windows-native bridge + workspace lifecycle CI workflow:
+  - `.github/workflows/windows-bridge-e2e.yml`
+- 🧪 Added/updated cross-OS workspace matrix workflow:
+  - `.github/workflows/workspace-e2e-matrix.yml`
+- 🪞 Added mirror lifecycle engine with integrity, attestation, evidence, and policy hooks:
+  - `src/utils/mirror.ts`
+- 📚 Added operational/public docs for governance and user scenarios:
+  - `docs/ENTERPRISE_GOVERNANCE_RUNBOOK.md`
+  - `docs/OPEN_SOURCE_USER_SCENARIOS.md`
+  - `docs/mirror-config.enterprise.example.json`
+  - `docs/governance-policy.enterprise.example.json`
+  - `docs/policies.workspace.example.yml`
+- 🧰 Added docs example schema/shape validator:
+  - `scripts/validate-doc-examples.mjs`
+- ✅ Added new mirror and scenario test suites:
+  - `src/__tests__/mirror-lifecycle.unit.test.ts`
+  - `src/__tests__/mirror-evidence-export.integration.test.ts`
+  - `src/__tests__/mirror-sigstore-branches.test.ts`
+  - `src/__tests__/user-level-scenarios.integration.test.ts`
+
+### Changed
+- ⚙️ Hardened runtime adapter behavior across Python/Node/Go paths (cache/env and workspace-aware execution behavior).
+- 🧠 Improved Python bridge execution integration path (`pythonRapidkitExec` and adapter wiring).
+- 🧾 Expanded docs and developer guides for setup, doctor, optimization, and utility references.
+
+### Fixed
+- 🧩 Continued help/UX and docs consistency updates around command surfaces and runtime adapter expectations.
+
+### Removed
+- 🗑️ Removed obsolete phase handoff/conformance docs:
+  - `docs/BLUEPRINT_CONFORMANCE_PHASE4.md`
+  - `docs/RELEASE_HANDOFF_PHASE4.md`
+
+### Testing
+- ✅ Extended regression coverage for index/runtime adapters/python bridge/update checker paths.
+- ✅ Added dedicated Windows bridge first-run checklist for CI triage and failure signatures:
+  - `docs/WINDOWS_BRIDGE_FIRST_RUN_CHECKLIST.md`
+
 ## [0.23.1] - 2026-02-22
 
 ### Fixed

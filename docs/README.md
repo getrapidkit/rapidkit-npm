@@ -1,11 +1,31 @@
 # Documentation
 
+Public documentation is split into two tracks:
+- **User Track**: install, configure, and use RapidKit in open-source projects.
+- **Contributor Track**: maintain/extend the npm CLI codebase.
+
 ## 📚 Available Documentation
 
 ### Getting Started
 
 - **[../README.md](../README.md)** - Main project documentation, installation, and quick start
 - **[../CHANGELOG.md](../CHANGELOG.md)** - Version history and changes
+
+### User Guides
+
+- **[OPEN_SOURCE_USER_SCENARIOS.md](./OPEN_SOURCE_USER_SCENARIOS.md)** - Practical scenarios for OSS teams
+- **[doctor-command.md](./doctor-command.md)** - Doctor command documentation
+- **[config-file-guide.md](./config-file-guide.md)** - Configuration file reference
+- **[PACKAGE_MANAGER_POLICY.md](./PACKAGE_MANAGER_POLICY.md)** - Supported package manager policy
+- **[WORKSPACE_MARKER_SPEC.md](./WORKSPACE_MARKER_SPEC.md)** - Workspace marker specification
+
+### Operations & Security
+
+- **[SECURITY.md](./SECURITY.md)** - Security policy and vulnerability reporting
+- **[ENTERPRISE_GOVERNANCE_RUNBOOK.md](./ENTERPRISE_GOVERNANCE_RUNBOOK.md)** - Multi-environment governance runbook
+- **[mirror-config.enterprise.example.json](./mirror-config.enterprise.example.json)** - Enterprise mirror + evidence export template
+- **[governance-policy.enterprise.example.json](./governance-policy.enterprise.example.json)** - Governance allowlist policy template
+- **[policies.workspace.example.yml](./policies.workspace.example.yml)** - Workspace policy template
 
 ### AI Features
 
@@ -14,27 +34,11 @@
 - **[AI_EXAMPLES.md](./AI_EXAMPLES.md)** - Real-world AI usage examples
 - **[AI_DYNAMIC_INTEGRATION.md](./AI_DYNAMIC_INTEGRATION.md)** - Advanced AI integration patterns
 
-### Development
+### Contributor Docs
 
 - **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Development guide, configuration, testing, and debugging
-- **[SETUP.md](./SETUP.md)** - Quick setup guide with all commands and workflow
-- **[RELEASE_HANDOFF_PHASE4.md](./RELEASE_HANDOFF_PHASE4.md)** - Release handoff package for workspace architecture phases 1→4
-- **[BLUEPRINT_CONFORMANCE_PHASE4.md](./BLUEPRINT_CONFORMANCE_PHASE4.md)** - Blueprint conformance matrix (implemented/partial/pending + evidence)
-
-### Configuration & Commands
-
-- **[config-file-guide.md](./config-file-guide.md)** - Configuration file reference
-- **[doctor-command.md](./doctor-command.md)** - Doctor command documentation
-- **[WORKSPACE_MARKER_SPEC.md](./WORKSPACE_MARKER_SPEC.md)** - Workspace marker specification
-
-### Optimization & Utilities
-
 - **[OPTIMIZATION_GUIDE.md](./OPTIMIZATION_GUIDE.md)** - Comprehensive optimization suggestions and best practices
 - **[UTILITIES.md](./UTILITIES.md)** - Cache system and performance monitoring utilities documentation
-
-### Security
-
-- **[SECURITY.md](./SECURITY.md)** - Security policy and vulnerability reporting
 
 ## 🎯 Quick Links
 
@@ -42,15 +46,17 @@
 
 1. Start with [README.md](../README.md) for installation and basic usage
 2. Try [AI_QUICKSTART.md](./AI_QUICKSTART.md) for AI-powered module recommendations
-3. Check [CHANGELOG.md](../CHANGELOG.md) for latest features
+3. Use [OPEN_SOURCE_USER_SCENARIOS.md](./OPEN_SOURCE_USER_SCENARIOS.md) for practical workflows
+4. Check [SECURITY.md](./SECURITY.md) for reporting/security policy
+5. Check [CHANGELOG.md](../CHANGELOG.md) for latest features
 
-### For Developers
+### For Contributors
 
 1. Read [DEVELOPMENT.md](./DEVELOPMENT.md) for development setup
-2. Use [SETUP.md](./SETUP.md) as command reference
-3. Review [OPTIMIZATION_GUIDE.md](./OPTIMIZATION_GUIDE.md) for improvements
-4. Check [UTILITIES.md](./UTILITIES.md) for using cache and performance tools
-5. See [config-file-guide.md](./config-file-guide.md) for configuration options
+2. Use [SETUP.md](./SETUP.md) for contributor workflow commands
+3. Review [OPTIMIZATION_GUIDE.md](./OPTIMIZATION_GUIDE.md) for improvement opportunities
+4. Check [UTILITIES.md](./UTILITIES.md) for cache/performance helpers
+5. Validate docs JSON templates with `npm run validate:docs-examples`
 
 ## 📖 Documentation Structure
 
@@ -66,12 +72,15 @@ rapidkit-npm/
     ├── AI_DYNAMIC_INTEGRATION.md       # Advanced AI integration
     ├── DEVELOPMENT.md                  # Development guide
     ├── SETUP.md                        # Setup and commands
-    ├── RELEASE_HANDOFF_PHASE4.md       # Release handoff (phases 1→4)
-    ├── BLUEPRINT_CONFORMANCE_PHASE4.md # Blueprint conformance matrix
+    ├── ENTERPRISE_GOVERNANCE_RUNBOOK.md# Enterprise governance ops runbook
+    ├── OPEN_SOURCE_USER_SCENARIOS.md   # Publish-ready user scenarios by role
     ├── OPTIMIZATION_GUIDE.md           # Optimization suggestions
     ├── UTILITIES.md                    # Cache and performance utilities
     ├── SECURITY.md                     # Security policy
     ├── config-file-guide.md            # Configuration reference
+    ├── mirror-config.enterprise.example.json # Enterprise mirror/evidence template
+    ├── governance-policy.enterprise.example.json # Env policy allowlist template
+    ├── policies.workspace.example.yml   # Workspace policy template
     ├── doctor-command.md               # Doctor command docs
     ├── WORKSPACE_MARKER_SPEC.md        # Workspace marker spec
     └── contracts/                      # Technical specifications

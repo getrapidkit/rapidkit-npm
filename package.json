@@ -1,6 +1,6 @@
 {
   "name": "rapidkit",
-  "version": "0.23.1",
+  "version": "0.24.0",
   "type": "module",
   "description": "Create RapidKit projects with a single command - The official CLI for RapidKit framework",
   "keywords": [
@@ -57,6 +57,7 @@
     "security": "npm audit --audit-level=moderate",
     "security:fix": "npm audit fix",
     "metrics": "npx tsx scripts/metrics.ts",
+    "validate:docs-examples": "node scripts/validate-doc-examples.mjs",
     "sync:contracts": "node scripts/sync-contracts.mjs",
     "check:contracts": "node scripts/sync-contracts.mjs --check",
     "bundle-size": "npm run build && du -sh dist/ && ls -lh dist/",

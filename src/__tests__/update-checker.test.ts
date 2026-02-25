@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { checkForUpdates, getVersion } from '../update-checker.js';
+import { checkForUpdates, getVersion, __testables } from '../update-checker.js';
 import { execa } from 'execa';
 
 // Mock execa
@@ -428,6 +428,58 @@ describe('Update Checker', () => {
       await checkForUpdates();
 
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Update available'));
+    });
+  });
+
+  describe('__testables.compareVersions', () => {
+    it('returns 0 for invalid left version', () => {
+      expect(__testables.compareVersions('invalid', '1.2.3')).toBe(0);
+    });
+
+    it('returns 0 for invalid right version', () => {
+      expect(__testables.compareVersions('1.2.3', 'invalid')).toBe(0);
+    });
+
+    it('returns 0 for same stable version', () => {
+      expect(__testables.compareVersions('1.2.3', '1.2.3')).toBe(0);
+    });
+
+    it('compares major/minor/patch correctly', () => {
+      expect(__testables.compareVersions('2.0.0', '1.9.9')).toBe(1);
+      expect(__testables.compareVersions('1.4.0', '1.5.0')).toBe(-1);
+      expect(__testables.compareVersions('1.5.2', '1.5.1')).toBe(1);
+    });
+
+    it('treats stable as newer than prerelease', () => {
+      expect(__testables.compareVersions('1.2.3', '1.2.3-rc.1')).toBe(1);
+      expect(__testables.compareVersions('1.2.3-rc.1', '1.2.3')).toBe(-1);
+    });
+
+    it('compares prerelease length boundaries', () => {
+      expect(__testables.compareVersions('1.2.3-alpha', '1.2.3-alpha.1')).toBe(-1);
+      expect(__testables.compareVersions('1.2.3-alpha.1', '1.2.3-alpha')).toBe(1);
+    });
+
+    it('compares prerelease numeric and string identifiers', () => {
+      expect(__testables.compareVersions('1.2.3-alpha.2', '1.2.3-alpha.1')).toBe(1);
+      expect(__testables.compareVersions('1.2.3-alpha.1', '1.2.3-alpha.beta')).toBe(-1);
+      expect(__testables.compareVersions('1.2.3-beta.alpha', '1.2.3-beta.1')).toBe(1);
+    });
+  });
+
+  describe('__testables.parseVersion', () => {
+    it('returns parsed semver for valid input', () => {
+      expect(__testables.parseVersion('1.2.3-alpha.1+build.7')).toEqual({
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: ['alpha', 1],
+      });
+    });
+
+    it('returns null for invalid semver input', () => {
+      expect(__testables.parseVersion('v1.2.3')).toBeNull();
+      expect(__testables.parseVersion('1.2')).toBeNull();
     });
   });
 });

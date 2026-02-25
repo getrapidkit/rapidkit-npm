@@ -1,5 +1,12 @@
 # Utilities Documentation
 
+> Cache and performance helper reference for the npm CLI codebase.
+>
+> For end-user command usage, prefer:
+> - `docs/doctor-command.md`
+> - `docs/OPEN_SOURCE_USER_SCENARIOS.md`
+> - `../README.md`
+
 ## Cache System
 
 ### Using Cache
@@ -114,12 +121,13 @@ import { measure } from './utils/performance.js';
 import { logger } from './logger.js';
 
 async function fetchUserData(userId: string) {
+  const apiBaseUrl = process.env.API_BASE_URL ?? 'https://api.example.com';
   return await getCachedOrFetch(
     `user-${userId}`,
     async () => {
       return await measure('fetch-user-from-api', async () => {
         logger.debug(`Fetching user ${userId} from API`);
-        const response = await fetch(`/api/users/${userId}`);
+        const response = await fetch(`${apiBaseUrl}/users/${userId}`);
         return await response.json();
       });
     },
@@ -195,13 +203,14 @@ async function loadTemplates() {
 ### Cache not working
 ```bash
 # Check cache location
-ls -la ~/.rapidkit/cache/
+ls -la "$HOME/.rapidkit/cache/"
 
 # Clear cache manually
-rm -rf ~/.rapidkit/cache/
+rm -rf "$HOME/.rapidkit/cache/"
 
-# Check permissions
-chmod -R 755 ~/.rapidkit/
+# Check safe permissions (least privilege)
+chmod 700 "$HOME/.rapidkit"
+chmod 700 "$HOME/.rapidkit/cache"
 ```
 
 ### Incorrect performance metrics

@@ -1,6 +1,14 @@
 import { execa } from 'execa';
 
-export type PythonCommand = 'python3' | 'python';
+export type PythonCommand = 'python3' | 'python' | 'py';
+
+function pythonCommandCandidates(): PythonCommand[] {
+  return process.platform === 'win32' ? ['python', 'py', 'python3'] : ['python3', 'python'];
+}
+
+function pythonLauncherArgs(cmd: PythonCommand, args: string[]): string[] {
+  return cmd === 'py' ? ['-3', ...args] : args;
+}
 
 export interface RapidkitJsonResult<T> {
   ok: boolean;
@@ -67,10 +75,10 @@ export async function runPythonRapidkitJson<T>(
   opts?: { cwd?: string; timeoutMs?: number }
 ): Promise<RapidkitJsonResult<T>> {
   const baseArgs = ['-m', 'rapidkit', ...rapidkitArgs];
-  const candidates: PythonCommand[] = ['python3', 'python'];
+  const candidates: PythonCommand[] = pythonCommandCandidates();
 
   for (const cmd of candidates) {
-    const res = await tryRun(cmd, baseArgs, opts?.cwd, opts?.timeoutMs);
+    const res = await tryRun(cmd, pythonLauncherArgs(cmd, baseArgs), opts?.cwd, opts?.timeoutMs);
     if (!res.ok) {
       continue;
     }
