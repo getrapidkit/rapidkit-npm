@@ -85,10 +85,9 @@ export class PythonRuntimeAdapter implements RuntimeAdapter {
 
   async checkPrereqs(): Promise<CommandResult> {
     const cwd = process.cwd();
-    // Run `doctor check` once. The legacy `doctor` fallback is removed because
-    // it triggered a second full diagnostic run, doubling the output.
-    // Modern Python core (v0.3+) always has `doctor check`.
-    return this.run(['doctor', 'check'], cwd);
+    const modern = await this.run(['doctor', 'check'], cwd);
+    if (modern.exitCode === 0) return modern;
+    return this.run(['doctor'], cwd);
   }
 
   async initProject(projectPath: string): Promise<CommandResult> {
@@ -113,9 +112,9 @@ export class PythonRuntimeAdapter implements RuntimeAdapter {
 
   async doctorHints(_projectPath: string): Promise<string[]> {
     return [
-      'Run rapidkit doctor --workspace for a full workspace scan.',
-      'Use rapidkit init after adding or changing modules.',
-      'Use workspace launcher ./rapidkit to avoid environment drift.',
+      'Run "npx rapidkit doctor --workspace" for a full workspace scan.',
+      'Use "npx rapidkit init" after adding or changing modules.',
+      'Use workspace launcher "./rapidkit" to avoid environment drift.',
     ];
   }
 }

@@ -1202,7 +1202,9 @@ async function executeFixCommands(
   }
 
   if (!autoFix) {
-    console.log(chalk.gray('💡 Run with --fix flag to apply fixes automatically'));
+    console.log(
+      chalk.gray('💡 Run "npx rapidkit doctor workspace --fix" to apply fixes automatically')
+    );
     return;
   }
 
@@ -1223,12 +1225,44 @@ async function executeFixCommands(
 
   console.log(chalk.bold.cyan('\n🚀 Applying fixes...\n'));
 
+  const isManualUrlFix = (cmd: string): boolean => /^https?:\/\//i.test(cmd.trim());
+  const parseEnvCopyFix = (cmd: string): { projectPath: string } | null => {
+    const match = cmd.match(/^cd\s+(.+?)\s*&&\s*cp\s+\.env\.example\s+\.env\s*$/);
+    if (!match) return null;
+    return { projectPath: match[1].trim() };
+  };
+
   for (const project of fixableProjects) {
     console.log(chalk.bold(`Fixing ${chalk.cyan(project.name)}...`));
 
     for (const cmd of project.fixCommands!) {
       try {
         console.log(chalk.gray(`  $ ${cmd}`));
+
+        if (isManualUrlFix(cmd)) {
+          console.log(chalk.yellow(`  ℹ Manual action required: open ${cmd}`));
+          console.log(chalk.green('  ✅ Recorded as guidance\n'));
+          continue;
+        }
+
+        const envCopyFix = parseEnvCopyFix(cmd);
+        if (envCopyFix) {
+          const sourcePath = path.join(envCopyFix.projectPath, '.env.example');
+          const targetPath = path.join(envCopyFix.projectPath, '.env');
+
+          if (!(await fsExtra.pathExists(sourcePath))) {
+            throw new Error(`.env.example not found at ${sourcePath}`);
+          }
+
+          if (await fsExtra.pathExists(targetPath)) {
+            console.log(chalk.green('  ✅ .env already exists\n'));
+            continue;
+          }
+
+          await fsExtra.copy(sourcePath, targetPath, { overwrite: false, errorOnExist: false });
+          console.log(chalk.green('  ✅ Success\n'));
+          continue;
+        }
 
         // Execute the full command through shell for proper command resolution
         await execa(cmd, {
@@ -1251,13 +1285,17 @@ async function executeFixCommands(
 export async function runDoctor(
   options: { workspace?: boolean; json?: boolean; fix?: boolean } = {}
 ): Promise<void> {
+  const autoWorkspacePath =
+    !options.workspace && options.fix ? await findWorkspace(process.cwd()) : null;
+  const workspaceMode = options.workspace || Boolean(autoWorkspacePath);
+
   if (!options.json) {
     console.log(chalk.bold.cyan('\n🩺 RapidKit Health Check\n'));
   }
 
-  if (options.workspace) {
+  if (workspaceMode) {
     // Workspace mode: check entire workspace
-    const workspacePath = await findWorkspace(process.cwd());
+    const workspacePath = autoWorkspacePath ?? (await findWorkspace(process.cwd()));
 
     if (!workspacePath) {
       logger.error('No RapidKit workspace found in current directory or parents');
@@ -1268,6 +1306,11 @@ export async function runDoctor(
     }
 
     if (!options.json) {
+      if (autoWorkspacePath) {
+        console.log(
+          chalk.gray('ℹ️  Detected workspace context; enabling workspace checks for --fix')
+        );
+      }
       console.log(chalk.bold(`Workspace: ${chalk.cyan(path.basename(workspacePath))}`));
       console.log(chalk.gray(`Path: ${workspacePath}`));
     }
@@ -1398,16 +1441,30 @@ export async function runDoctor(
 
     if (hasErrors) {
       console.log(chalk.bold.red('\n❌ Some required tools are missing'));
+      if (options.fix) {
+        console.log(
+          chalk.gray(
+            '\nTip: Project auto-fix runs in workspace mode. Run from a workspace and use "npx rapidkit doctor workspace --fix"'
+          )
+        );
+      }
       console.log(
         chalk.gray(
-          '\nTip: Run "rapidkit doctor --workspace" from within a workspace for detailed project checks'
+          '\nTip: Run "npx rapidkit doctor workspace" (or "npx rapidkit doctor --workspace") for detailed project checks'
         )
       );
     } else {
       console.log(chalk.bold.green('\n✅ All required tools are installed!'));
+      if (options.fix) {
+        console.log(
+          chalk.gray(
+            '\nTip: Project auto-fix runs in workspace mode. Run from a workspace and use "npx rapidkit doctor workspace --fix"'
+          )
+        );
+      }
       console.log(
         chalk.gray(
-          '\nTip: Run "rapidkit doctor --workspace" from within a workspace for detailed project checks'
+          '\nTip: Run "npx rapidkit doctor workspace" (or "npx rapidkit doctor --workspace") for detailed project checks'
         )
       );
     }

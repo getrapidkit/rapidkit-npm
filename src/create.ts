@@ -577,6 +577,14 @@ export async function createProject(
   // Profiles that need Python prompts: python-only, polyglot, enterprise.
   // For minimal/node-only/go-only we skip Python-specific questions and auto-detect.
   const needsPythonPrompts = !yes && PYTHON_PROFILES.has(resolvedProfile);
+  const promptDefaultPythonVersion = ['3.10', '3.11', '3.12'].includes(
+    String(userConfig.pythonVersion || '')
+  )
+    ? String(userConfig.pythonVersion)
+    : '3.10';
+  const promptDefaultInstallMethod = (providedInstallMethod ||
+    userConfig.defaultInstallMethod ||
+    'poetry') as InstallMethod;
 
   // Step 1: Choose Python version and install method (or auto-select with --yes / non-Python profile)
   const pythonAnswers: { pythonVersion: string; installMethod: InstallMethod } = needsPythonPrompts
@@ -586,7 +594,7 @@ export async function createProject(
           name: 'pythonVersion',
           message: 'Select Python version for RapidKit:',
           choices: ['3.10', '3.11', '3.12'],
-          default: 1,
+          default: promptDefaultPythonVersion,
         },
         {
           type: 'rawlist',
@@ -597,7 +605,7 @@ export async function createProject(
             { name: '📦 pip with venv (Standard)', value: 'venv' },
             { name: '🔧 pipx (Global isolated install)', value: 'pipx' },
           ],
-          default: 1,
+          default: promptDefaultInstallMethod,
         },
       ])) as { pythonVersion: string; installMethod: InstallMethod })
     : await (async () => {

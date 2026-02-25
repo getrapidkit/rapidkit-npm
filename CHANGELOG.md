@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-02-25
+
+### Fixed
+- 🧩 Restored setup command contract so `rapidkit setup <python|node|go>` no longer depends on `RAPIDKIT_ENABLE_RUNTIME_ADAPTERS=1`.
+- 🍎 Added macOS arm64 Rollup optional dependency workaround in CI matrix to avoid install-time module resolution failures.
+
+### Changed
+- 🧭 Updated create prompt defaults to honor configured workspace defaults (`pythonVersion`, `defaultInstallMethod`) in profile-first flows.
+- 🐍 Python runtime adapter prereq checks now fall back to legacy `doctor` when `doctor check` is unavailable/non-zero.
+- 🧪 Aligned create/setup/runtime contract tests with current wrapper behavior.
+- 🧹 Ignored local `.rapidkit/` generated artifacts to keep commits clean.
+
 ## [0.24.0] - 2026-02-25
 
 ### Added

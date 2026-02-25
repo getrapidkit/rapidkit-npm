@@ -110,7 +110,7 @@ describe('Phase 3 commands - CLI process integration', () => {
     expect(output).toContain('prerequisites look good');
   });
 
-  it('returns error for setup node when runtime adapters are disabled', () => {
+  it('executes setup node successfully when runtime adapters are disabled', () => {
     const dist = ensureDistBuilt();
 
     const run = spawnSync(process.execPath, [dist, 'setup', 'node'], {
@@ -122,9 +122,9 @@ describe('Phase 3 commands - CLI process integration', () => {
       },
     });
 
-    expect(run.status).toBe(1);
+    expect(run.status).toBe(0);
     const output = `${run.stdout || ''}\n${run.stderr || ''}`;
-    expect(output).toContain('Runtime adapters are disabled');
+    expect(output).toContain('prerequisites look good');
   });
 
   it('handles cache status command at npm wrapper level', () => {

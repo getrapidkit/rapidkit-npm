@@ -102,6 +102,7 @@ describe('Create Module Helpers', () => {
       await createProject('my-poetry-project', {
         yes: true,
         skipGit: true,
+        profile: 'python-only',
         userConfig: { defaultInstallMethod: 'poetry', pythonVersion: '3.11' },
       });
 

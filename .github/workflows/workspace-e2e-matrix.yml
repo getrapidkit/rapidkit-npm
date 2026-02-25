@@ -41,6 +41,11 @@ jobs:
         shell: bash
         run: npm install --no-save @rollup/rollup-win32-x64-msvc
 
+      - name: Workaround npm optional-deps bug (rollup on macOS arm64)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: npm install --no-save @rollup/rollup-darwin-arm64
+
       - name: Build
         shell: bash
         run: npm run build

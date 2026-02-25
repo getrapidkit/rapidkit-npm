@@ -355,14 +355,16 @@ describe('Phase 3 command contract handlers', () => {
       expect(getRuntimeAdapterMock).not.toHaveBeenCalled();
     });
 
-    it('returns error when runtime adapters are disabled', async () => {
+    it('runs setup even when runtime adapters flag is disabled', async () => {
       const index = await import('../index.js');
       areRuntimeAdaptersEnabledMock.mockReturnValue(false);
+      adapterCheckPrereqs.mockResolvedValue({ exitCode: 0 });
+      adapterDoctorHints.mockResolvedValue([]);
 
       const code = await index.handleSetupCommand(['setup', 'python']);
 
-      expect(code).toBe(1);
-      expect(getRuntimeAdapterMock).not.toHaveBeenCalled();
+      expect(code).toBe(0);
+      expect(getRuntimeAdapterMock).toHaveBeenCalledWith('python', expect.any(Object));
     });
 
     it('runs prereq checks and returns adapter exit code when enabled', async () => {

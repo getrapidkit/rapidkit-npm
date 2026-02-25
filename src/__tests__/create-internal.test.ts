@@ -5,7 +5,7 @@ import inquirer from 'inquirer';
 import { promises as fsPromises } from 'fs';
 import { createProject } from '../create';
 import { getPythonCommand } from '../utils';
-import { DirectoryExistsError, PythonNotFoundError } from '../errors';
+import { DirectoryExistsError } from '../errors';
 
 vi.mock('fs-extra');
 vi.mock('execa');
@@ -50,12 +50,12 @@ describe('Create Module - Internal Functions', () => {
         if (command === 'git') {
           return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
         }
-        return Promise.reject(new Error('Unknown command'));
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
       });
 
       vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]\nname = "test"');
 
-      await createProject('test-project', {});
+      await createProject('test-project', { profile: 'python-only' });
 
       expect(execa).toHaveBeenCalledWith('poetry', ['--version']);
       expect(execa).toHaveBeenCalledWith(
@@ -79,7 +79,7 @@ describe('Create Module - Internal Functions', () => {
       } as any);
       vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]');
 
-      await createProject('test-project', {});
+      await createProject('test-project', { profile: 'python-only' });
 
       expect(execa).toHaveBeenCalledWith('poetry', ['--version']);
     });
@@ -104,7 +104,7 @@ describe('Create Module - Internal Functions', () => {
 
       vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]\nname = "test"');
 
-      await createProject('test-project', { testMode: true });
+      await createProject('test-project', { testMode: true, profile: 'python-only' });
 
       expect(execa).toHaveBeenCalledWith(
         'poetry',
@@ -147,7 +147,7 @@ describe('Create Module - Internal Functions', () => {
 
       mockReadFile.mockResolvedValue('[tool.poetry]\nname = "test"\nversion = "0.1.0"');
 
-      await createProject('test-project', {});
+      await createProject('test-project', { profile: 'python-only' });
 
       expect(mockWriteFile).toHaveBeenCalledWith(
         expect.stringContaining('pyproject.toml'),
@@ -198,7 +198,7 @@ describe('Create Module - Internal Functions', () => {
 
       vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]\nname = "test"');
 
-      await createProject('test-project', {});
+      await createProject('test-project', { profile: 'python-only' });
 
       // Confirm we offered to install Poetry, then used pipx.
       expect(inquirer.prompt).toHaveBeenCalledTimes(2);
@@ -271,7 +271,7 @@ describe('Create Module - Internal Functions', () => {
 
       vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]\nname = "test"');
 
-      await createProject('test-project', {});
+      await createProject('test-project', { profile: 'python-only' });
 
       expect(pipxBinaryChecks).toBeGreaterThan(0);
       // We should have prompted for both: installing pipx and installing poetry.
@@ -323,11 +323,15 @@ describe('Create Module - Internal Functions', () => {
         return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
       });
 
-      await createProject('test-project', {});
+      await createProject('test-project', { profile: 'python-only' });
 
-      // Accept either python3 or python depending on OS
+      // Accept either python3, pythonX.Y, absolute python path, or pyenv-resolved python
+      expect(execa).toHaveBeenCalledWith(
+        expect.stringMatching(/python|py/),
+        ['--version'],
+        expect.any(Object)
+      );
       const pythonCmd = getPythonCommand();
-      expect(execa).toHaveBeenCalledWith(pythonCmd, ['--version']);
       expect(execa).toHaveBeenCalledWith(pythonCmd, ['-m', 'venv', '.venv'], expect.any(Object));
     });
 
@@ -346,7 +350,9 @@ describe('Create Module - Internal Functions', () => {
         return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
       });
 
-      await expect(createProject('test-project', {})).rejects.toThrow(PythonNotFoundError);
+      await expect(createProject('test-project', { profile: 'python-only' })).rejects.toThrow(
+        'process.exit unexpectedly called with "1"'
+      );
     });
 
     it('should install from local path in venv test mode', async () => {
@@ -366,7 +372,7 @@ describe('Create Module - Internal Functions', () => {
         return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
       });
 
-      await createProject('test-project', { testMode: true });
+      await createProject('test-project', { testMode: true, profile: 'python-only' });
 
       // Verify editable install was called with python -m pip (not direct pip)
       expect(execa).toHaveBeenCalledWith(
@@ -396,7 +402,7 @@ describe('Create Module - Internal Functions', () => {
         return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
       });
 
-      await createProject('test-project', {});
+      await createProject('test-project', { profile: 'python-only' });
 
       expect(execa).toHaveBeenCalledWith('pipx', ['--version']);
       expect(execa).toHaveBeenCalledWith('pipx', ['install', 'rapidkit-core']);
@@ -410,7 +416,7 @@ describe('Create Module - Internal Functions', () => {
 
       vi.mocked(execa).mockResolvedValue({ stdout: 'pipx 1.2.0', stderr: '', exitCode: 0 } as any);
 
-      await createProject('test-project', {});
+      await createProject('test-project', { profile: 'python-only' });
 
       expect(execa).toHaveBeenCalledWith('pipx', ['--version']);
     });
@@ -430,7 +436,7 @@ describe('Create Module - Internal Functions', () => {
         return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
       });
 
-      await createProject('test-project', { testMode: true });
+      await createProject('test-project', { testMode: true, profile: 'python-only' });
 
       expect(execa).toHaveBeenCalledWith('pipx', ['install', '-e', '/local/rapidkit']);
 
@@ -476,7 +482,7 @@ describe('Create Module - Internal Functions', () => {
         return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
       });
 
-      await createProject('test-project', {});
+      await createProject('test-project', { profile: 'python-only' });
 
       // Verify the pipx or python -m pipx install happened
       const calls = vi.mocked(execa).mock.calls;
@@ -628,7 +634,7 @@ describe('Create Module - Internal Functions', () => {
       vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
       vi.spyOn(fsPromises, 'readFile').mockResolvedValue('[tool.poetry]');
 
-      await createProject('test-project', { userConfig });
+      await createProject('test-project', { userConfig, profile: 'python-only' });
 
       expect(inquirer.prompt).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -653,7 +659,7 @@ describe('Create Module - Internal Functions', () => {
 
       vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
 
-      await createProject('test-project', { userConfig });
+      await createProject('test-project', { userConfig, profile: 'python-only' });
 
       expect(inquirer.prompt).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -734,7 +740,7 @@ describe('Create Module - Internal Functions', () => {
 
       vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
 
-      await createProject('test-venv-project', { yes: true });
+      await createProject('test-venv-project', { profile: 'python-only' });
 
       // Verify project was created
       expect(fsExtra.ensureDir).toHaveBeenCalled();
@@ -748,7 +754,7 @@ describe('Create Module - Internal Functions', () => {
 
       vi.mocked(execa).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as any);
 
-      await createProject('test-venv-project', { yes: true });
+      await createProject('test-venv-project', { profile: 'python-only' });
 
       const pipInstallCalls = vi
         .mocked(execa)

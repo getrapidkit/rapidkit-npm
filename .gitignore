@@ -22,6 +22,7 @@ rapidkit-full-workspace/
 
 # User config (should not be committed)
 .rapidkitrc.json
+.rapidkit/
 
 # AI embeddings (generated at runtime, ~1MB)
 data/modules-embeddings.json

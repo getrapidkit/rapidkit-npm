@@ -16,14 +16,14 @@ describe('Phase 3 command handlers - integration (real adapters)', () => {
     expect(code).toBe(0);
   });
 
-  it('returns disabled error for setup node when adapters are off', async () => {
+  it('runs setup node successfully when adapters are off', async () => {
     delete process.env.RAPIDKIT_ENABLE_RUNTIME_ADAPTERS;
     vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const index = await import('../index.js');
     const code = await index.handleSetupCommand(['setup', 'node']);
 
-    expect(code).toBe(1);
+    expect(code).toBe(0);
   });
 
   it('keeps phase3 commands npm-local and not forwarded to core', async () => {

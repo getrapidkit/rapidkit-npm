@@ -1,5 +1,40 @@
 # Release Notes
 
+## Latest Release: v0.24.1 (February 25, 2026)
+
+### 🧩 v0.24.1 — Setup Contract Fixes, Cross-OS CI Stability, and Workspace Flow Alignment (Patch)
+
+This patch release resolves setup/runtime contract regressions, hardens cross-OS matrix reliability, and aligns create/setup behavior with local E2E expectations.
+
+**What's New:**
+
+- ✅ **Setup command contract consistency**
+  - `rapidkit setup <runtime>` now runs without requiring `RAPIDKIT_ENABLE_RUNTIME_ADAPTERS=1`.
+  - Restores expected S-03 workspace E2E behavior for setup flows.
+
+- 🪟🍎 **CI matrix reliability for optional Rollup binaries**
+  - Added macOS arm64 optional Rollup install workaround in matrix workflow:
+    - `.github/workflows/workspace-e2e-matrix.yml`
+  - Complements existing Windows optional dependency workaround to prevent matrix install failures.
+
+- 🧭 **Create/setup behavior alignment**
+  - `create` prompt defaults now respect configured values (`pythonVersion`, `defaultInstallMethod`) in profile-first flows.
+  - Python runtime adapter prereq check now gracefully falls back to legacy `doctor` when needed.
+
+- 🧪 **Test and workspace hygiene updates**
+  - Updated command/runtime/create tests for the current setup and profile behavior.
+  - Added `.rapidkit/` to git ignore for local generated artifacts.
+
+**Upgrade:**
+
+```bash
+npm install -g rapidkit@0.24.1
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.24.1.md)
+
+---
+
 ## Latest Release: v0.24.0 (February 25, 2026)
 
 ### 🧭 v0.24.0 — Windows Bridge E2E, Mirror Lifecycle Hardening, and Runtime Adapter Stability (Minor)

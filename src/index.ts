@@ -1649,17 +1649,9 @@ export async function handleBootstrapCommand(
 
     // In JSON mode, skip the init phase to keep stdout clean for machine consumption.
     // JSON output is about compliance checking only; initialization is a side-effect.
-    //
-    // Workspace bootstrap is handled at npm layer: update profile/policy state and install
-    // workspace-level essentials only. Per-project dependency/bootstrap remains explicit via
-    // `rapidkit init` run inside each project.
     let initExitCode = 0;
     if (!jsonMode) {
-      if (workspacePath) {
-        initExitCode = await installWorkspaceDependencies(workspacePath);
-      } else {
-        initExitCode = await initRunner(initArgs);
-      }
+      initExitCode = await initRunner(initArgs);
     }
     const failedCheckCount = checks.filter((c) => c.status === 'failed').length;
     const resultValue =
@@ -1853,6 +1845,7 @@ export async function handleCacheCommand(args: string[]): Promise<number> {
   }
 
   if (action === 'status') {
+    console.log(chalk.cyan('RapidKit cache is enabled'));
     console.log(chalk.cyan('RapidKit cache status'));
     if (workspacePath) {
       console.log(chalk.gray(`  Workspace: ${workspacePath}`));
@@ -1871,6 +1864,7 @@ export async function handleCacheCommand(args: string[]): Promise<number> {
   if (action === 'clear') {
     // Full cache wipe — removes all cached entries
     await cache.clear();
+    console.log(chalk.green('Cache clear completed'));
     console.log(chalk.green('\u2705 Cache cleared (all entries removed).'));
     return 0;
   }
@@ -3109,14 +3103,28 @@ program
 
 // Doctor command - health check for RapidKit environment
 program
-  .command('doctor')
+  .command('doctor [scope]')
   .description('🩺 Check RapidKit environment health')
   .option('--workspace', 'Check entire workspace (including all projects)')
   .option('--json', 'Output results in JSON format (for CI/CD pipelines)')
   .option('--fix', 'Automatically fix common issues (with confirmation)')
-  .action(async (options) => {
-    await runDoctor(options);
-  });
+  .action(
+    async (
+      scope: string | undefined,
+      options: { workspace?: boolean; json?: boolean; fix?: boolean }
+    ) => {
+      if (scope && scope !== 'workspace') {
+        console.log(chalk.red(`Unknown doctor scope: ${scope}`));
+        console.log(chalk.gray('Available: workspace'));
+        process.exit(1);
+      }
+
+      await runDoctor({
+        ...options,
+        workspace: options.workspace || scope === 'workspace',
+      });
+    }
+  );
 
 // Workspace management command
 program

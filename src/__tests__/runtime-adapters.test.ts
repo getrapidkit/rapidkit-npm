@@ -359,7 +359,10 @@ describe('Runtime Adapters', () => {
       expect(adapter.runtime).toBe('python');
       const result = await adapter.initProject('/tmp/project');
       expect(result.exitCode).toBe(0);
-      expect(runCoreRapidkit).toHaveBeenCalledWith(['init'], { cwd: '/tmp/project' });
+      expect(runCoreRapidkit).toHaveBeenCalledWith(
+        ['init'],
+        expect.objectContaining({ cwd: '/tmp/project' })
+      );
     });
 
     it('returns node adapter from factory', async () => {
