@@ -21,7 +21,11 @@ import {
   runCoreRapidkitStreamed,
 } from './core-bridge/pythonRapidkitExec.js';
 import { BOOTSTRAP_CORE_COMMANDS_SET } from './core-bridge/bootstrapCoreCommands.js';
-import { createProject as createPythonEnvironment, registerWorkspaceAtPath } from './create.js';
+import {
+  createProject as createPythonEnvironment,
+  registerWorkspaceAtPath,
+  syncWorkspaceFoundationFiles,
+} from './create.js';
 import { generateDemoKit } from './demo-kit.js';
 import { generateGoFiberKit } from './generators/gofiber-standard.js';
 import { generateGoGinKit } from './generators/gogin-standard.js';
@@ -801,6 +805,29 @@ function findWorkspaceUp(start: string): string | null {
   return null;
 }
 
+/**
+ * Detect legacy workspace roots that predate `.rapidkit-workspace` marker files.
+ *
+ * Legacy roots are identified by `.rapidkit/workspace.json` while missing the
+ * root marker file. Bootstrap can then auto-sync the modern foundation layout.
+ */
+function findLegacyWorkspaceUp(start: string): string | null {
+  let p = start;
+
+  while (true) {
+    const markerPath = path.join(p, '.rapidkit-workspace');
+    const legacyManifestPath = path.join(p, '.rapidkit', 'workspace.json');
+    if (!fs.existsSync(markerPath) && fs.existsSync(legacyManifestPath)) {
+      return p;
+    }
+    const parent = path.dirname(p);
+    if (parent === p) break;
+    p = parent;
+  }
+
+  return null;
+}
+
 type DependencySharingMode = 'isolated' | 'shared-runtime-caches' | 'shared-node-deps';
 
 function parseDependencySharingMode(
@@ -1218,7 +1245,10 @@ export async function handleBootstrapCommand(
     }
 
     const cwd = process.cwd();
-    const workspacePath = findWorkspaceUp(cwd);
+    let workspacePath = findWorkspaceUp(cwd);
+    if (!workspacePath) {
+      workspacePath = findLegacyWorkspaceUp(cwd);
+    }
     const checks: ComplianceCheck[] = [];
     let mirrorLifecycleDetails: {
       syncedArtifacts: number;
@@ -1284,6 +1314,51 @@ export async function handleBootstrapCommand(
     }
 
     const profile: BootstrapProfile = selectedProfile || workspaceProfile || 'minimal';
+
+    if (workspacePath) {
+      try {
+        const requiresPythonProfile =
+          profile === 'python-only' || profile === 'polyglot' || profile === 'enterprise';
+        const installMethodForSync = requiresPythonProfile ? 'poetry' : 'venv';
+
+        let pythonVersion: string | undefined;
+        try {
+          const pyVersionRaw = await fs.promises.readFile(
+            path.join(workspacePath, '.python-version'),
+            'utf-8'
+          );
+          const parsed = pyVersionRaw.trim();
+          if (parsed) pythonVersion = parsed;
+        } catch {
+          /* optional */
+        }
+
+        const syncedPaths = await syncWorkspaceFoundationFiles(workspacePath, {
+          workspaceName: path.basename(workspacePath),
+          installMethod: installMethodForSync,
+          pythonVersion,
+          profile,
+          writeMarker: true,
+          writeGitignore: true,
+          onlyIfMissing: true,
+        });
+
+        checks.push({
+          id: 'workspace.legacy.sync',
+          status: syncedPaths.length > 0 ? 'passed' : 'skipped',
+          message:
+            syncedPaths.length > 0
+              ? `Legacy workspace foundation synchronized: ${syncedPaths.join(', ')}`
+              : 'Workspace foundation files are already up to date.',
+        });
+      } catch (error) {
+        checks.push({
+          id: 'workspace.legacy.sync',
+          status: 'failed',
+          message: `Failed to synchronize legacy workspace foundation files: ${(error as Error).message}`,
+        });
+      }
+    }
 
     // Persist profile back to workspace.json if an explicit/profile-selected value was given
     // and differs from what's currently stored. This keeps workspace.json as the

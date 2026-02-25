@@ -89,7 +89,45 @@ describe('Phase 3 command contract handlers', () => {
       expect(code).toBe(1);
     });
 
-    it('blocks bootstrap in strict mode when required lock file is missing', async () => {
+    it('auto-syncs missing workspace foundation files for legacy workspaces', async () => {
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-bootstrap-legacy-sync-'));
+      const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
+
+      await mkdir(rapidkitDir, { recursive: true });
+      await writeFile(
+        path.join(rapidkitDir, 'workspace.json'),
+        JSON.stringify({ profile: 'polyglot' }, null, 2),
+        'utf-8'
+      );
+
+      process.chdir(workspaceRoot);
+
+      const index = await import('../index.js');
+      const initRunner = vi.fn().mockResolvedValue(0);
+      const code = await index.handleBootstrapCommand(
+        ['bootstrap', '--profile', 'polyglot'],
+        initRunner
+      );
+
+      expect(code).toBe(0);
+      expect(initRunner).toHaveBeenCalled();
+
+      const fsExtra = await import('fs-extra');
+      await expect(
+        fsExtra.pathExists(path.join(workspaceRoot, '.rapidkit-workspace'))
+      ).resolves.toBe(true);
+      await expect(fsExtra.pathExists(path.join(rapidkitDir, 'toolchain.lock'))).resolves.toBe(
+        true
+      );
+      await expect(fsExtra.pathExists(path.join(rapidkitDir, 'policies.yml'))).resolves.toBe(true);
+      await expect(fsExtra.pathExists(path.join(rapidkitDir, 'cache-config.yml'))).resolves.toBe(
+        true
+      );
+
+      await cleanupWorkspaceDir(workspaceRoot);
+    });
+
+    it('auto-heals missing lock in strict mode before running bootstrap', async () => {
       const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'rapidkit-bootstrap-strict-'));
       const rapidkitDir = path.join(workspaceRoot, '.rapidkit');
 
@@ -120,10 +158,13 @@ describe('Phase 3 command contract handlers', () => {
       const initRunner = vi.fn().mockResolvedValue(0);
       const code = await index.handleBootstrapCommand(['bootstrap'], initRunner);
 
-      expect(code).toBe(1);
-      expect(initRunner).not.toHaveBeenCalled();
+      expect(code).toBe(0);
+      expect(initRunner).toHaveBeenCalled();
 
       const fsExtra = await import('fs-extra');
+      await expect(fsExtra.pathExists(path.join(rapidkitDir, 'toolchain.lock'))).resolves.toBe(
+        true
+      );
       const latestReport = path.join(
         workspaceRoot,
         '.rapidkit',

@@ -122,3 +122,7 @@ rapidkit doctor workspace
 rapidkit cache status
 rapidkit mirror status
 ```
+
+`rapidkit bootstrap` now auto-syncs legacy workspaces (missing `.rapidkit-workspace`
+or newer `.rapidkit/*` foundation files) so older workspace roots can align with
+the current workspace architecture without manual file creation.

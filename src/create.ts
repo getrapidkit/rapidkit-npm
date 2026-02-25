@@ -20,6 +20,7 @@ import {
 import { getPythonCommand } from './utils.js';
 import {
   createNpmWorkspaceMarker,
+  readWorkspaceMarker,
   writeWorkspaceMarker as writeWorkspaceMarkerToFile,
 } from './workspace-marker.js';
 
@@ -202,6 +203,98 @@ async function writeWorkspaceFoundationFiles(
     buildCacheConfigYaml(),
     'utf-8'
   );
+}
+
+/**
+ * Ensure workspace foundation files exist for legacy workspaces.
+ *
+ * This helper writes only missing files by default so existing workspace
+ * configuration is preserved. It can be used by commands like `bootstrap`
+ * to auto-heal workspaces created before the foundation-file architecture.
+ */
+export async function syncWorkspaceFoundationFiles(
+  workspacePath: string,
+  options?: {
+    workspaceName?: string;
+    installMethod?: InstallMethod;
+    pythonVersion?: string;
+    profile?: string;
+    writeMarker?: boolean;
+    writeGitignore?: boolean;
+    onlyIfMissing?: boolean;
+  }
+): Promise<string[]> {
+  const {
+    workspaceName = path.basename(workspacePath),
+    installMethod = 'venv',
+    pythonVersion,
+    profile,
+    writeMarker = true,
+    writeGitignore = true,
+    onlyIfMissing = true,
+  } = options || {};
+
+  const created: string[] = [];
+
+  let goVersion: string | undefined;
+  try {
+    const { stdout: goOut } = await execa('go', ['version'], { timeout: 3000, stdio: 'pipe' });
+    const gm = goOut.match(/go(\d+\.\d+(?:\.\d+)?)/i);
+    goVersion = gm ? gm[1] : undefined;
+  } catch {
+    /* Go not installed — leave null in toolchain lock */
+  }
+
+  const foundationFiles: Array<{ relPath: string; content: string }> = [
+    {
+      relPath: path.join('.rapidkit', 'workspace.json'),
+      content: buildWorkspaceManifest(workspaceName, installMethod, pythonVersion, profile),
+    },
+    {
+      relPath: path.join('.rapidkit', 'toolchain.lock'),
+      content: buildToolchainLock(installMethod, pythonVersion, process.version, goVersion),
+    },
+    {
+      relPath: path.join('.rapidkit', 'policies.yml'),
+      content: buildPoliciesYaml(),
+    },
+    {
+      relPath: path.join('.rapidkit', 'cache-config.yml'),
+      content: buildCacheConfigYaml(),
+    },
+  ];
+
+  for (const file of foundationFiles) {
+    const absPath = path.join(workspacePath, file.relPath);
+    if (onlyIfMissing && (await fsExtra.pathExists(absPath))) {
+      continue;
+    }
+    await fsExtra.outputFile(absPath, file.content, 'utf-8');
+    created.push(file.relPath);
+  }
+
+  if (writeMarker) {
+    const markerExists = !!(await readWorkspaceMarker(workspacePath));
+    if (!markerExists || !onlyIfMissing) {
+      const markerObj = createNpmWorkspaceMarker(workspaceName, getVersion(), installMethod);
+      if (pythonVersion) {
+        if (!markerObj.metadata) markerObj.metadata = {};
+        (markerObj.metadata as Record<string, unknown>).python = { version: pythonVersion };
+      }
+      await writeWorkspaceMarkerToFile(workspacePath, markerObj);
+      created.push('.rapidkit-workspace');
+    }
+  }
+
+  if (writeGitignore) {
+    const gitignorePath = path.join(workspacePath, '.gitignore');
+    if (!onlyIfMissing || !(await fsExtra.pathExists(gitignorePath))) {
+      await writeWorkspaceGitignore(workspacePath);
+      created.push('.gitignore');
+    }
+  }
+
+  return created;
 }
 
 type InstallMethod = 'poetry' | 'venv' | 'pipx';
