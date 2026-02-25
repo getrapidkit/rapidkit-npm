@@ -89,7 +89,7 @@ describe('Phase 3 commands - CLI process integration', () => {
       const output = `${run.stdout || ''}\n${run.stderr || ''}`;
       expect(output).not.toContain('delegated-local-script');
     } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+      fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     }
   });
 
@@ -217,7 +217,7 @@ describe('Phase 3 commands - CLI process integration', () => {
       expect(output).not.toContain('Runtime adapters are disabled');
       expect(fs.existsSync(path.join(projectDir, 'package-lock.json'))).toBe(true);
     } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+      fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     }
   });
 
@@ -283,9 +283,9 @@ describe('Phase 3 commands - CLI process integration', () => {
         expect(output).toContain('MODE:shared-runtime-caches');
       }
     } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+      fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     }
-  });
+  }, 20000);
 
   it('fails fast on invalid dependency_sharing_mode for lifecycle commands', () => {
     const dist = ensureDistBuilt();
@@ -343,7 +343,7 @@ describe('Phase 3 commands - CLI process integration', () => {
       expect(output).toContain('Invalid dependency_sharing_mode');
       expect(output).not.toContain('SHOULD_NOT_RUN');
     } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+      fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     }
   });
 });

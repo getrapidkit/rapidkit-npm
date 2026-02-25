@@ -17,6 +17,19 @@ vi.mock('../runtime-adapters/index.js', () => ({
 describe('User-level practical scenarios', () => {
   let originalCwd = process.cwd();
 
+  const cleanupWorkspaceDir = async (workspaceRoot: string): Promise<void> => {
+    const cwd = process.cwd();
+    if (cwd === workspaceRoot || cwd.startsWith(`${workspaceRoot}${path.sep}`)) {
+      process.chdir(originalCwd);
+    }
+    await rm(workspaceRoot, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200,
+    });
+  };
+
   beforeEach(() => {
     originalCwd = process.cwd();
     vi.resetModules();
@@ -82,7 +95,7 @@ describe('User-level practical scenarios', () => {
         fsExtra.pathExists(path.join(rapidkitDir, 'reports', 'bootstrap-compliance.latest.json'))
       ).resolves.toBe(true);
     } finally {
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     }
   });
 
@@ -131,7 +144,7 @@ describe('User-level practical scenarios', () => {
       const fsExtra = await import('fs-extra');
       await expect(fsExtra.pathExists(path.join(rapidkitDir, 'mirror.lock'))).resolves.toBe(true);
     } finally {
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     }
   });
 
@@ -218,7 +231,7 @@ describe('User-level practical scenarios', () => {
         fsExtra.pathExists(path.join(rapidkitDir, 'reports', 'transparency-evidence.latest.json'))
       ).resolves.toBe(true);
     } finally {
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     }
   });
 
@@ -337,7 +350,7 @@ describe('User-level practical scenarios', () => {
         fsExtra.pathExists(path.join(rapidkitDir, 'reports', 'transparency-evidence.latest.json'))
       ).resolves.toBe(true);
     } finally {
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     }
   });
 });

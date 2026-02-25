@@ -5,6 +5,8 @@ import { NodeRuntimeAdapter } from '../runtime-adapters/node.js';
 import { PythonRuntimeAdapter } from '../runtime-adapters/python.js';
 import { areRuntimeAdaptersEnabled, getRuntimeAdapter } from '../runtime-adapters/index.js';
 
+const normalizePath = (value: string | undefined): string => (value || '').replace(/\\/g, '/');
+
 describe('Runtime Adapters', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -56,8 +58,12 @@ describe('Runtime Adapters', () => {
       process.env.RAPIDKIT_DEP_SHARING_MODE = 'isolated';
       process.env.RAPIDKIT_WORKSPACE_PATH = '/tmp/workspace';
       const run = vi.fn().mockImplementation(async () => {
-        expect(process.env.GOMODCACHE).toContain('/tmp/project/.rapidkit/cache/go/mod');
-        expect(process.env.GOCACHE).toContain('/tmp/project/.rapidkit/cache/go/build');
+        expect(normalizePath(process.env.GOMODCACHE)).toContain(
+          '/tmp/project/.rapidkit/cache/go/mod'
+        );
+        expect(normalizePath(process.env.GOCACHE)).toContain(
+          '/tmp/project/.rapidkit/cache/go/build'
+        );
         return 0;
       });
       const adapter = new GoRuntimeAdapter(run);
@@ -71,8 +77,12 @@ describe('Runtime Adapters', () => {
       process.env.RAPIDKIT_DEP_SHARING_MODE = 'shared-runtime-caches';
       process.env.RAPIDKIT_WORKSPACE_PATH = '/tmp/workspace';
       const run = vi.fn().mockImplementation(async () => {
-        expect(process.env.GOMODCACHE).toContain('/tmp/workspace/.rapidkit/cache/go/mod');
-        expect(process.env.GOCACHE).toContain('/tmp/workspace/.rapidkit/cache/go/build');
+        expect(normalizePath(process.env.GOMODCACHE)).toContain(
+          '/tmp/workspace/.rapidkit/cache/go/mod'
+        );
+        expect(normalizePath(process.env.GOCACHE)).toContain(
+          '/tmp/workspace/.rapidkit/cache/go/build'
+        );
         return 0;
       });
       const adapter = new GoRuntimeAdapter(run);
@@ -99,14 +109,17 @@ describe('Runtime Adapters', () => {
     it('runs binary directly for start when built binary exists', async () => {
       const run = vi.fn().mockResolvedValue(0);
       const adapter = new GoRuntimeAdapter(run);
+      const expectedBinary =
+        process.platform === 'win32' ? '/tmp/project/server.exe' : '/tmp/project/server';
       vi.spyOn(fs, 'existsSync').mockImplementation((p: fs.PathLike) =>
-        String(p).endsWith('/server')
+        normalizePath(String(p)).endsWith(process.platform === 'win32' ? '/server.exe' : '/server')
       );
 
       const result = await adapter.runStart('/tmp/project');
 
       expect(result.exitCode).toBe(0);
-      expect(run).toHaveBeenCalledWith('/tmp/project/server', [], '/tmp/project');
+      expect(normalizePath(run.mock.calls[0][0])).toBe(expectedBinary);
+      expect(run).toHaveBeenCalledWith(expect.any(String), [], '/tmp/project');
     });
   });
 
@@ -157,8 +170,10 @@ describe('Runtime Adapters', () => {
       process.env.RAPIDKIT_WORKSPACE_PATH = '/tmp/workspace';
 
       const runCore = vi.fn().mockImplementation(async () => {
-        expect(process.env.PIP_CACHE_DIR).toContain('/tmp/workspace/.rapidkit/cache/python/pip');
-        expect(process.env.POETRY_CACHE_DIR).toContain(
+        expect(normalizePath(process.env.PIP_CACHE_DIR)).toContain(
+          '/tmp/workspace/.rapidkit/cache/python/pip'
+        );
+        expect(normalizePath(process.env.POETRY_CACHE_DIR)).toContain(
           '/tmp/workspace/.rapidkit/cache/python/poetry'
         );
         return 0;
@@ -176,8 +191,10 @@ describe('Runtime Adapters', () => {
       process.env.RAPIDKIT_WORKSPACE_PATH = '/tmp/workspace';
 
       const runCore = vi.fn().mockImplementation(async () => {
-        expect(process.env.PIP_CACHE_DIR).toContain('/tmp/project/.rapidkit/cache/python/pip');
-        expect(process.env.POETRY_CACHE_DIR).toContain(
+        expect(normalizePath(process.env.PIP_CACHE_DIR)).toContain(
+          '/tmp/project/.rapidkit/cache/python/pip'
+        );
+        expect(normalizePath(process.env.POETRY_CACHE_DIR)).toContain(
           '/tmp/project/.rapidkit/cache/python/poetry'
         );
         return 0;
@@ -248,7 +265,7 @@ describe('Runtime Adapters', () => {
 
       const run = vi.fn().mockImplementation(async (command: string) => {
         expect(command).toBe('npm');
-        expect(process.env.npm_config_cache).toContain(
+        expect(normalizePath(process.env.npm_config_cache)).toContain(
           '/tmp/workspace/.rapidkit/cache/node/npm-cache'
         );
         return 0;
@@ -268,10 +285,10 @@ describe('Runtime Adapters', () => {
 
       const run = vi.fn().mockImplementation(async (command: string) => {
         expect(command).toBe('pnpm');
-        expect(process.env.npm_config_store_dir).toContain(
+        expect(normalizePath(process.env.npm_config_store_dir)).toContain(
           '/tmp/workspace/.rapidkit/cache/node/pnpm-store'
         );
-        expect(process.env.npm_config_cache).toContain(
+        expect(normalizePath(process.env.npm_config_cache)).toContain(
           '/tmp/workspace/.rapidkit/cache/node/pnpm-cache'
         );
         return 0;
@@ -311,7 +328,7 @@ describe('Runtime Adapters', () => {
       const result = await adapter.initProject('/tmp/node-project');
 
       expect(result.exitCode).toBe(0);
-      expect(seenCache).toContain('/tmp/workspace/.rapidkit/cache/node/yarn-cache');
+      expect(normalizePath(seenCache)).toContain('/tmp/workspace/.rapidkit/cache/node/yarn-cache');
       expect(process.env.npm_config_cache).toBeUndefined();
     });
 

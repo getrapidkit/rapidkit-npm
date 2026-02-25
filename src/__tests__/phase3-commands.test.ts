@@ -28,6 +28,19 @@ vi.mock('../utils/cache.js', () => ({
 describe('Phase 3 command contract handlers', () => {
   let originalCwd = process.cwd();
 
+  const cleanupWorkspaceDir = async (workspaceRoot: string): Promise<void> => {
+    const cwd = process.cwd();
+    if (cwd === workspaceRoot || cwd.startsWith(`${workspaceRoot}${path.sep}`)) {
+      process.chdir(originalCwd);
+    }
+    await rm(workspaceRoot, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200,
+    });
+  };
+
   beforeEach(() => {
     originalCwd = process.cwd();
     vi.resetModules();
@@ -119,7 +132,7 @@ describe('Phase 3 command contract handlers', () => {
       );
       await expect(fsExtra.pathExists(latestReport)).resolves.toBe(true);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('fails fast when dependency_sharing_mode policy value is invalid', async () => {
@@ -157,7 +170,7 @@ describe('Phase 3 command contract handlers', () => {
       expect(code).toBe(1);
       expect(initRunner).not.toHaveBeenCalled();
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('forwards bootstrap path args and writes compliance report on success', async () => {
@@ -208,7 +221,7 @@ describe('Phase 3 command contract handlers', () => {
       );
       await expect(fsExtra.pathExists(latestReport)).resolves.toBe(true);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('blocks strict offline bootstrap when mirror requirements are missing', async () => {
@@ -250,7 +263,7 @@ describe('Phase 3 command contract handlers', () => {
       expect(code).toBe(1);
       expect(initRunner).not.toHaveBeenCalled();
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('passes strict enterprise bootstrap when mirror and compatibility artifacts exist', async () => {
@@ -341,7 +354,7 @@ describe('Phase 3 command contract handlers', () => {
         true
       );
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
   });
 
@@ -434,7 +447,7 @@ describe('Phase 3 command contract handlers', () => {
         fsExtra.pathExists(path.join(rapidkitDir, 'reports', 'mirror-ops.latest.json'))
       ).resolves.toBe(true);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('outputs JSON for mirror status when --json is provided', async () => {
@@ -458,7 +471,7 @@ describe('Phase 3 command contract handlers', () => {
       expect(parsed.result).toBe('ok');
 
       stdoutSpy.mockRestore();
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('runs mirror sync lifecycle and writes lock', async () => {
@@ -508,7 +521,7 @@ describe('Phase 3 command contract handlers', () => {
         fsExtra.pathExists(path.join(rapidkitDir, 'reports', 'mirror-ops.latest.json'))
       ).resolves.toBe(true);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('prefetches remote mirror artifact with checksum pinning', async () => {
@@ -572,7 +585,7 @@ describe('Phase 3 command contract handlers', () => {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve()))
       );
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('retries prefetch and records provenance attempts', async () => {
@@ -653,7 +666,7 @@ describe('Phase 3 command contract handlers', () => {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve()))
       );
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('verifies cryptographic attestation for mirrored artifact', async () => {
@@ -721,7 +734,7 @@ describe('Phase 3 command contract handlers', () => {
       const entry = lock.artifacts?.find((artifact) => artifact.id === 'attested-artifact');
       expect(entry?.attestation?.detached?.verified).toBe(true);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('fails when attestation is required but missing', async () => {
@@ -765,7 +778,7 @@ describe('Phase 3 command contract handlers', () => {
       const code = await index.handleMirrorCommand(['mirror', 'sync']);
       expect(code).toBe(1);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('verifies Sigstore attestation via cosign integration path (mocked)', async () => {
@@ -857,7 +870,7 @@ describe('Phase 3 command contract handlers', () => {
       expect(entry?.attestation?.sigstore?.verified).toBe(true);
       expect(entry?.attestation?.sigstore?.tlogVerified).toBe(true);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('fails when Sigstore is required but missing', async () => {
@@ -907,7 +920,7 @@ describe('Phase 3 command contract handlers', () => {
       const code = await index.handleMirrorCommand(['mirror', 'sync']);
       expect(code).toBe(1);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('passes Sigstore governance allowlists in prod environment', async () => {
@@ -989,7 +1002,7 @@ describe('Phase 3 command contract handlers', () => {
       const code = await index.handleMirrorCommand(['mirror', 'sync']);
       expect(code).toBe(0);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('fails Sigstore governance allowlists in prod environment', async () => {
@@ -1068,7 +1081,7 @@ describe('Phase 3 command contract handlers', () => {
       const code = await index.handleMirrorCommand(['mirror', 'sync']);
       expect(code).toBe(1);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('accepts verified signed governance bundle and enforces its policy', async () => {
@@ -1183,7 +1196,7 @@ describe('Phase 3 command contract handlers', () => {
         fsExtra.pathExists(path.join(rapidkitDir, 'reports', 'transparency-evidence.latest.json'))
       ).resolves.toBe(true);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('blocks when signed governance bundle is required but signature is invalid', async () => {
@@ -1251,7 +1264,7 @@ describe('Phase 3 command contract handlers', () => {
       const code = await index.handleMirrorCommand(['mirror', 'sync']);
       expect(code).toBe(1);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('exports transparency evidence to file sink', async () => {
@@ -1329,7 +1342,7 @@ describe('Phase 3 command contract handlers', () => {
       const sinkPath = path.join(rapidkitDir, 'reports', 'siem-evidence.ndjson');
       await expect(fsExtra.pathExists(sinkPath)).resolves.toBe(true);
 
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
 
     it('exports transparency evidence to HTTP webhook sink', async () => {
@@ -1422,7 +1435,7 @@ describe('Phase 3 command contract handlers', () => {
       await new Promise<void>((resolve, reject) =>
         webhook.close((error) => (error ? reject(error) : resolve()))
       );
-      await rm(workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(workspaceRoot);
     });
   });
 

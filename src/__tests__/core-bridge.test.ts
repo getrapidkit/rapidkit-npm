@@ -5,6 +5,12 @@ import { detectRapidkitProject, getRapidkitCoreVersion } from '../core-bridge/py
 
 vi.mock('execa');
 
+const pythonCandidates =
+  process.platform === 'win32'
+    ? (['python', 'py', 'python3'] as const)
+    : (['python3', 'python'] as const);
+const withLauncherArgs = (cmd: string, args: string[]) => (cmd === 'py' ? ['-3', ...args] : args);
+
 describe('core-bridge/pythonRapidkit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -33,8 +39,8 @@ describe('core-bridge/pythonRapidkit', () => {
     expect(res.data?.version).toBe('0.2.0');
 
     expect(vi.mocked(execa)).toHaveBeenCalledWith(
-      'python3',
-      ['-m', 'rapidkit', '--version', '--json'],
+      pythonCandidates[0],
+      withLauncherArgs(pythonCandidates[0], ['-m', 'rapidkit', '--version', '--json']),
       expect.objectContaining({ cwd: '/tmp', reject: false })
     );
   });
@@ -54,14 +60,14 @@ describe('core-bridge/pythonRapidkit', () => {
 
     expect(vi.mocked(execa)).toHaveBeenNthCalledWith(
       1,
-      'python3',
-      ['-m', 'rapidkit', '--version', '--json'],
+      pythonCandidates[0],
+      withLauncherArgs(pythonCandidates[0], ['-m', 'rapidkit', '--version', '--json']),
       expect.any(Object)
     );
     expect(vi.mocked(execa)).toHaveBeenNthCalledWith(
       2,
-      'python',
-      ['-m', 'rapidkit', '--version', '--json'],
+      pythonCandidates[1],
+      withLauncherArgs(pythonCandidates[1], ['-m', 'rapidkit', '--version', '--json']),
       expect.any(Object)
     );
   });
@@ -88,8 +94,16 @@ describe('core-bridge/pythonRapidkit', () => {
     expect(res.data?.projectRoot).toBe('/work');
 
     expect(vi.mocked(execa)).toHaveBeenCalledWith(
-      'python3',
-      ['-m', 'rapidkit', 'project', 'detect', '--path', '/work', '--json'],
+      pythonCandidates[0],
+      withLauncherArgs(pythonCandidates[0], [
+        '-m',
+        'rapidkit',
+        'project',
+        'detect',
+        '--path',
+        '/work',
+        '--json',
+      ]),
       expect.objectContaining({ cwd: '/work', reject: false })
     );
   });

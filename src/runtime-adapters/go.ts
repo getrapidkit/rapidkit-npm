@@ -108,9 +108,14 @@ export class GoRuntimeAdapter implements RuntimeAdapter {
 
   async runStart(projectPath: string): Promise<CommandResult> {
     return this.withGoCacheEnv(projectPath, () => {
-      const binaryPath = path.join(projectPath, 'server');
-      if (fs.existsSync(binaryPath)) {
-        return this.run(binaryPath, [], projectPath);
+      const binaryCandidates =
+        process.platform === 'win32'
+          ? [path.join(projectPath, 'server.exe'), path.join(projectPath, 'server')]
+          : [path.join(projectPath, 'server')];
+
+      const existingBinary = binaryCandidates.find((candidate) => fs.existsSync(candidate));
+      if (existingBinary) {
+        return this.run(existingBinary, [], projectPath);
       }
       return this.run('go', ['run', './main.go'], projectPath);
     });

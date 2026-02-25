@@ -35,6 +35,11 @@ const mockFs = fsExtra as unknown as {
   ensureDir: Mock;
 };
 
+const pythonCandidates =
+  process.platform === 'win32'
+    ? (['python', 'py', 'python3'] as const)
+    : (['python3', 'python'] as const);
+
 describe('bridge internals', () => {
   let bridge: typeof import('../core-bridge/pythonRapidkitExec');
 
@@ -93,15 +98,15 @@ rapidkit deploy
     it('returns python3 if available', async () => {
       mockExeca.mockResolvedValueOnce({ exitCode: 0 });
       const res = await bridge.__test__.pickSystemPython();
-      expect(res).toBe('python3');
+      expect(res).toBe(pythonCandidates[0]);
     });
 
     it('falls back to python', async () => {
       mockExeca
-        .mockRejectedValueOnce(new Error('no python3'))
+        .mockRejectedValueOnce(new Error('first candidate unavailable'))
         .mockResolvedValueOnce({ exitCode: 0 });
       const res = await bridge.__test__.pickSystemPython();
-      expect(res).toBe('python');
+      expect(res).toBe(pythonCandidates[1]);
     });
 
     it('returns null if none found', async () => {
@@ -291,11 +296,12 @@ describe('resolveRapidkitPython', () => {
     const res = await bridge.resolveRapidkitPython();
     expect(res.kind).toBe('system');
     if (res.kind === 'system') {
-      expect(res.cmd).toBe('python3');
+      expect(res.cmd).toBe(pythonCandidates[0]);
     }
   });
 
   it('bootstraps venv when system python has no rapidkit', async () => {
+    process.env.RAPIDKIT_BRIDGE_FORCE_VENV = '1';
     // tryRapidkit(python3): all probes must fail
     // 1. sysconfig script path probe - returns path but doesn't exist
     mockExeca.mockResolvedValueOnce({ stdout: '/some/path/rapidkit', exitCode: 0 });

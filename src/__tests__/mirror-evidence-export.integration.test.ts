@@ -19,6 +19,19 @@ vi.mock('../runtime-adapters/index.js', () => ({
 describe('Mirror evidence export hardening', () => {
   let originalCwd = process.cwd();
 
+  const cleanupWorkspaceDir = async (workspaceRoot: string): Promise<void> => {
+    const cwd = process.cwd();
+    if (cwd === workspaceRoot || cwd.startsWith(`${workspaceRoot}${path.sep}`)) {
+      process.chdir(originalCwd);
+    }
+    await rm(workspaceRoot, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200,
+    });
+  };
+
   beforeEach(() => {
     originalCwd = process.cwd();
     vi.resetModules();
@@ -151,7 +164,7 @@ describe('Mirror evidence export hardening', () => {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve()))
       );
-      await rm(fixture.workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(fixture.workspaceRoot);
     }
   });
 
@@ -227,7 +240,7 @@ describe('Mirror evidence export hardening', () => {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve()))
       );
-      await rm(fixture.workspaceRoot, { recursive: true, force: true });
+      await cleanupWorkspaceDir(fixture.workspaceRoot);
     }
   });
 });
