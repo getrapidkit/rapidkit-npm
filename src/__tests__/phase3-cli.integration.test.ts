@@ -329,35 +329,41 @@ describe('Phase 3 commands - CLI process integration', () => {
 
   it('clears disk cache entries via cache clear command', () => {
     const dist = ensureDistBuilt();
-    const cacheDir = path.join(os.homedir(), '.rapidkit', 'cache');
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rapidkit-cache-clear-'));
+    const cacheDir = path.join(tempDir, 'cache');
     const markerKey = `phase3-cli-marker-${Date.now()}-${Math.random()}`;
     const markerFile = `${createHash('md5').update(markerKey).digest('hex')}.json`;
     const markerPath = path.join(cacheDir, markerFile);
 
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(
-      markerPath,
-      JSON.stringify({
-        data: { ok: true },
-        timestamp: Date.now(),
-        version: '1.0',
-      })
-    );
-    expect(fs.existsSync(markerPath)).toBe(true);
+    try {
+      fs.mkdirSync(cacheDir, { recursive: true });
+      fs.writeFileSync(
+        markerPath,
+        JSON.stringify({
+          data: { ok: true },
+          timestamp: Date.now(),
+          version: '1.0',
+        })
+      );
+      expect(fs.existsSync(markerPath)).toBe(true);
 
-    const run = spawnSync(process.execPath, [dist, 'cache', 'clear'], {
-      cwd: process.cwd(),
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        RAPIDKIT_ENABLE_RUNTIME_ADAPTERS: '1',
-      },
-    });
+      const run = spawnSync(process.execPath, [dist, 'cache', 'clear'], {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          RAPIDKIT_ENABLE_RUNTIME_ADAPTERS: '1',
+          RAPIDKIT_CACHE_DIR: cacheDir,
+        },
+      });
 
-    expect(run.status).toBe(0);
-    const output = `${run.stdout || ''}\n${run.stderr || ''}`;
-    expect(output).toContain('Cache clear completed');
-    expect(fs.existsSync(markerPath)).toBe(false);
+      expect(run.status).toBe(0);
+      const output = `${run.stdout || ''}\n${run.stderr || ''}`;
+      expect(output).toContain('Cache clear completed');
+      expect(fs.existsSync(markerPath)).toBe(false);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    }
   });
 
   it('executes bootstrap for a node project path via init rewrite when adapters are enabled', () => {

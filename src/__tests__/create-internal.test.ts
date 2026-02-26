@@ -710,7 +710,17 @@ describe('Create Module - Internal Functions', () => {
       });
 
       vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
+        if (
+          command === 'py' &&
+          (args?.[0] === '-3.14' || args?.[0] === '-3') &&
+          args?.[1] === '--version'
+        ) {
+          return Promise.resolve({ stdout: 'Python 3.14.1', stderr: '', exitCode: 0 } as any);
+        }
         if (command === 'python3.14' && args?.[0] === '--version') {
+          return Promise.resolve({ stdout: 'Python 3.14.1', stderr: '', exitCode: 0 } as any);
+        }
+        if (command === 'python' && args?.[0] === '--version') {
           return Promise.resolve({ stdout: 'Python 3.14.1', stderr: '', exitCode: 0 } as any);
         }
         if (command === 'python3' && args?.[0] === '--version') {
