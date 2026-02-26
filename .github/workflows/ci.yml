@@ -208,6 +208,9 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Generate mock embeddings for tests
+        run: npm run test:prepare-embeddings
+
       - name: Run Phase 4 adapter/contract regression suites
         env:
           RAPIDKIT_ENABLE_RUNTIME_ADAPTERS: '1'

@@ -39,6 +39,10 @@ jobs:
         shell: pwsh
         run: npm run build
 
+      - name: Generate mock embeddings for tests
+        shell: pwsh
+        run: npm run test:prepare-embeddings
+
       - name: Bridge + lifecycle smoke (native pwsh)
         shell: pwsh
         run: |
