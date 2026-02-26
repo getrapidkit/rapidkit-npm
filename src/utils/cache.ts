@@ -5,8 +5,22 @@ import os from 'os';
 import { createHash } from 'crypto';
 import { logger } from '../logger.js';
 
-const CACHE_DIR = path.join(os.homedir(), '.rapidkit', 'cache');
+const BASE_CACHE_DIR = path.join(os.homedir(), '.rapidkit', 'cache');
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+function getCacheDir(): string {
+  const configured = process.env.RAPIDKIT_CACHE_DIR?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  const vitestWorkerId = process.env.VITEST_WORKER_ID?.trim();
+  if (vitestWorkerId) {
+    return path.join(BASE_CACHE_DIR, `vitest-${vitestWorkerId}`);
+  }
+
+  return BASE_CACHE_DIR;
+}
 
 interface CacheEntry<T> {
   data: T;
@@ -32,7 +46,7 @@ export class Cache {
   }
 
   private getCachePath(key: string): string {
-    return path.join(CACHE_DIR, `${this.getCacheKey(key)}.json`);
+    return path.join(getCacheDir(), `${this.getCacheKey(key)}.json`);
   }
 
   async get<T>(key: string, version: string = '1.0'): Promise<T | null> {
@@ -79,7 +93,7 @@ export class Cache {
 
     // Set on disk
     try {
-      await fs.mkdir(CACHE_DIR, { recursive: true });
+      await fs.mkdir(getCacheDir(), { recursive: true });
       const cachePath = this.getCachePath(key);
       await fs.writeFile(cachePath, JSON.stringify(entry), 'utf-8');
       logger.debug(`Cache set: ${key}`);
@@ -102,8 +116,9 @@ export class Cache {
   async clear(): Promise<void> {
     this.memoryCache.clear();
     try {
-      const files = await fs.readdir(CACHE_DIR);
-      await Promise.all(files.map((file) => fs.unlink(path.join(CACHE_DIR, file))));
+      const cacheDir = getCacheDir();
+      const files = await fs.readdir(cacheDir);
+      await Promise.all(files.map((file) => fs.unlink(path.join(cacheDir, file))));
       logger.debug('Cache cleared');
     } catch {
       // Ignore errors
