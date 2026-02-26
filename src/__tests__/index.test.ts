@@ -7,8 +7,38 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execa } from 'execa';
 import * as path from 'path';
 import * as fs from 'fs-extra';
+import { spawnSync } from 'child_process';
 
-const CLI_PATH = path.join(process.cwd(), 'dist', 'index.js');
+function ensureDistBuilt(): string {
+  const repoRoot = process.cwd();
+  const distPath = path.join(repoRoot, 'dist', 'index.js');
+  const srcEntryPath = path.join(repoRoot, 'src', 'index.ts');
+
+  const shouldBuild = (() => {
+    if (!fs.existsSync(distPath)) return true;
+    if (!fs.existsSync(srcEntryPath)) return false;
+
+    const distMtime = fs.statSync(distPath).mtimeMs;
+    const srcMtime = fs.statSync(srcEntryPath).mtimeMs;
+    return srcMtime > distMtime;
+  })();
+
+  if (shouldBuild) {
+    const build = spawnSync('npm', ['run', 'build'], {
+      cwd: repoRoot,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+
+    if (build.status !== 0) {
+      throw new Error('Failed to build dist/index.js for CLI entry point tests');
+    }
+  }
+
+  return distPath;
+}
+
+const CLI_PATH = ensureDistBuilt();
 const TEST_DIR = path.join(process.cwd(), 'test-cli-output');
 
 describe('CLI Entry Point', () => {
@@ -35,75 +65,98 @@ describe('CLI Entry Point', () => {
       const { stdout } = await execa('node', [CLI_PATH, '--help']);
 
       // CLI identity
-      expect(stdout).toContain('RapidKit');
-      expect(stdout).toContain('Global CLI');
+      expect(stdout).toContain('Welcome to RapidKit NPM CLI');
+      expect(stdout).toContain('Usage:');
 
       // Core sections
-      expect(stdout).toContain('Workspace Setup Commands');
-      expect(stdout).toContain('Project Commands');
+      expect(stdout).toContain('Workspace commands (inside a workspace):');
+      expect(stdout).toContain('Project commands (inside a project):');
 
       // Known commands
       expect(stdout).toContain('rapidkit create');
       expect(stdout).toContain('rapidkit init');
       expect(stdout).toContain('rapidkit dev');
-      expect(stdout).toContain('rapidkit help');
-      expect(stdout).toContain('mirror status --json | sync | verify | rotate');
-      expect(stdout).toContain('cache status | clear | prune | repair');
+      expect(stdout).toContain('rapidkit workspace list');
+      expect(stdout).toContain('mirror [status|sync|verify|rotate]');
+      expect(stdout).toContain('cache [status|clear|prune|repair]');
 
       // Legacy options should remain hidden from option list
-      expect(stdout).not.toContain('--template');
-      expect(stdout).not.toContain('--skip-git');
-      expect(stdout).not.toContain('--dry-run');
+      expect(stdout).not.toContain('Legacy (shown because RAPIDKIT_SHOW_LEGACY=1):');
 
       // Clarification note must be visible in help text
       expect(stdout).toContain(
-        '--skip-install (npm wrapper) enables fast-path for lock/dependency steps.'
+        '--skip-install              npm fast-path for lock/dependency steps'
       );
-      expect(stdout).toContain('core --skip-essentials');
+      expect(stdout).toContain(
+        '--skip-essentials           core flag for skipping essential module installation'
+      );
     }, 15000);
 
-    it('should not show legacy flags even when legacy env is enabled', async () => {
+    it('should show legacy flags when legacy env is enabled', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '--help'], {
         env: { ...process.env, RAPIDKIT_SHOW_LEGACY: '1' },
       });
 
-      expect(stdout).not.toContain('--template');
-      expect(stdout).toContain('core --skip-essentials');
+      expect(stdout).toContain('Legacy (shown because RAPIDKIT_SHOW_LEGACY=1):');
+      expect(stdout).toContain('npx rapidkit my-project --template fastapi');
+      expect(stdout).not.toContain(
+        'Tip: set RAPIDKIT_SHOW_LEGACY=1 to show legacy template flags in help.'
+      );
+      expect(stdout).toContain(
+        '--skip-essentials           core flag for skipping essential module installation'
+      );
     });
 
     it('should display the same help output with -h flag', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '-h']);
 
-      expect(stdout).toContain('RapidKit');
-      expect(stdout).toContain('Workspace Setup Commands');
-      expect(stdout).toContain('Project Commands');
-      expect(stdout).toContain('rapidkit help');
+      expect(stdout).toContain('Welcome to RapidKit NPM CLI');
+      expect(stdout).toContain('Workspace commands (inside a workspace):');
+      expect(stdout).toContain('Project commands (inside a project):');
+      expect(stdout).toContain('npx rapidkit workspace list');
     });
 
     it('should keep workspace help command variants aligned with supported actions', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '--help']);
 
       expect(stdout).toContain(
-        'rapidkit mirror            Manage registry mirrors   (mirror status --json | sync | verify | rotate)'
+        'npx rapidkit workspace list               List registered workspaces'
       );
       expect(stdout).toContain(
-        'rapidkit cache             Manage package cache      (cache status | clear | prune | repair)'
+        'npx rapidkit mirror [status|sync|verify|rotate] Registry mirror management'
+      );
+      expect(stdout).toContain(
+        'npx rapidkit cache [status|clear|prune|repair]  Package cache management'
       );
     });
 
-    it('should match workspace setup help block snapshot', async () => {
+    it('should match workspace command block snapshot', async () => {
       const { stdout } = await execa('node', [CLI_PATH, '--help']);
-      const block = stdout.match(/Workspace Setup Commands[\s\S]*?Project Commands/);
+      const block = stdout.match(
+        /Workspace commands \(inside a workspace\):[\s\S]*?Options \(workspace creation\):/
+      );
 
       expect(block?.[0].replace(/\r/g, '')).toMatchInlineSnapshot(`
-        "Workspace Setup Commands
-          rapidkit bootstrap         Bootstrap projects in workspace (--profile python-only|node-only|go-only|polyglot|enterprise)
-          rapidkit setup <runtime>   Set up runtime toolchain  (runtime: python | node | go)
-          rapidkit mirror            Manage registry mirrors   (mirror status --json | sync | verify | rotate)
-          rapidkit cache             Manage package cache      (cache status | clear | prune | repair)
+        "Workspace commands (inside a workspace):
+          npx rapidkit bootstrap [--profile <p>]   Re-bootstrap toolchains
+          npx rapidkit workspace list               List registered workspaces
+          npx rapidkit workspace policy show        Show effective workspace policies
+          npx rapidkit workspace policy set <k> <v> Update workspace policy values
+          npx rapidkit setup python|node|go [--warm-deps]  Set up runtime (+ optional deps warm-up)
+          npx rapidkit mirror [status|sync|verify|rotate] Registry mirror management
+          npx rapidkit cache [status|clear|prune|repair]  Package cache management
 
-        Project Commands"
+        Options (workspace creation):"
       `);
+    });
+
+    it('should render identical output for no-arg, --help, and help at root', async () => {
+      const noArg = await execa('node', [CLI_PATH]);
+      const withHelp = await execa('node', [CLI_PATH, '--help']);
+      const withHelpCommand = await execa('node', [CLI_PATH, 'help']);
+
+      expect(noArg.stdout.replace(/\r/g, '')).toBe(withHelp.stdout.replace(/\r/g, ''));
+      expect(noArg.stdout.replace(/\r/g, '')).toBe(withHelpCommand.stdout.replace(/\r/g, ''));
     });
   });
 

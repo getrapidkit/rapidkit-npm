@@ -1481,13 +1481,26 @@ describe('Phase 3 command contract handlers', () => {
   });
 
   describe('core forwarding boundary', () => {
-    it('keeps bootstrap/setup/cache npm-local and never forwards to core', async () => {
+    it('keeps npm-only commands local and never forwards to core', async () => {
       const index = await import('../index.js');
+
+      for (const command of index.NPM_ONLY_TOP_LEVEL_COMMANDS) {
+        await expect(index.shouldForwardToCore([command])).resolves.toBe(false);
+      }
 
       await expect(index.shouldForwardToCore(['bootstrap'])).resolves.toBe(false);
       await expect(index.shouldForwardToCore(['setup', 'python'])).resolves.toBe(false);
       await expect(index.shouldForwardToCore(['cache', 'status'])).resolves.toBe(false);
       await expect(index.shouldForwardToCore(['mirror', 'status'])).resolves.toBe(false);
+      await expect(index.shouldForwardToCore(['doctor', 'workspace'])).resolves.toBe(false);
+      await expect(index.shouldForwardToCore(['workspace', 'list'])).resolves.toBe(false);
+      await expect(index.shouldForwardToCore(['shell', 'activate'])).resolves.toBe(false);
+      await expect(index.shouldForwardToCore(['ai'])).resolves.toBe(false);
+      await expect(index.shouldForwardToCore(['config'])).resolves.toBe(false);
+
+      await expect(index.shouldForwardToCore(['lint'])).resolves.toBe(true);
+      await expect(index.shouldForwardToCore(['format'])).resolves.toBe(true);
+      await expect(index.shouldForwardToCore(['docs'])).resolves.toBe(true);
     });
   });
 });

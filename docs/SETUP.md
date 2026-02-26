@@ -37,16 +37,22 @@ npm run validate:docs
 npm run build
 
 # CLI surface
+node dist/index.js
 node dist/index.js --help
+node dist/index.js help
 node dist/index.js --version
 
 # Workspace lifecycle
 node dist/index.js create workspace test-ws --yes --profile polyglot
+node dist/index.js workspace list
 cd test-ws
 node ../dist/index.js bootstrap --profile polyglot
 node ../dist/index.js setup python
 node ../dist/index.js setup node --warm-deps
 node ../dist/index.js setup go --warm-deps
+node ../dist/index.js workspace policy show
+node ../dist/index.js workspace policy set mode strict
+node ../dist/index.js workspace policy set mode warn
 node ../dist/index.js cache status
 node ../dist/index.js mirror status
 ```

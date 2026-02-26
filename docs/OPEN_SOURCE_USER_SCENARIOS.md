@@ -20,6 +20,8 @@ Goal: get productive quickly with minimal complexity.
 
 ### Steps
 
+Note: after `cd api`, use the local project launcher (`rapidkit`) for project lifecycle commands.
+
 ```bash
 npx rapidkit my-workspace
 cd my-workspace
@@ -49,12 +51,13 @@ Goal: improve stability and repeatability using mirror artifacts.
 ```bash
 cd my-workspace
 npx rapidkit doctor workspace
-rapidkit mirror status
-rapidkit cache status
-rapidkit mirror sync
-rapidkit mirror verify
-rapidkit init
-rapidkit dev
+npx rapidkit workspace list
+npx rapidkit mirror status
+npx rapidkit cache status
+npx rapidkit mirror sync
+npx rapidkit mirror verify
+npx rapidkit init
+npx rapidkit dev
 ```
 
 ### When manual vs automatic?
@@ -77,9 +80,9 @@ Goal: enforce stronger security controls (attestation + Sigstore governance) in 
 2) Run:
 
 ```bash
-RAPIDKIT_ENV=stage rapidkit mirror sync --json
-RAPIDKIT_ENV=stage rapidkit mirror verify --json
-rapidkit bootstrap --profile=enterprise --ci --offline --json
+RAPIDKIT_ENV=stage npx rapidkit mirror sync --json
+RAPIDKIT_ENV=stage npx rapidkit mirror verify --json
+npx rapidkit bootstrap --profile=enterprise --ci --offline --json
 ```
 
 ### When manual vs automatic?
@@ -106,9 +109,9 @@ Goal: enforce signed governance policy bundle, generate and export audit evidenc
 3) Run:
 
 ```bash
-RAPIDKIT_ENV=prod rapidkit mirror sync --json
-RAPIDKIT_ENV=prod rapidkit mirror verify --json
-RAPIDKIT_ENV=prod rapidkit bootstrap --profile=enterprise --ci --offline --json
+RAPIDKIT_ENV=prod npx rapidkit mirror sync --json
+RAPIDKIT_ENV=prod npx rapidkit mirror verify --json
+RAPIDKIT_ENV=prod npx rapidkit bootstrap --profile=enterprise --ci --offline --json
 ```
 
 ### When manual vs automatic?

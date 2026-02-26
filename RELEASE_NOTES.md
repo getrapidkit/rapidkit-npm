@@ -1,5 +1,46 @@
 # Release Notes
 
+## Latest Release: v0.25.0 (February 26, 2026)
+
+### 🧭 v0.25.0 — Help Surface Unification, Workspace Policy/List Contract Completion, and Reliability Hardening (Minor)
+
+This minor release unifies the root help UX across entry modes, completes workspace command contract coverage (`workspace list`, policy set/show) across docs/tests/help text, and hardens runtime/workspace reliability for production workflows.
+
+**What's New:**
+
+- 🧱 **Workspace command contract completion**
+  - Standardized/expanded workspace command references (including `workspace list`) across:
+    - root help output
+    - README/docs command examples
+    - docs drift guard expectations
+    - CLI integration and contract test suites
+
+- 🧪 **Phase-3 contract and process coverage expansion**
+  - Extended process-level integration coverage for workspace policy operations and list flows.
+  - Strengthened command contract tests for lifecycle/policy behavior and help consistency.
+  - Added deterministic dist-refresh handling in CLI entry tests when build artifacts are missing/stale.
+
+- ⚙️ **Runtime/workspace hardening updates**
+  - Improved bridge/runtime execution reliability and adapter-path handling in wrapper-core integration.
+  - Hardened workspace registry behavior (normalization/dedupe/pruning paths) and reduced noisy debug output.
+  - Updated create/doctor/runtime flows to better align with workspace-first operations.
+
+- 📚 **Governance and docs alignment**
+  - Professionalized governance and setup docs to match current command contracts and release expectations.
+  - CI/docs workflow alignment updates in:
+    - `.github/workflows/ci.yml`
+    - `.github/workflows/e2e-smoke.yml`
+
+**Upgrade:**
+
+```bash
+npm install -g rapidkit@0.25.0
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.25.0.md)
+
+---
+
 ## Latest Release: v0.24.2 (February 25, 2026)
 
 ### 🧱 v0.24.2 — Workspace Docs Governance, Runtime Warm-Setup Coverage, and CI Ownership Hardening (Patch)
@@ -139,6 +180,7 @@ npm install -g rapidkit@0.24.0
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.25.0](releases/RELEASE_NOTES_v0.25.0.md) | Feb 26, 2026 | Help surface unification, workspace policy/list contract completion, reliability hardening |
 | [v0.24.2](releases/RELEASE_NOTES_v0.24.2.md) | Feb 25, 2026 | Workspace docs governance, docs drift/link/smoke gates, CI ownership hardening |
 | [v0.24.1](releases/RELEASE_NOTES_v0.24.1.md) | Feb 25, 2026 | Setup contract fixes, cross-OS matrix reliability, workspace flow alignment |
 | [v0.24.0](releases/RELEASE_NOTES_v0.24.0.md) | Feb 25, 2026 | Windows-native bridge E2E, mirror lifecycle hardening, runtime adapter stability |

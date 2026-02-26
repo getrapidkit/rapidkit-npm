@@ -7,6 +7,55 @@ on:
     branches: [main, develop]
 
 jobs:
+  phase4-fast-guard:
+    name: Phase4 Fast Guard (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect phase4-impacting changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            phase4:
+              - 'src/index.ts'
+              - 'src/runtime-adapters/**'
+              - 'src/core-bridge/**'
+              - 'src/__tests__/phase3-cli.integration.test.ts'
+              - 'src/__tests__/phase3-commands.test.ts'
+              - 'src/__tests__/phase3-commands.integration.test.ts'
+              - 'src/__tests__/init-scenarios.integration.test.ts'
+              - 'src/__tests__/runtime-adapters.test.ts'
+
+      - name: Skip message (no phase4 changes)
+        if: steps.changes.outputs.phase4 != 'true'
+        run: echo "No phase4-related changes detected; skipping fast guard."
+
+      - name: Setup Node.js 20
+        if: steps.changes.outputs.phase4 == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.changes.outputs.phase4 == 'true'
+        run: npm ci
+
+      - name: Build project
+        if: steps.changes.outputs.phase4 == 'true'
+        run: npm run build
+
+      - name: Run phase3 CLI integration fast guard
+        if: steps.changes.outputs.phase4 == 'true'
+        env:
+          RAPIDKIT_ENABLE_RUNTIME_ADAPTERS: '1'
+        run: npm run test -- src/__tests__/phase3-cli.integration.test.ts
+
   build-test-matrix:
     name: Build & Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -126,9 +175,14 @@ jobs:
           fail_ci_if_error: false
 
   phase4-runtime-contracts:
-    name: Phase4 Runtime Contracts (ubuntu)
-    runs-on: ubuntu-latest
+    name: Phase4 Runtime Contracts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - name: Checkout code
@@ -142,6 +196,14 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Workaround npm optional-deps bug (rollup on Windows)
+        if: runner.os == 'Windows'
+        run: npm install --no-save @rollup/rollup-win32-x64-msvc
+
+      - name: Workaround npm optional-deps bug (rollup on macOS arm64)
+        if: runner.os == 'macOS'
+        run: npm install --no-save @rollup/rollup-darwin-arm64
 
       - name: Build project
         run: npm run build

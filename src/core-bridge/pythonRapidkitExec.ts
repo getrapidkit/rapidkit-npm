@@ -4,11 +4,19 @@ import path from 'path';
 import * as fsExtra from 'fs-extra';
 import { execa } from 'execa';
 import { BOOTSTRAP_CORE_COMMANDS_SET } from './bootstrapCoreCommands';
+import {
+  getDefaultPythonCommand,
+  getPythonCommandCandidates,
+  getPythonVersionProbeCandidates,
+  getVenvPythonPath,
+  getVenvRapidkitPath,
+  isWindowsPlatform,
+} from '../utils/platform-capabilities.js';
 
 export type PythonCommand = 'python3' | 'python' | 'py';
 
 function pythonCommandCandidates(): PythonCommand[] {
-  return process.platform === 'win32' ? ['python', 'py', 'python3'] : ['python3', 'python'];
+  return getPythonCommandCandidates() as PythonCommand[];
 }
 
 function pythonLauncherArgs(cmd: string, args: string[]): string[] {
@@ -58,7 +66,7 @@ function formatBridgeError(err: unknown): string {
   if (err instanceof BridgeError) {
     switch (err.code) {
       case 'PYTHON_NOT_FOUND': {
-        const expectedCmd = process.platform === 'win32' ? 'python' : 'python3';
+        const expectedCmd = getDefaultPythonCommand();
         return (
           'RapidKit (npm) could not find Python (python3/python/py) on your PATH.\n' +
           `Install Python 3.10+ and ensure \`${expectedCmd}\` is available, then retry.\n` +
@@ -68,7 +76,7 @@ function formatBridgeError(err: unknown): string {
       case 'BRIDGE_VENV_CREATE_FAILED':
         return (
           'RapidKit (npm) failed to create its bridge virtual environment.\n' +
-          (process.platform === 'win32'
+          (isWindowsPlatform()
             ? 'Ensure Python is installed with venv support.\n'
             : 'Ensure Python venv support is installed (e.g., python3-venv).\n') +
           `Details: ${err.message}`
@@ -76,7 +84,7 @@ function formatBridgeError(err: unknown): string {
       case 'BRIDGE_PIP_BOOTSTRAP_FAILED':
         return (
           'RapidKit (npm) could not bootstrap pip inside the bridge virtual environment.\n' +
-          (process.platform === 'win32'
+          (isWindowsPlatform()
             ? 'Ensure pip is available for your Python installation and retry.\n'
             : 'Install python3-venv/python3-pip and retry.\n') +
           `Details: ${err.message}`
@@ -131,15 +139,11 @@ function bridgeVenvDir(): string {
 }
 
 function bridgePython(venvDir: string): string {
-  const isWin = process.platform === 'win32';
-  return isWin ? path.join(venvDir, 'Scripts', 'python.exe') : path.join(venvDir, 'bin', 'python');
+  return getVenvPythonPath(venvDir);
 }
 
 function bridgeRapidkitCli(venvDir: string): string {
-  const isWin = process.platform === 'win32';
-  return isWin
-    ? path.join(venvDir, 'Scripts', 'rapidkit.exe')
-    : path.join(venvDir, 'bin', 'rapidkit');
+  return getVenvRapidkitPath(venvDir);
 }
 
 function isPinnedSpec(spec: string): boolean {
@@ -272,7 +276,7 @@ async function tryRapidkit(cmd: PythonCommand): Promise<boolean> {
     debug('probing PATH for rapidkit executables');
     const pathEnv = (process.env.PATH ?? '').split(path.delimiter).filter(Boolean);
     for (const dir of pathEnv) {
-      const candidate = path.join(dir, process.platform === 'win32' ? 'rapidkit.exe' : 'rapidkit');
+      const candidate = path.join(dir, isWindowsPlatform() ? 'rapidkit.exe' : 'rapidkit');
       try {
         if (await fsExtra.pathExists(candidate)) {
           debug(`found candidate on PATH: ${candidate}; invoking --version --json`);
@@ -335,14 +339,8 @@ async function isCoreJsonVersion(stdout: unknown): Promise<boolean> {
 }
 
 async function findWorkspaceRunner(startDir: string): Promise<RapidkitRunner | null> {
-  const isWin = process.platform === 'win32';
-
-  const cliRel = isWin
-    ? path.join('.venv', 'Scripts', 'rapidkit.exe')
-    : path.join('.venv', 'bin', 'rapidkit');
-  const pyRel = isWin
-    ? path.join('.venv', 'Scripts', 'python.exe')
-    : path.join('.venv', 'bin', 'python');
+  const cliRel = path.relative('.', getVenvRapidkitPath('.venv'));
+  const pyRel = path.relative('.', getVenvPythonPath('.venv'));
 
   let p = startDir;
   // Hard cap to avoid pathological scans.
@@ -527,8 +525,15 @@ async function checkRapidkitCoreAvailable(): Promise<boolean> {
     }
   };
 
-  // Method 1: Try standard Python commands with import
-  for (const cmd of ['python3', 'python', 'py', 'python3.10', 'python3.11', 'python3.12']) {
+  const dynamicPythonCommands = Array.from(
+    new Set([
+      ...getPythonCommandCandidates(),
+      ...getPythonVersionProbeCandidates(14, 10).map((probe) => probe.command),
+    ])
+  );
+
+  // Method 1: Try detected Python commands with import
+  for (const cmd of dynamicPythonCommands) {
     try {
       debug(`Method 1: trying ${cmd} import`);
       const result = await execa(
@@ -550,7 +555,7 @@ async function checkRapidkitCoreAvailable(): Promise<boolean> {
   }
 
   // Method 2: Try python -m pip show
-  for (const cmd of ['python3', 'python', 'py']) {
+  for (const cmd of dynamicPythonCommands) {
     try {
       debug(`Method 2: trying ${cmd} -m pip show`);
       const result = await execa(
@@ -619,11 +624,15 @@ async function checkRapidkitCoreAvailable(): Promise<boolean> {
         } catch {
           // Try with PYENV_VERSION environment variable
           try {
-            const result = await execa(
-              'bash',
-              ['-c', `PYENV_VERSION=${version.trim()} pyenv exec pip show rapidkit-core`],
-              { reject: false, stdio: 'pipe', timeout: 3000 }
-            );
+            const result = await execa('pyenv', ['exec', 'pip', 'show', 'rapidkit-core'], {
+              reject: false,
+              stdio: 'pipe',
+              timeout: 3000,
+              env: {
+                ...process.env,
+                PYENV_VERSION: version.trim(),
+              },
+            });
             if (result.exitCode === 0 && result.stdout?.includes('Name: rapidkit-core')) {
               debug(`✓ Found in pyenv ${version} via PYENV_VERSION`);
               return true;
@@ -639,7 +648,7 @@ async function checkRapidkitCoreAvailable(): Promise<boolean> {
   }
 
   // Method 5: Check user site-packages
-  for (const cmd of ['python3', 'python', 'py']) {
+  for (const cmd of dynamicPythonCommands) {
     try {
       debug(`Method 5: checking ${cmd} user site`);
       const result = await execa(cmd, pythonLauncherArgs(cmd, ['-m', 'site', '--user-site']), {
@@ -678,6 +687,23 @@ async function checkRapidkitCoreAvailable(): Promise<boolean> {
     debug('pipx not available');
   }
 
+  for (const cmd of dynamicPythonCommands) {
+    try {
+      debug(`Method 6: checking ${cmd} -m pipx list`);
+      const result = await execa(cmd, pythonLauncherArgs(cmd, ['-m', 'pipx', 'list']), {
+        reject: false,
+        stdio: 'pipe',
+        timeout: 3000,
+      });
+      if (result.exitCode === 0 && result.stdout?.includes('rapidkit-core')) {
+        debug(`✓ Found via ${cmd} -m pipx list`);
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+
   // Method 7: Check poetry (if in a project directory)
   try {
     debug('Method 7: checking poetry');
@@ -692,6 +718,27 @@ async function checkRapidkitCoreAvailable(): Promise<boolean> {
     }
   } catch {
     debug('poetry check failed');
+  }
+
+  for (const cmd of dynamicPythonCommands) {
+    try {
+      debug(`Method 7: checking ${cmd} -m poetry show rapidkit-core`);
+      const result = await execa(
+        cmd,
+        pythonLauncherArgs(cmd, ['-m', 'poetry', 'show', 'rapidkit-core']),
+        {
+          reject: false,
+          stdio: 'pipe',
+          timeout: 3000,
+        }
+      );
+      if (result.exitCode === 0) {
+        debug(`✓ Found via ${cmd} -m poetry`);
+        return true;
+      }
+    } catch {
+      continue;
+    }
   }
 
   // Method 8: Check conda

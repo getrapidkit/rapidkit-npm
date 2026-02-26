@@ -22,10 +22,10 @@ This runbook is an operations-ready guide for Platform, SRE, and Security teams 
 
 ## 3) Core Commands
 
-- `rapidkit mirror status`
-- `rapidkit mirror sync`
-- `rapidkit mirror verify`
-- `rapidkit mirror rotate`
+- `npx rapidkit mirror status`
+- `npx rapidkit mirror sync`
+- `npx rapidkit mirror verify`
+- `npx rapidkit mirror rotate`
 - Add `--json` for machine-readable output when needed.
 
 ## 4) Environment Strategy
@@ -147,8 +147,8 @@ This runbook is an operations-ready guide for Platform, SRE, and Security teams 
 ### Rollout
 
 1. Set environment pinning: `RAPIDKIT_ENV=stage|prod`
-2. Run `rapidkit mirror sync`
-3. Run `rapidkit mirror verify`
+2. Run `npx rapidkit mirror sync`
+3. Run `npx rapidkit mirror verify`
 4. Review generated reports:
    - `.rapidkit/reports/mirror-ops.latest.json`
    - `.rapidkit/reports/transparency-evidence.latest.json`

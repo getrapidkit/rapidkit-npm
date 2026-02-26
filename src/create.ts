@@ -19,6 +19,12 @@ import {
 } from './errors.js';
 import { getPythonCommand } from './utils.js';
 import {
+  getDefaultPythonCommand,
+  getPythonVersionProbeCandidates,
+  getVenvPythonPath,
+  isWindowsPlatform,
+} from './utils/platform-capabilities.js';
+import {
   createNpmWorkspaceMarker,
   readWorkspaceMarker,
   writeWorkspaceMarker as writeWorkspaceMarkerToFile,
@@ -147,8 +153,10 @@ function buildToolchainLock(
 
 function buildPoliciesYaml(): string {
   return `version: "1.0"
-mode: warn
-dependency_sharing_mode: isolated
+mode: warn # "warn" or "strict"
+dependency_sharing_mode: isolated # "isolated" or "shared-runtime-caches" or "shared-node-deps"
+# change profile (recommended): npx rapidkit bootstrap --profile polyglot
+# change mode/dependency manually: edit this file and rerun npx rapidkit init
 rules:
   enforce_workspace_marker: true
   enforce_toolchain_lock: false
@@ -159,7 +167,7 @@ rules:
 function buildCacheConfigYaml(): string {
   return `version: "1.0"
 cache:
-  strategy: shared
+  strategy: shared # "shared" or "on-demand"
   prune_on_bootstrap: false
   self_heal: true
   verify_integrity: false
@@ -299,6 +307,14 @@ export async function syncWorkspaceFoundationFiles(
 
 type InstallMethod = 'poetry' | 'venv' | 'pipx';
 
+const MIN_SUPPORTED_PYTHON = '3.10';
+const BASELINE_SUPPORTED_PYTHON_VERSIONS = ['3.10', '3.11', '3.12'] as const;
+
+type InstallMethodAvailability = {
+  poetry: boolean;
+  pipx: boolean;
+};
+
 type PipxInvoker = { kind: 'binary' } | { kind: 'python-module'; pythonCmd: string };
 
 // Detect actual Python version installed on system (not just requested version)
@@ -418,6 +434,142 @@ async function execaPipx(invoker: PipxInvoker, args: string[]) {
     return execa('pipx', args);
   }
   return execa(invoker.pythonCmd, ['-m', 'pipx', ...args]);
+}
+
+function normalizePythonMajorMinor(version: string): string | null {
+  const match = version.match(/^(\d+)\.(\d+)/);
+  if (!match) return null;
+  return `${match[1]}.${match[2]}`;
+}
+
+function parsePythonMajorMinorFromOutput(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const match = raw.match(/Python\s+(\d+)\.(\d+)(?:\.\d+)?/i);
+  if (!match) return null;
+  return `${match[1]}.${match[2]}`;
+}
+
+function comparePythonMajorMinor(a: string, b: string): number {
+  const [amaj, amin] = a.split('.').map((n) => Number(n));
+  const [bmaj, bmin] = b.split('.').map((n) => Number(n));
+  if (amaj !== bmaj) return amaj - bmaj;
+  return amin - bmin;
+}
+
+function isPythonAtLeast(version: string, minVersion: string): boolean {
+  return comparePythonMajorMinor(version, minVersion) >= 0;
+}
+
+async function detectPythonVersionPromptModel(preferredVersion?: string): Promise<{
+  choices: Array<{ name: string; value: string }>;
+  defaultValue: string;
+}> {
+  const detectedVersions = new Set<string>();
+  const probes = getPythonVersionProbeCandidates(14, 10);
+
+  for (const probe of probes) {
+    try {
+      const res = await execa(probe.command, probe.args, { timeout: 2500 });
+      const parsed = parsePythonMajorMinorFromOutput(`${res.stdout || ''}\n${res.stderr || ''}`);
+      if (parsed && isPythonAtLeast(parsed, MIN_SUPPORTED_PYTHON)) {
+        detectedVersions.add(parsed);
+      }
+    } catch {
+      // Ignore probe failures.
+    }
+  }
+
+  let currentSystemPython: string | null = null;
+  try {
+    const current = await execa(getPythonCommand(), ['--version'], { timeout: 2500 });
+    const parsed = parsePythonMajorMinorFromOutput(
+      `${current.stdout || ''}\n${current.stderr || ''}`
+    );
+    if (parsed && isPythonAtLeast(parsed, MIN_SUPPORTED_PYTHON)) {
+      currentSystemPython = parsed;
+      detectedVersions.add(parsed);
+    }
+  } catch {
+    // Ignore current-python detection failures.
+  }
+
+  const baseline = BASELINE_SUPPORTED_PYTHON_VERSIONS.filter((v) =>
+    isPythonAtLeast(v, MIN_SUPPORTED_PYTHON)
+  );
+  const allCandidateVersions = new Set<string>([...baseline, ...detectedVersions]);
+
+  const sortedCandidates = Array.from(allCandidateVersions).sort((a, b) =>
+    comparePythonMajorMinor(b, a)
+  );
+
+  const preferredNormalized = preferredVersion ? normalizePythonMajorMinor(preferredVersion) : null;
+  const defaultValue =
+    preferredNormalized && isPythonAtLeast(preferredNormalized, MIN_SUPPORTED_PYTHON)
+      ? preferredNormalized
+      : currentSystemPython || sortedCandidates[0] || MIN_SUPPORTED_PYTHON;
+
+  if (!allCandidateVersions.has(defaultValue)) {
+    allCandidateVersions.add(defaultValue);
+  }
+
+  const finalSorted = Array.from(allCandidateVersions).sort((a, b) =>
+    comparePythonMajorMinor(b, a)
+  );
+
+  const choices = finalSorted.map((version) => {
+    const tags: string[] = [];
+    if (version === currentSystemPython) tags.push('current system');
+    if (version === MIN_SUPPORTED_PYTHON) tags.push('minimum supported');
+    if (detectedVersions.has(version) && version !== currentSystemPython) tags.push('detected');
+
+    return {
+      name: tags.length > 0 ? `${version} (${tags.join(', ')})` : version,
+      value: version,
+    };
+  });
+
+  return { choices, defaultValue };
+}
+
+async function detectInstallMethodAvailability(): Promise<InstallMethodAvailability> {
+  ensureUserLocalBinOnPath();
+
+  let poetry = false;
+  let pipx = false;
+
+  try {
+    await execa('poetry', ['--version'], { timeout: 2500 });
+    poetry = true;
+  } catch {
+    poetry = false;
+  }
+
+  try {
+    await execa('pipx', ['--version'], { timeout: 2500 });
+    pipx = true;
+  } catch {
+    const pythonCmd = getDefaultPythonCommand();
+    try {
+      await execa(pythonCmd, ['-m', 'pipx', '--version'], { timeout: 2500 });
+      pipx = true;
+    } catch {
+      pipx = false;
+    }
+  }
+
+  return { poetry, pipx };
+}
+
+function resolveInteractiveInstallMethodDefault(
+  preferred: InstallMethod,
+  availability: InstallMethodAvailability
+): InstallMethod {
+  if (preferred === 'poetry' && availability.poetry) return 'poetry';
+  if (preferred === 'pipx' && availability.pipx) return 'pipx';
+  if (preferred === 'venv') return 'venv';
+
+  if (availability.poetry) return 'poetry';
+  return 'venv';
 }
 
 async function ensurePoetryAvailable(spinner: Ora, yes: boolean): Promise<void> {
@@ -670,14 +822,46 @@ export async function createProject(
   // Profiles that need Python prompts: python-only, polyglot, enterprise.
   // For minimal/node-only/go-only we skip Python-specific questions and auto-detect.
   const needsPythonPrompts = !yes && PYTHON_PROFILES.has(resolvedProfile);
-  const promptDefaultPythonVersion = ['3.10', '3.11', '3.12'].includes(
-    String(userConfig.pythonVersion || '')
-  )
-    ? String(userConfig.pythonVersion)
-    : '3.10';
+  const promptDefaultPythonVersion =
+    typeof userConfig.pythonVersion === 'string' && userConfig.pythonVersion.trim().length > 0
+      ? userConfig.pythonVersion.trim()
+      : undefined;
   const promptDefaultInstallMethod = (providedInstallMethod ||
     userConfig.defaultInstallMethod ||
     'poetry') as InstallMethod;
+
+  const installMethodAvailability = needsPythonPrompts
+    ? await detectInstallMethodAvailability()
+    : { poetry: true, pipx: true };
+  const pythonVersionPromptModel = needsPythonPrompts
+    ? await detectPythonVersionPromptModel(promptDefaultPythonVersion)
+    : {
+        choices: BASELINE_SUPPORTED_PYTHON_VERSIONS.map((v) => ({ name: v, value: v })),
+        defaultValue: MIN_SUPPORTED_PYTHON,
+      };
+  const installMethodPromptDefault = resolveInteractiveInstallMethodDefault(
+    promptDefaultInstallMethod,
+    installMethodAvailability
+  );
+
+  const installMethodChoices = [
+    {
+      name: installMethodAvailability.poetry
+        ? '🎯 Poetry (Recommended - includes virtual env)'
+        : '🎯 Poetry (Recommended - includes virtual env) — not detected (we can install it)',
+      value: 'poetry',
+    },
+    {
+      name: '📦 pip with venv (Standard, zero extra tools)',
+      value: 'venv',
+    },
+    {
+      name: installMethodAvailability.pipx
+        ? '🔧 pipx (Global isolated install)'
+        : '🔧 pipx (Global isolated install) — not detected (we can install it)',
+      value: 'pipx',
+    },
+  ] as const;
 
   // Step 1: Choose Python version and install method (or auto-select with --yes / non-Python profile)
   const pythonAnswers: { pythonVersion: string; installMethod: InstallMethod } = needsPythonPrompts
@@ -686,19 +870,15 @@ export async function createProject(
           type: 'rawlist',
           name: 'pythonVersion',
           message: 'Select Python version for RapidKit:',
-          choices: ['3.10', '3.11', '3.12'],
-          default: promptDefaultPythonVersion,
+          choices: pythonVersionPromptModel.choices,
+          default: pythonVersionPromptModel.defaultValue,
         },
         {
           type: 'rawlist',
           name: 'installMethod',
           message: 'How would you like to manage the workspace environment?',
-          choices: [
-            { name: '🎯 Poetry (Recommended - includes virtual env)', value: 'poetry' },
-            { name: '📦 pip with venv (Standard)', value: 'venv' },
-            { name: '🔧 pipx (Global isolated install)', value: 'pipx' },
-          ],
-          default: promptDefaultInstallMethod,
+          choices: installMethodChoices,
+          default: installMethodPromptDefault,
         },
       ])) as { pythonVersion: string; installMethod: InstallMethod })
     : await (async () => {
@@ -764,11 +944,15 @@ export async function createProject(
           `\`\`\`bash\n` +
           (resolvedProfile === 'go-only'
             ? `npx rapidkit create project gofiber.standard my-api\n` +
-              `cd my-api && npx rapidkit init && npx rapidkit dev\n`
+              `cd my-api\n` +
+              `npx rapidkit init\n` +
+              `npx rapidkit dev\n`
             : resolvedProfile === 'node-only'
               ? `npx rapidkit create project nestjs.standard my-app\n` +
-                `cd my-app && npx rapidkit init && npx rapidkit dev\n`
-              : `npx rapidkit create project\ncd <project-name> && npx rapidkit init && npx rapidkit dev\n`) +
+                `cd my-app\n` +
+                `npx rapidkit init\n` +
+                `npx rapidkit dev\n`
+              : `npx rapidkit create project\ncd <project-name>\nnpx rapidkit init\nnpx rapidkit dev\n`) +
           `\`\`\`\n`,
         'utf-8'
       );
@@ -804,7 +988,9 @@ export async function createProject(
 
       if (resolvedProfile === 'go-only') {
         console.log(chalk.white('   npx rapidkit create project gofiber.standard my-api'));
-        console.log(chalk.white('   cd my-api && npx rapidkit init && npx rapidkit dev\n'));
+        console.log(chalk.white('   cd my-api'));
+        console.log(chalk.white('   npx rapidkit init'));
+        console.log(chalk.white('   npx rapidkit dev\n'));
         console.log(
           chalk.gray('💡 No Python required — Go kits run entirely through the npm package.')
         );
@@ -824,7 +1010,9 @@ export async function createProject(
         }
       } else if (resolvedProfile === 'node-only') {
         console.log(chalk.white('   npx rapidkit create project nestjs.standard my-app'));
-        console.log(chalk.white('   cd my-app && npx rapidkit init && npx rapidkit dev\n'));
+        console.log(chalk.white('   cd my-app'));
+        console.log(chalk.white('   npx rapidkit init'));
+        console.log(chalk.white('   npx rapidkit dev\n'));
         console.log(
           chalk.gray(
             '💡 Python engine will be installed automatically on first `create project nestjs.standard`.'
@@ -833,7 +1021,9 @@ export async function createProject(
       } else {
         // minimal
         console.log(chalk.white('   npx rapidkit create project'));
-        console.log(chalk.white('   cd <project-name> && npx rapidkit init && npx rapidkit dev\n'));
+        console.log(chalk.white('   cd <project-name>'));
+        console.log(chalk.white('   npx rapidkit init'));
+        console.log(chalk.white('   npx rapidkit dev\n'));
         console.log(
           chalk.gray(
             '💡 Bootstrap a specific runtime any time: rapidkit bootstrap --profile python-only|node-only|go-only'
@@ -1057,16 +1247,22 @@ export async function createProject(
 
       console.log(chalk.white(`   ${activateCmd}  # Or: poetry run rapidkit`));
       console.log(chalk.white('   rapidkit create  # Interactive mode'));
-      console.log(chalk.white('   cd <project-name> && rapidkit init && rapidkit dev'));
+      console.log(chalk.white('   cd <project-name>'));
+      console.log(chalk.white('   rapidkit init'));
+      console.log(chalk.white('   rapidkit dev'));
     } else if (pythonAnswers.installMethod === 'venv') {
       console.log(
         chalk.white('   source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate')
       );
       console.log(chalk.white('   rapidkit create  # Interactive mode'));
-      console.log(chalk.white('   cd <project-name> && rapidkit init && rapidkit dev'));
+      console.log(chalk.white('   cd <project-name>'));
+      console.log(chalk.white('   rapidkit init'));
+      console.log(chalk.white('   rapidkit dev'));
     } else {
       console.log(chalk.white('   rapidkit create  # Interactive mode'));
-      console.log(chalk.white('   cd <project-name> && rapidkit init && rapidkit dev'));
+      console.log(chalk.white('   cd <project-name>'));
+      console.log(chalk.white('   rapidkit init'));
+      console.log(chalk.white('   rapidkit dev'));
     }
 
     console.log(chalk.white('\n💡 For more information, check the README.md file.'));
@@ -1115,7 +1311,7 @@ async function findRealPython(pythonVersion: string): Promise<string | null> {
   const candidates: string[] = [];
 
   // 1. Try pyenv versions directly (bypass shims)
-  if (process.platform !== 'win32') {
+  if (!isWindowsPlatform()) {
     try {
       // Prefer the concrete interpreter selected by pyenv for this shell.
       const { stdout } = await execa('pyenv', ['which', 'python']);
@@ -1134,12 +1330,12 @@ async function findRealPython(pythonVersion: string): Promise<string | null> {
     'python'
   );
 
-  if (process.platform === 'win32') {
+  if (isWindowsPlatform()) {
     candidates.push('py');
   }
 
   // 3. Try common installation paths
-  if (process.platform !== 'win32') {
+  if (!isWindowsPlatform()) {
     candidates.push(
       `/usr/bin/python${pythonVersion}`,
       `/usr/bin/python3`,
@@ -1158,7 +1354,7 @@ async function findRealPython(pythonVersion: string): Promise<string | null> {
           : ['-c', 'import sys; sys.exit(0)'];
       const { stdout } = await execa(candidate, versionArgs, { timeout: 2000 });
       const version = stdout.match(/Python (\d+\.\d+)/)?.[1];
-      if (version && parseFloat(version) >= parseFloat(pythonVersion)) {
+      if (version && isPythonAtLeast(version, pythonVersion)) {
         // Verify this Python actually works (not a broken shim)
         await execa(candidate, probeArgs, { timeout: 2000 });
         return candidate;
@@ -1266,12 +1462,7 @@ async function installWithPoetry(
   //   3. poetry install --no-root       (near-instant — venv already exists)
   spinner.start('Creating virtualenv');
   const pythonBin = realPython || getPythonCommand();
-  let venvPythonBin: string = path.join(
-    projectPath,
-    '.venv',
-    process.platform === 'win32' ? 'Scripts' : 'bin',
-    process.platform === 'win32' ? 'python.exe' : 'python'
-  );
+  let venvPythonBin: string = getVenvPythonPath(path.join(projectPath, '.venv'));
   try {
     await execa(pythonBin, ['-m', 'venv', '.venv'], { cwd: projectPath, timeout: 60000 });
     spinner.succeed('Virtualenv created');
@@ -1487,7 +1678,7 @@ async function installWithVenv(
     const { stdout } = await execa(pythonCmd, ['--version']);
     const version = stdout.match(/Python (\d+\.\d+)/)?.[1];
 
-    if (version && parseFloat(version) < parseFloat(pythonVersion)) {
+    if (version && !isPythonAtLeast(version, pythonVersion)) {
       throw new PythonNotFoundError(pythonVersion, version);
     }
 
@@ -1543,12 +1734,7 @@ async function installWithVenv(
   spinner.start('Installing RapidKit');
   // Use python -m pip for cross-platform compatibility.
   // Windows 25.0+ requires this instead of calling pip.exe directly.
-  const venvPython = path.join(
-    projectPath,
-    '.venv',
-    process.platform === 'win32' ? 'Scripts' : 'bin',
-    process.platform === 'win32' ? 'python.exe' : 'python'
-  );
+  const venvPython = getVenvPythonPath(path.join(projectPath, '.venv'));
 
   await execa(venvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'], { cwd: projectPath });
 
@@ -1609,7 +1795,7 @@ async function installWithVenv(
               `Error: ${errorMsg}\n\n` +
               `Possible solutions:\n` +
               `  1. Check your internet connection\n` +
-              `  2. Try installing manually: cd ${path.basename(projectPath)} && .venv/bin/python -m pip install rapidkit-core\n` +
+              `  2. Try installing manually: cd ${path.basename(projectPath)} && ${getVenvPythonPath('.venv')} -m pip install rapidkit-core\n` +
               `  3. Use Poetry instead: npx rapidkit ${path.basename(projectPath)} --install-method=poetry`
           )
         );

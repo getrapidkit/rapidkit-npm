@@ -80,6 +80,8 @@ cd my-workspace
 # Or activate Poetry-managed env (usually in Poetry cache):
 source "$(poetry env info --path)/bin/activate"
 
+# Use the local workspace launcher (`rapidkit`) in this section.
+
 # Interactive mode:
 rapidkit create
 

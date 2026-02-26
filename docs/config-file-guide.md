@@ -74,7 +74,7 @@ export default {
     pythonVersion: '3.12'
   },
   projects: {
-    defaultKit: 'fastapi.ddd',          // Always use DDD template
+    defaultKit: 'fastapi.standard',     // Always use FastAPI standard template
     addDefaultModules: [
       'prisma',
       'redis', 
@@ -267,11 +267,30 @@ npx rapidkit my-workspace --author "Different Author"
 # Check environment
 npx rapidkit doctor
 
+# Inspect/set workspace policy (recommended over manual YAML edits)
+npx rapidkit workspace policy show
+npx rapidkit workspace policy set mode strict
+npx rapidkit workspace policy set dependency_sharing_mode shared-runtime-caches
+npx rapidkit workspace policy set rules.enforce_toolchain_lock true
+
 # List available kits
 npx rapidkit list
 ```
 
 ---
 
-**Last Updated**: February 5, 2026  
-**Version**: 0.16.5
+## 🛡️ Workspace Policy vs `rapidkit.config.*`
+
+- `rapidkit.config.js|mjs|cjs` defines creation defaults and prompt behavior.
+- `.rapidkit/policies.yml` defines runtime governance and enforcement behavior after workspace creation.
+- Preferred policy management path:
+
+```bash
+npx rapidkit workspace policy show
+npx rapidkit workspace policy set <key> <value>
+```
+
+---
+
+**Last Updated**: February 26, 2026  
+**Version**: 0.25.0

@@ -1,9 +1,10 @@
 import { execa } from 'execa';
+import { getPythonCommandCandidates } from '../utils/platform-capabilities.js';
 
 export type PythonCommand = 'python3' | 'python' | 'py';
 
 function pythonCommandCandidates(): PythonCommand[] {
-  return process.platform === 'win32' ? ['python', 'py', 'python3'] : ['python3', 'python'];
+  return getPythonCommandCandidates() as PythonCommand[];
 }
 
 function pythonLauncherArgs(cmd: PythonCommand, args: string[]): string[] {

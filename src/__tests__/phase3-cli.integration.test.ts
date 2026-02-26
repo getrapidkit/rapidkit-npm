@@ -35,6 +35,189 @@ function ensureDistBuilt(): string {
 }
 
 describe('Phase 3 commands - CLI process integration', () => {
+  it('lists registered workspaces via workspace list', () => {
+    const dist = ensureDistBuilt();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rapidkit-ws-list-'));
+    const isolatedHome = path.join(tempDir, 'home');
+    const workspaceName = 'ws-list-check';
+    const workspaceDir = path.join(tempDir, workspaceName);
+
+    try {
+      fs.mkdirSync(isolatedHome, { recursive: true });
+
+      const env = {
+        ...process.env,
+        HOME: isolatedHome,
+        USERPROFILE: isolatedHome,
+      };
+
+      const createWorkspace = spawnSync(
+        process.execPath,
+        [dist, 'create', 'workspace', workspaceName, '--yes', '--profile', 'minimal'],
+        {
+          cwd: tempDir,
+          encoding: 'utf8',
+          env,
+        }
+      );
+      expect(createWorkspace.status).toBe(0);
+      expect(fs.existsSync(workspaceDir)).toBe(true);
+
+      const list = spawnSync(process.execPath, [dist, 'workspace', 'list'], {
+        cwd: tempDir,
+        encoding: 'utf8',
+        env,
+      });
+
+      expect(list.status).toBe(0);
+      const output = `${list.stdout || ''}\n${list.stderr || ''}`;
+      expect(output).toContain('Registered RapidKit Workspaces');
+      expect(output).toContain(workspaceName);
+      expect(output).toContain('Total: 1 workspace(s)');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    }
+  }, 20000);
+
+  it('supports workspace policy set/show for mode, dependency mode, and rules', () => {
+    const dist = ensureDistBuilt();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rapidkit-ws-policy-'));
+    const workspaceDir = path.join(tempDir, 'my-workspace');
+
+    try {
+      fs.mkdirSync(path.join(workspaceDir, '.rapidkit'), { recursive: true });
+      fs.writeFileSync(
+        path.join(workspaceDir, '.rapidkit-workspace'),
+        JSON.stringify({ signature: 'RAPIDKIT_WORKSPACE' }, null, 2)
+      );
+      fs.writeFileSync(
+        path.join(workspaceDir, '.rapidkit', 'policies.yml'),
+        [
+          'version: "1.0"',
+          'mode: warn # "warn" or "strict"',
+          'dependency_sharing_mode: isolated # "isolated" or "shared-runtime-caches" or "shared-node-deps"',
+          'rules:',
+          '  enforce_workspace_marker: true',
+          '  enforce_toolchain_lock: false',
+          '  disallow_untrusted_tool_sources: false',
+          '',
+        ].join('\n')
+      );
+
+      const setMode = spawnSync(
+        process.execPath,
+        [dist, 'workspace', 'policy', 'set', 'mode', 'strict'],
+        {
+          cwd: workspaceDir,
+          encoding: 'utf8',
+        }
+      );
+      expect(setMode.status).toBe(0);
+
+      const setDep = spawnSync(
+        process.execPath,
+        [dist, 'workspace', 'policy', 'set', 'dependency_sharing_mode', 'shared-runtime-caches'],
+        {
+          cwd: workspaceDir,
+          encoding: 'utf8',
+        }
+      );
+      expect(setDep.status).toBe(0);
+
+      const setRule = spawnSync(
+        process.execPath,
+        [dist, 'workspace', 'policy', 'set', 'rules.enforce_toolchain_lock', 'true'],
+        {
+          cwd: workspaceDir,
+          encoding: 'utf8',
+        }
+      );
+      expect(setRule.status).toBe(0);
+
+      const show = spawnSync(process.execPath, [dist, 'workspace', 'policy', 'show'], {
+        cwd: workspaceDir,
+        encoding: 'utf8',
+      });
+      expect(show.status).toBe(0);
+      const output = `${show.stdout || ''}\n${show.stderr || ''}`;
+      expect(output).toContain('mode: strict');
+      expect(output).toContain('dependency_sharing_mode: shared-runtime-caches');
+      expect(output).toContain('enforce_toolchain_lock: true');
+
+      const policyContent = fs.readFileSync(
+        path.join(workspaceDir, '.rapidkit', 'policies.yml'),
+        'utf-8'
+      );
+      expect(policyContent).toContain('mode: strict # "warn" or "strict"');
+      expect(policyContent).toContain(
+        'dependency_sharing_mode: shared-runtime-caches # "isolated" or "shared-runtime-caches" or "shared-node-deps"'
+      );
+      expect(policyContent).toContain('  enforce_toolchain_lock: true');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    }
+  });
+
+  it('rejects workspace policy operations outside a workspace', () => {
+    const dist = ensureDistBuilt();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rapidkit-ws-policy-outside-'));
+
+    try {
+      const run = spawnSync(process.execPath, [dist, 'workspace', 'policy', 'show'], {
+        cwd: tempDir,
+        encoding: 'utf8',
+      });
+
+      expect(run.status).toBe(1);
+      const output = `${run.stdout || ''}\n${run.stderr || ''}`;
+      expect(output).toContain('Not inside a RapidKit workspace');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    }
+  });
+
+  it('rejects unknown policy rules and invalid boolean values', () => {
+    const dist = ensureDistBuilt();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rapidkit-ws-policy-invalid-'));
+    const workspaceDir = path.join(tempDir, 'my-workspace');
+
+    try {
+      fs.mkdirSync(path.join(workspaceDir, '.rapidkit'), { recursive: true });
+      fs.writeFileSync(
+        path.join(workspaceDir, '.rapidkit-workspace'),
+        JSON.stringify({ signature: 'RAPIDKIT_WORKSPACE' }, null, 2)
+      );
+
+      const unknownRule = spawnSync(
+        process.execPath,
+        [dist, 'workspace', 'policy', 'set', 'rules.unknown_rule', 'true'],
+        {
+          cwd: workspaceDir,
+          encoding: 'utf8',
+        }
+      );
+      expect(unknownRule.status).toBe(1);
+      expect(`${unknownRule.stdout || ''}\n${unknownRule.stderr || ''}`).toContain(
+        'Unknown policy rule'
+      );
+
+      const invalidBool = spawnSync(
+        process.execPath,
+        [dist, 'workspace', 'policy', 'set', 'rules.enforce_toolchain_lock', 'maybe'],
+        {
+          cwd: workspaceDir,
+          encoding: 'utf8',
+        }
+      );
+      expect(invalidBool.status).toBe(1);
+      expect(`${invalidBool.stdout || ''}\n${invalidBool.stderr || ''}`).toContain(
+        'Rule values must be boolean'
+      );
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    }
+  });
+
   it('keeps init at workspace root on wrapper path (no local script delegation)', () => {
     const dist = ensureDistBuilt();
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rapidkit-ws-init-'));
@@ -342,6 +525,66 @@ describe('Phase 3 commands - CLI process integration', () => {
       const output = `${run.stdout || ''}\n${run.stderr || ''}`;
       expect(output).toContain('Invalid dependency_sharing_mode');
       expect(output).not.toContain('SHOULD_NOT_RUN');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    }
+  }, 20000);
+
+  it('enforces strict policy preflight for lint/format/docs project commands', () => {
+    const dist = ensureDistBuilt();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rapidkit-project-commands-strict-'));
+    const workspaceDir = path.join(tempDir, 'workspace');
+    const projectDir = path.join(workspaceDir, 'node-app');
+
+    try {
+      fs.mkdirSync(path.join(projectDir, '.rapidkit'), { recursive: true });
+      fs.mkdirSync(path.join(workspaceDir, '.rapidkit'), { recursive: true });
+      fs.writeFileSync(path.join(workspaceDir, '.rapidkit-workspace'), '{}');
+      fs.writeFileSync(
+        path.join(workspaceDir, '.rapidkit', 'policies.yml'),
+        [
+          'version: "1.0"',
+          'mode: strict',
+          'dependency_sharing_mode: shared-runtime-caches',
+          'rules:',
+          '  enforce_workspace_marker: true',
+          '  enforce_toolchain_lock: true',
+          '',
+        ].join('\n')
+      );
+
+      fs.writeFileSync(
+        path.join(projectDir, '.rapidkit', 'project.json'),
+        JSON.stringify({ runtime: 'node', kit_name: 'nestjs.standard' }, null, 2)
+      );
+      fs.writeFileSync(
+        path.join(projectDir, 'package.json'),
+        JSON.stringify(
+          {
+            name: 'node-app',
+            version: '1.0.0',
+            private: true,
+          },
+          null,
+          2
+        )
+      );
+
+      for (const command of ['lint', 'format', 'docs']) {
+        const run = spawnSync(process.execPath, [dist, command], {
+          cwd: projectDir,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            RAPIDKIT_ENABLE_RUNTIME_ADAPTERS: '1',
+          },
+        });
+
+        expect(run.status).toBe(1);
+        const output = `${run.stdout || ''}\n${run.stderr || ''}`;
+        expect(output).toContain('Strict policy violations prevent running this command');
+        expect(output).toContain('toolchain.lock is missing');
+      }
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     }

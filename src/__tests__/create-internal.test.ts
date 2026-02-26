@@ -173,8 +173,8 @@ describe('Create Module - Internal Functions', () => {
       let poetryVersionChecks = 0;
       vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
         if (command === 'poetry' && args?.[0] === '--version') {
-          // First check fails (missing), subsequent checks succeed.
-          if (poetryVersionChecks === 0) {
+          // Availability pre-check + ensurePoetry check should both fail first.
+          if (poetryVersionChecks < 2) {
             poetryVersionChecks += 1;
             return Promise.reject(new Error('Command not found: poetry'));
           }
@@ -223,7 +223,9 @@ describe('Create Module - Internal Functions', () => {
 
         // Poetry is missing first, then available.
         if (command === 'poetry' && args?.[0] === '--version') {
-          if (poetryVersionChecks === 0) {
+          // Fail both availability pre-check and ensurePoetry check, then succeed
+          // after Poetry gets installed through pipx.
+          if (poetryVersionChecks < 2) {
             poetryVersionChecks += 1;
             return Promise.reject(new Error('Command not found: poetry'));
           }
@@ -666,6 +668,71 @@ describe('Create Module - Internal Functions', () => {
           expect.objectContaining({
             name: 'installMethod',
             default: 'pipx',
+          }),
+        ])
+      );
+    });
+
+    it('should default install method to venv when Poetry is unavailable', async () => {
+      const userConfig = {
+        pythonVersion: '3.10',
+        defaultInstallMethod: 'poetry' as const,
+      };
+
+      vi.mocked(inquirer.prompt).mockResolvedValue({
+        pythonVersion: '3.10',
+        installMethod: 'venv',
+      });
+
+      vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
+        if (command === 'poetry' && args?.[0] === '--version') {
+          return Promise.reject(new Error('Command not found: poetry'));
+        }
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+      });
+
+      await createProject('test-project', { userConfig, profile: 'python-only' });
+
+      expect(inquirer.prompt).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'installMethod',
+            default: 'venv',
+          }),
+        ])
+      );
+    });
+
+    it('should include detected newer Python versions in prompt choices', async () => {
+      vi.mocked(inquirer.prompt).mockResolvedValue({
+        pythonVersion: '3.14',
+        installMethod: 'venv',
+      });
+
+      vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
+        if (command === 'python3.14' && args?.[0] === '--version') {
+          return Promise.resolve({ stdout: 'Python 3.14.1', stderr: '', exitCode: 0 } as any);
+        }
+        if (command === 'python3' && args?.[0] === '--version') {
+          return Promise.resolve({ stdout: 'Python 3.14.1', stderr: '', exitCode: 0 } as any);
+        }
+        if (command === 'poetry' && args?.[0] === '--version') {
+          return Promise.reject(new Error('Command not found: poetry'));
+        }
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+      });
+
+      await createProject('test-project', { profile: 'python-only' });
+
+      expect(inquirer.prompt).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'pythonVersion',
+            default: '3.14',
+            choices: expect.arrayContaining([
+              expect.objectContaining({ value: '3.14' }),
+              expect.objectContaining({ value: '3.10' }),
+            ]),
           }),
         ])
       );

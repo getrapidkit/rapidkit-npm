@@ -76,10 +76,11 @@ jobs:
 ## Related Workspace Commands
 
 ```bash
-rapidkit bootstrap [--profile <profile>]
-rapidkit setup <python|node|go> [--warm-deps]
-rapidkit cache <status|clear|prune|repair>
-rapidkit mirror <status|sync|verify|rotate>
+npx rapidkit bootstrap [--profile <profile>]
+npx rapidkit setup <python|node|go> [--warm-deps]
+npx rapidkit workspace list
+npx rapidkit cache <status|clear|prune|repair>
+npx rapidkit mirror <status|sync|verify|rotate>
 ```
 
 Use `doctor workspace` before and after major workspace operations to detect drift early.

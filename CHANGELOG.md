@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-02-26
+
+### Added
+- 🧱 Extended workspace command contract coverage for `workspace list` and policy command surfaces across docs/help/tests.
+- 🧪 Expanded process-level Phase-3 integration coverage for workspace list/policy and lifecycle contract scenarios.
+- 🧰 Added deterministic dist artifact refresh behavior for CLI entry process tests when `dist/index.js` is missing/stale.
+- 🧭 Added platform capability utility surface:
+  - `src/utils/platform-capabilities.ts`
+
+### Changed
+- 🖥️ Unified root help UX so `rapidkit`, `rapidkit --help`, and `rapidkit help` render aligned output.
+- 📚 Refreshed release-facing and governance docs for current workspace command model:
+  - `README.md`
+  - `docs/README.md`
+  - `docs/SETUP.md`
+  - `docs/doctor-command.md`
+  - `docs/OPEN_SOURCE_USER_SCENARIOS.md`
+  - `docs/ENTERPRISE_GOVERNANCE_RUNBOOK.md`
+  - `docs/config-file-guide.md`
+  - `docs/policies.workspace.example.yml`
+- ⚙️ Updated runtime adapter and bridge paths (`python`, `node`, `go`) for stronger workspace-aware execution behavior.
+- 🔁 Updated CI/e2e workflow alignment for release and docs governance expectations:
+  - `.github/workflows/ci.yml`
+  - `.github/workflows/e2e-smoke.yml`
+
+### Fixed
+- 🧩 Reduced test instability caused by absent build artifacts in process-invoked CLI tests.
+- 🧹 Reduced noisy workspace/debug output and improved workspace registry hygiene paths.
+
 ## [0.24.2] - 2026-02-25
 
 ### Added

@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import type { CommandResult, RuntimeAdapter } from './types.js';
+import { isWindowsPlatform } from '../utils/platform-capabilities.js';
 
 export type GoCommandRunner = (command: string, args: string[], cwd: string) => Promise<number>;
 
@@ -41,7 +42,7 @@ export class GoRuntimeAdapter implements RuntimeAdapter {
 
     try {
       const policyRaw = fs.readFileSync(policyPath, 'utf-8');
-      const match = policyRaw.match(/^\s*dependency_sharing_mode:\s*([a-zA-Z\-]+)\s*$/m);
+      const match = policyRaw.match(/^\s*dependency_sharing_mode:\s*([a-zA-Z\-]+)\s*(?:#.*)?$/m);
       const value = match?.[1]?.toLowerCase();
       if (
         value === 'shared-runtime-caches' ||
@@ -124,10 +125,9 @@ export class GoRuntimeAdapter implements RuntimeAdapter {
 
   async runStart(projectPath: string): Promise<CommandResult> {
     return this.withGoCacheEnv(projectPath, () => {
-      const binaryCandidates =
-        process.platform === 'win32'
-          ? [path.join(projectPath, 'server.exe'), path.join(projectPath, 'server')]
-          : [path.join(projectPath, 'server')];
+      const binaryCandidates = isWindowsPlatform()
+        ? [path.join(projectPath, 'server.exe'), path.join(projectPath, 'server')]
+        : [path.join(projectPath, 'server')];
 
       const existingBinary = binaryCandidates.find((candidate) => fs.existsSync(candidate));
       if (existingBinary) {

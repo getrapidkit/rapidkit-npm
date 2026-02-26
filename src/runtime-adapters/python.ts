@@ -43,7 +43,7 @@ export class PythonRuntimeAdapter implements RuntimeAdapter {
 
     try {
       const policyRaw = fs.readFileSync(policyPath, 'utf-8');
-      const match = policyRaw.match(/^\s*dependency_sharing_mode:\s*([a-zA-Z\-]+)\s*$/m);
+      const match = policyRaw.match(/^\s*dependency_sharing_mode:\s*([a-zA-Z\-]+)\s*(?:#.*)?$/m);
       const value = match?.[1]?.toLowerCase();
       if (
         value === 'shared-runtime-caches' ||

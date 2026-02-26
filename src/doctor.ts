@@ -4,6 +4,12 @@ import fsExtra from 'fs-extra';
 import path from 'path';
 import { logger } from './logger.js';
 import inquirer from 'inquirer';
+import {
+  getPythonCommandCandidates,
+  getVenvPythonPath,
+  isWindowsPlatform,
+  shouldUseShellExecution,
+} from './utils/platform-capabilities.js';
 
 interface HealthCheckResult {
   status: 'ok' | 'warn' | 'error';
@@ -60,9 +66,22 @@ interface WorkspaceHealth {
   npmVersion?: string;
 }
 
+function buildProjectFixCommand(projectPath: string, command: string): string {
+  if (isWindowsPlatform()) {
+    return `cd "${projectPath}"; ${command}`;
+  }
+  return `cd ${projectPath} && ${command}`;
+}
+
+function buildEnvCopyFixCommand(projectPath: string): string {
+  if (isWindowsPlatform()) {
+    return buildProjectFixCommand(projectPath, 'Copy-Item .env.example .env');
+  }
+  return buildProjectFixCommand(projectPath, 'cp .env.example .env');
+}
+
 async function checkPython(): Promise<HealthCheckResult> {
-  const pythonCommands =
-    process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'];
+  const pythonCommands = getPythonCommandCandidates();
 
   for (const cmd of pythonCommands) {
     try {
@@ -111,6 +130,65 @@ async function checkPoetry(): Promise<HealthCheckResult> {
     }
     return { status: 'warn', message: 'Poetry version unknown' };
   } catch {
+    const candidates = isWindowsPlatform()
+      ? [
+          { cmd: 'python', args: ['-m', 'poetry', '--version'] },
+          { cmd: 'py', args: ['-3', '-m', 'poetry', '--version'] },
+        ]
+      : [{ cmd: 'python3', args: ['-m', 'poetry', '--version'] }];
+
+    for (const candidate of candidates) {
+      try {
+        const { stdout } = await execa(candidate.cmd, candidate.args, {
+          timeout: 3000,
+          shell: shouldUseShellExecution(),
+        });
+        const match = stdout.match(/Poetry .*version ([\d.]+)/) || stdout.match(/([\d.]+)/);
+        return {
+          status: 'ok',
+          message: match?.[1] ? `Poetry ${match[1]}` : 'Poetry detected',
+          details: `Available via ${candidate.cmd} ${candidate.args.join(' ')}`,
+        };
+      } catch {
+        continue;
+      }
+    }
+
+    if (isWindowsPlatform()) {
+      const winPathCandidates = [
+        path.join(process.env.APPDATA || '', 'Python', 'Scripts', 'poetry.exe'),
+        path.join(process.env.USERPROFILE || '', '.local', 'bin', 'poetry.exe'),
+        path.join(
+          process.env.USERPROFILE || '',
+          'AppData',
+          'Roaming',
+          'Python',
+          'Scripts',
+          'poetry.exe'
+        ),
+      ].filter((candidatePath) => candidatePath && candidatePath.trim().length > 0);
+
+      for (const poetryPath of winPathCandidates) {
+        try {
+          if (!(await fsExtra.pathExists(poetryPath))) {
+            continue;
+          }
+          const { stdout } = await execa(poetryPath, ['--version'], {
+            timeout: 3000,
+            shell: true,
+          });
+          const match = stdout.match(/Poetry .*version ([\d.]+)/) || stdout.match(/([\d.]+)/);
+          return {
+            status: 'ok',
+            message: match?.[1] ? `Poetry ${match[1]}` : 'Poetry detected',
+            details: `Available at ${poetryPath}`,
+          };
+        } catch {
+          continue;
+        }
+      }
+    }
+
     return {
       status: 'warn',
       message: 'Poetry not installed',
@@ -263,8 +341,7 @@ async function checkRapidKitCore(): Promise<HealthCheckResult> {
   }
 
   // Try Python module import (last resort)
-  const pythonCommands =
-    process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'];
+  const pythonCommands = getPythonCommandCandidates();
   for (const cmd of pythonCommands) {
     try {
       const { stdout, exitCode } = await execa(
@@ -418,10 +495,7 @@ async function performCommonChecks(projectPath: string, health: ProjectHealth): 
     } else if (health.framework === 'FastAPI') {
       // Check for safety or pip-audit
       const venvPath = path.join(projectPath, '.venv');
-      const pythonPath =
-        process.platform === 'win32'
-          ? path.join(venvPath, 'Scripts', 'python.exe')
-          : path.join(venvPath, 'bin', 'python');
+      const pythonPath = getVenvPythonPath(venvPath);
 
       if (await fsExtra.pathExists(pythonPath)) {
         try {
@@ -555,7 +629,7 @@ async function checkProject(projectPath: string): Promise<ProjectHealth> {
     } else {
       health.depsInstalled = false;
       health.issues.push('Go dependencies not downloaded (go.sum missing)');
-      health.fixCommands?.push(`cd ${projectPath} && go mod tidy`);
+      health.fixCommands?.push(buildProjectFixCommand(projectPath, 'go mod tidy'));
     }
 
     // .env check — Go reads env vars from OS directly; .env is optional (no dotenv loaded by default)
@@ -588,7 +662,7 @@ async function checkProject(projectPath: string): Promise<ProjectHealth> {
 
     if (!health.depsInstalled) {
       health.issues.push('Dependencies not installed (node_modules empty or missing)');
-      health.fixCommands?.push(`cd ${projectPath} && rapidkit init`);
+      health.fixCommands?.push(buildProjectFixCommand(projectPath, 'rapidkit init'));
     }
 
     // Node.js projects don't need Python venv
@@ -601,7 +675,7 @@ async function checkProject(projectPath: string): Promise<ProjectHealth> {
       const envExamplePath = path.join(projectPath, '.env.example');
       if (await fsExtra.pathExists(envExamplePath)) {
         health.issues.push('Environment file missing (found .env.example)');
-        health.fixCommands?.push(`cd ${projectPath} && cp .env.example .env`);
+        health.fixCommands?.push(buildEnvCopyFixCommand(projectPath));
       }
     }
 
@@ -636,10 +710,7 @@ async function checkProject(projectPath: string): Promise<ProjectHealth> {
       health.venvActive = true;
 
       // Check if dependencies are installed
-      const pythonPath =
-        process.platform === 'win32'
-          ? path.join(venvPath, 'Scripts', 'python.exe')
-          : path.join(venvPath, 'bin', 'python');
+      const pythonPath = getVenvPythonPath(venvPath);
 
       if (await fsExtra.pathExists(pythonPath)) {
         // Check for rapidkit-core in venv (optional - Core is usually global)
@@ -687,7 +758,7 @@ async function checkProject(projectPath: string): Promise<ProjectHealth> {
 
             if (!health.depsInstalled) {
               health.issues.push('Dependencies not installed');
-              health.fixCommands?.push(`cd ${projectPath} && rapidkit init`);
+              health.fixCommands?.push(buildProjectFixCommand(projectPath, 'rapidkit init'));
             }
           } catch {
             health.issues.push('Could not verify dependency installation');
@@ -698,7 +769,7 @@ async function checkProject(projectPath: string): Promise<ProjectHealth> {
       }
     } else {
       health.issues.push('Virtual environment not created');
-      health.fixCommands?.push(`cd ${projectPath} && rapidkit init`);
+      health.fixCommands?.push(buildProjectFixCommand(projectPath, 'rapidkit init'));
     }
 
     // Check for .env file
@@ -708,7 +779,7 @@ async function checkProject(projectPath: string): Promise<ProjectHealth> {
       const envExamplePath = path.join(projectPath, '.env.example');
       if (await fsExtra.pathExists(envExamplePath)) {
         health.issues.push('Environment file missing (found .env.example)');
-        health.fixCommands?.push(`cd ${projectPath} && cp .env.example .env`);
+        health.fixCommands?.push(buildEnvCopyFixCommand(projectPath));
       }
     }
 
@@ -1203,7 +1274,7 @@ async function executeFixCommands(
 
   if (!autoFix) {
     console.log(
-      chalk.gray('💡 Run "npx rapidkit doctor workspace --fix" to apply fixes automatically')
+      chalk.gray('💡 Run "rapidkit doctor workspace --fix" to apply fixes automatically')
     );
     return;
   }
@@ -1226,10 +1297,32 @@ async function executeFixCommands(
   console.log(chalk.bold.cyan('\n🚀 Applying fixes...\n'));
 
   const isManualUrlFix = (cmd: string): boolean => /^https?:\/\//i.test(cmd.trim());
+
+  const parseProjectCommandFix = (
+    cmd: string,
+    expectedTail: string
+  ): { projectPath: string } | null => {
+    const escapedTail = expectedTail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const patterns = [
+      new RegExp(`^cd\\s+"([^"]+)"\\s*(?:&&|;)\\s*${escapedTail}\\s*$`, 'i'),
+      new RegExp(`^cd\\s+(.+?)\\s*(?:&&|;)\\s*${escapedTail}\\s*$`, 'i'),
+    ];
+
+    for (const pattern of patterns) {
+      const match = cmd.match(pattern);
+      if (match?.[1]) {
+        return { projectPath: match[1].trim() };
+      }
+    }
+
+    return null;
+  };
+
   const parseEnvCopyFix = (cmd: string): { projectPath: string } | null => {
-    const match = cmd.match(/^cd\s+(.+?)\s*&&\s*cp\s+\.env\.example\s+\.env\s*$/);
-    if (!match) return null;
-    return { projectPath: match[1].trim() };
+    return (
+      parseProjectCommandFix(cmd, 'cp\\s+\\.env\\.example\\s+\\.env') ||
+      parseProjectCommandFix(cmd, 'copy-item\\s+\\.env\\.example\\s+\\.env')
+    );
   };
 
   for (const project of fixableProjects) {
@@ -1260,6 +1353,28 @@ async function executeFixCommands(
           }
 
           await fsExtra.copy(sourcePath, targetPath, { overwrite: false, errorOnExist: false });
+          console.log(chalk.green('  ✅ Success\n'));
+          continue;
+        }
+
+        const rapidkitInitFix = parseProjectCommandFix(cmd, 'rapidkit\\s+init');
+        if (rapidkitInitFix) {
+          await execa('rapidkit', ['init'], {
+            cwd: rapidkitInitFix.projectPath,
+            shell: shouldUseShellExecution(),
+            stdio: 'inherit',
+          });
+          console.log(chalk.green('  ✅ Success\n'));
+          continue;
+        }
+
+        const goModTidyFix = parseProjectCommandFix(cmd, 'go\\s+mod\\s+tidy');
+        if (goModTidyFix) {
+          await execa('go', ['mod', 'tidy'], {
+            cwd: goModTidyFix.projectPath,
+            shell: shouldUseShellExecution(),
+            stdio: 'inherit',
+          });
           console.log(chalk.green('  ✅ Success\n'));
           continue;
         }
@@ -1444,25 +1559,21 @@ export async function runDoctor(
       if (options.fix) {
         console.log(
           chalk.gray(
-            '\nTip: Project auto-fix runs in workspace mode. Run from a workspace and use "npx rapidkit doctor workspace --fix"'
+            '\nTip: Project auto-fix runs in workspace mode. Run from a workspace and use "rapidkit doctor workspace --fix"'
           )
         );
       }
-      console.log(
-        chalk.gray('\nTip: Run "npx rapidkit doctor workspace" for detailed project checks')
-      );
+      console.log(chalk.gray('\nTip: Run "rapidkit doctor workspace" for detailed project checks'));
     } else {
       console.log(chalk.bold.green('\n✅ All required tools are installed!'));
       if (options.fix) {
         console.log(
           chalk.gray(
-            '\nTip: Project auto-fix runs in workspace mode. Run from a workspace and use "npx rapidkit doctor workspace --fix"'
+            '\nTip: Project auto-fix runs in workspace mode. Run from a workspace and use "rapidkit doctor workspace --fix"'
           )
         );
       }
-      console.log(
-        chalk.gray('\nTip: Run "npx rapidkit doctor workspace" for detailed project checks')
-      );
+      console.log(chalk.gray('\nTip: Run "rapidkit doctor workspace" for detailed project checks'));
     }
   }
 

@@ -103,6 +103,8 @@ npx rapidkit my-workspace
 
 ### Use Project CLI
 
+Use the local project launcher (`rapidkit`) after entering a generated project folder.
+
 ```bash
 cd my-api
 rapidkit init      # Install dependencies
@@ -114,15 +116,26 @@ rapidkit --help    # Show all commands
 ### Workspace Runtime Lifecycle
 
 ```bash
-rapidkit bootstrap --profile polyglot
-rapidkit setup python
-rapidkit setup node --warm-deps
-rapidkit setup go --warm-deps
-rapidkit doctor workspace
-rapidkit cache status
-rapidkit mirror status
+npx rapidkit bootstrap --profile polyglot
+npx rapidkit setup python
+npx rapidkit setup node --warm-deps
+npx rapidkit setup go --warm-deps
+npx rapidkit doctor workspace
+npx rapidkit workspace list
+npx rapidkit workspace policy show
+npx rapidkit workspace policy set mode strict
+npx rapidkit cache status
+npx rapidkit mirror status
 ```
 
-`rapidkit bootstrap` now auto-syncs legacy workspaces (missing `.rapidkit-workspace`
+`npx rapidkit bootstrap` now auto-syncs legacy workspaces (missing `.rapidkit-workspace`
 or newer `.rapidkit/*` foundation files) so older workspace roots can align with
 the current workspace architecture without manual file creation.
+
+Root help commands are equivalent and intentionally aligned:
+
+```bash
+npx rapidkit
+npx rapidkit --help
+npx rapidkit help
+```

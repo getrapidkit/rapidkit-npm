@@ -36,30 +36,32 @@ Or run directly with `npx`:
 npx rapidkit --help
 ```
 
+All three commands above render the same root help output.
+
 ## Quick Start (Recommended)
 
 ### 1) Create a workspace
 
 ```bash
-rapidkit create workspace my-workspace --yes --profile polyglot
+npx rapidkit create workspace my-workspace --yes --profile polyglot
 cd my-workspace
 ```
 
 ### 2) Bootstrap and setup runtimes
 
 ```bash
-rapidkit bootstrap --profile polyglot
-rapidkit setup python
-rapidkit setup node --warm-deps
-rapidkit setup go --warm-deps
+npx rapidkit bootstrap --profile polyglot
+npx rapidkit setup python
+npx rapidkit setup node --warm-deps
+npx rapidkit setup go --warm-deps
 ```
 
 ### 3) Create projects
 
 ```bash
-rapidkit create project fastapi.standard my-api --yes --skip-install
-rapidkit create project nestjs.standard my-nest --yes --skip-install
-rapidkit create project gofiber.standard my-fiber --yes --skip-install
+npx rapidkit create project fastapi.standard my-api --yes --skip-install
+npx rapidkit create project nestjs.standard my-nest --yes --skip-install
+npx rapidkit create project gofiber.standard my-fiber --yes --skip-install
 ```
 
 ## Core Commands
@@ -67,28 +69,32 @@ rapidkit create project gofiber.standard my-fiber --yes --skip-install
 ### Workspace lifecycle
 
 ```bash
-rapidkit create workspace <name> [--profile <profile>] [--yes]
-rapidkit bootstrap [--profile <profile>] [--json]
-rapidkit setup <python|node|go> [--warm-deps]
-rapidkit doctor workspace [--fix]
+npx rapidkit create # Prompts: workspace | project
+npx rapidkit create workspace <name> [--profile <profile>] [--author <name>] [--yes]
+npx rapidkit bootstrap [--profile <profile>] [--json]
+npx rapidkit setup <python|node|go> [--warm-deps]
+npx rapidkit workspace policy show
+npx rapidkit workspace policy set <key> <value>
+npx rapidkit doctor workspace [--fix]
+npx rapidkit workspace list # Display all workspaces created on this system
 ```
 
 ### Project lifecycle
 
 ```bash
-rapidkit create project <kit> <name> [--yes] [--skip-install]
-rapidkit init
-rapidkit dev
-rapidkit test
-rapidkit build
-rapidkit start
+npx rapidkit create project <kit> <name> [--yes] [--skip-install]
+npx rapidkit init
+npx rapidkit dev
+npx rapidkit test
+npx rapidkit build
+npx rapidkit start
 ```
 
 ### Operations
 
 ```bash
-rapidkit cache <status|clear|prune|repair>
-rapidkit mirror <status|sync|verify|rotate>
+npx rapidkit cache <status|clear|prune|repair>
+npx rapidkit mirror <status|sync|verify|rotate>
 ```
 
 ## Profiles
@@ -106,6 +112,26 @@ rapidkit mirror <status|sync|verify|rotate>
 
 - `warn` (default): report violations, continue
 - `strict`: block incompatible operations
+
+## Workspace Policy Management
+
+Manage `.rapidkit/policies.yml` via CLI (recommended, avoids manual YAML edits):
+
+```bash
+npx rapidkit workspace policy show
+npx rapidkit workspace policy set mode strict
+npx rapidkit workspace policy set dependency_sharing_mode shared-runtime-caches
+npx rapidkit workspace policy set rules.enforce_toolchain_lock true
+```
+
+Supported keys:
+- `mode`
+- `dependency_sharing_mode`
+- `rules.enforce_workspace_marker`
+- `rules.enforce_toolchain_lock`
+- `rules.disallow_untrusted_tool_sources`
+- `rules.enforce_compatibility_matrix`
+- `rules.require_mirror_lock_for_offline`
 
 ## Setup and Warm Dependencies
 
@@ -170,12 +196,12 @@ Link local CLI globally for manual testing:
 
 ```bash
 npm run install:local
-rapidkit --version
+npx rapidkit --version
 ```
 
 ## Troubleshooting
 
-- If setup output looks stale, run `rapidkit setup <runtime>` again to refresh `.rapidkit/toolchain.lock`.
+- If setup output looks stale, run `npx rapidkit setup <runtime>` again to refresh `.rapidkit/toolchain.lock`.
 - If dependency warm-up is skipped, verify you are inside the corresponding project directory (`package.json` for Node, `go.mod` for Go).
 - For strict-mode blocks, inspect `.rapidkit/policies.yml` and workspace profile in `.rapidkit/workspace.json`.
 

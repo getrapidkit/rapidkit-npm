@@ -3,6 +3,7 @@ import { GoRuntimeAdapter } from './go.js';
 import { NodeRuntimeAdapter } from './node.js';
 import { PythonRuntimeAdapter } from './python.js';
 import path from 'path';
+import { getDefaultPythonCommand } from '../utils/platform-capabilities.js';
 
 export type AdapterDeps = {
   runCommandInCwd: (command: string, args: string[], cwd: string) => Promise<number>;
@@ -31,7 +32,7 @@ function buildPythonCoreEnv(): NodeJS.ProcessEnv {
   // Prefer system Python during Poetry interpreter discovery to avoid broken
   // pyenv shim invocations in mixed workspaces.
   env.PYENV_VERSION = 'system';
-  env.POETRY_PYTHON = env.POETRY_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  env.POETRY_PYTHON = env.POETRY_PYTHON || getDefaultPythonCommand();
 
   // Keep workspace init/bootstrap fast by default. Core can still be forced to
   // perform lock sync via RAPIDKIT_SKIP_LOCK_SYNC=0 when needed.

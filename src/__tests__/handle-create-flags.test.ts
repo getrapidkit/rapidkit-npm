@@ -67,4 +67,56 @@ describe('handleCreateOrFallback - wrapper flags handling', () => {
     expect(forwarded).toContain('demo');
     expect(code).toBe(0);
   });
+
+  it('routes `create` without subcommand to workspace flow in non-interactive mode', async () => {
+    const createWsSpy = vi.spyOn(create, 'createProject').mockResolvedValue(undefined as never);
+    const runSpy = vi.spyOn(coreExec, 'runCoreRapidkit').mockResolvedValue(0 as any);
+
+    const stdinIsTty = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+    Object.defineProperty(process.stdin, 'isTTY', {
+      configurable: true,
+      get: () => false,
+    });
+
+    try {
+      const code = await index.handleCreateOrFallback(['create', '--yes']);
+      expect(code).toBe(0);
+      expect(createWsSpy).toHaveBeenCalled();
+      expect(runSpy).not.toHaveBeenCalled();
+    } finally {
+      if (stdinIsTty) {
+        Object.defineProperty(process.stdin, 'isTTY', stdinIsTty);
+      }
+    }
+  });
+
+  it('prompts for target on `create` and supports choosing project', async () => {
+    vi.spyOn(inquirer, 'prompt')
+      .mockResolvedValueOnce({ createTarget: 'project' })
+      .mockResolvedValueOnce({ kitChoice: 'fastapi.standard' })
+      .mockResolvedValueOnce({ projectName: 'demo' });
+
+    const resolveSpy = vi.spyOn(coreExec, 'resolveRapidkitPython').mockResolvedValue();
+    const runSpy = vi.spyOn(coreExec, 'runCoreRapidkit').mockResolvedValue(0 as any);
+
+    const stdinIsTty = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+    Object.defineProperty(process.stdin, 'isTTY', {
+      configurable: true,
+      get: () => true,
+    });
+
+    try {
+      const code = await index.handleCreateOrFallback(['create', '--no-workspace']);
+      expect(code).toBe(0);
+      expect(resolveSpy).toHaveBeenCalled();
+      expect(runSpy).toHaveBeenCalled();
+
+      const forwarded = runSpy.mock.calls[0][0] as string[];
+      expect(forwarded).toEqual(['create', 'project', 'fastapi.standard', 'demo']);
+    } finally {
+      if (stdinIsTty) {
+        Object.defineProperty(process.stdin, 'isTTY', stdinIsTty);
+      }
+    }
+  });
 });

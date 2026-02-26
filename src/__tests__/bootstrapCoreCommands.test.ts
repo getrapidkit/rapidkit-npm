@@ -29,8 +29,8 @@ describe('bootstrapCoreCommands', () => {
     }
   });
 
-  it('includes critical core lifecycle commands', () => {
-    const mustHave = ['create', 'init', 'dev', 'build', 'test'];
+  it('includes critical core top-level commands', () => {
+    const mustHave = ['create', 'project', 'version', 'commands', 'list'];
 
     for (const cmd of mustHave) {
       expect(BOOTSTRAP_CORE_COMMANDS_SET.has(cmd)).toBe(true);
