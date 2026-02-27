@@ -1497,6 +1497,11 @@ describe('Phase 3 command contract handlers', () => {
       await expect(index.shouldForwardToCore(['shell', 'activate'])).resolves.toBe(false);
       await expect(index.shouldForwardToCore(['ai'])).resolves.toBe(false);
       await expect(index.shouldForwardToCore(['config'])).resolves.toBe(false);
+      await expect(index.shouldForwardToCore(['init'])).resolves.toBe(false);
+
+      for (const command of index.WRAPPER_ORCHESTRATED_PROJECT_COMMANDS) {
+        await expect(index.shouldForwardToCore([command])).resolves.toBe(false);
+      }
 
       await expect(index.shouldForwardToCore(['lint'])).resolves.toBe(true);
       await expect(index.shouldForwardToCore(['format'])).resolves.toBe(true);

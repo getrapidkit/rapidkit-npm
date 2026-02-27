@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.2] - 2026-02-27
+
+### Added
+- 🧭 Added explicit command ownership contract for wrapper/core boundaries:
+  - Wrapper-orchestrated project command set now explicitly includes `init`.
+  - Added ownership reference doc: `docs/contracts/COMMAND_OWNERSHIP_MATRIX.md`.
+- 🧪 Added forwarding-boundary assertions to prevent `init` delegation regressions.
+
+### Changed
+- 🚀 Upgraded `init` orchestration to runtime-aware smart behavior:
+  - Detects runtime by project markers and file heuristics (`go.mod`, `package.json`, `pyproject.toml`/`requirements.txt`).
+  - Keeps `init` on npm wrapper path to apply policy context + fallback logic consistently.
+- 🐍 Python `init` now enforces project-local `.venv` binding and falls back to direct `pip` installation paths when primary flow cannot complete.
+- 🌐 Node `init` now has resilient package-manager fallback attempts (`npm` → `pnpm` → `yarn`) based on tool availability.
+- 🛡️ Lifecycle delegation for Go/Node projects is kept on wrapper/runtime adapter path to avoid local launcher argument drift (`dev --port` misrouting).
+
+### Fixed
+- 🧩 Fixed scenario where `rapidkit init` could succeed without creating project-local `.venv` in Python projects due to cached/global Poetry env binding.
+- 🧱 Fixed Go lifecycle command forwarding issue that could pass unsupported args to `make` via local launcher delegation.
+- 🗣️ Fixed silent `rapidkit init` behavior for Go projects without Go installed by surfacing clear user-facing error messaging.
+
 ## [0.25.1] - 2026-02-27
 
 ### Added

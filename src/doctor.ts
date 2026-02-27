@@ -80,6 +80,25 @@ function getRapidkitBinaryCandidates(homeDir: string): Array<{ location: string;
   });
 }
 
+function sortRapidkitInstalledPaths(
+  paths: { location: string; path: string; version: string }[]
+): { location: string; path: string; version: string }[] {
+  const locationPriority = new Map<string, number>([
+    ['Workspace (.venv)', 0],
+    ['Global (user-local)', 1],
+    ['Global (pipx)', 2],
+    ['Global (pyenv)', 3],
+    ['Global (system)', 4],
+  ]);
+
+  return [...paths].sort((a, b) => {
+    const aPriority = locationPriority.get(a.location) ?? Number.MAX_SAFE_INTEGER;
+    const bPriority = locationPriority.get(b.location) ?? Number.MAX_SAFE_INTEGER;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    return a.path.localeCompare(b.path);
+  });
+}
+
 interface HealthCheckResult {
   status: 'ok' | 'warn' | 'error';
   message: string;
@@ -341,12 +360,27 @@ async function checkRapidKitCore(): Promise<HealthCheckResult> {
 
   // If found installations, return them
   if (foundPaths.length > 0) {
-    // Use first found version for message
-    const primaryVersion = foundPaths[0].version;
+    const installedPackagePaths = foundPaths.filter((f) => f.location !== 'Workspace (launcher)');
+
+    if (installedPackagePaths.length > 0) {
+      const sortedInstalledPaths = sortRapidkitInstalledPaths(installedPackagePaths);
+      const primaryVersion = sortedInstalledPaths[0].version;
+      return {
+        status: 'ok',
+        message: `RapidKit Core ${primaryVersion}`,
+        paths: sortedInstalledPaths.map((f) => ({
+          location: f.location,
+          path: f.path,
+          version: f.version,
+        })),
+      };
+    }
+
+    const launcherVersion = foundPaths[0].version;
     return {
       status: 'ok',
-      message: `RapidKit Core ${primaryVersion}`,
-      paths: foundPaths.map((f) => ({ location: f.location, path: f.path, version: f.version })),
+      message: `RapidKit Core ${launcherVersion}`,
+      details: 'Detected via workspace launcher',
     };
   }
 

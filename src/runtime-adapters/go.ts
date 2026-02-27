@@ -15,6 +15,19 @@ export class GoRuntimeAdapter implements RuntimeAdapter {
     return { exitCode };
   }
 
+  private async ensureGoInstalled(projectPath: string): Promise<CommandResult | null> {
+    const probe = await this.run('go', ['version'], projectPath);
+    if (probe.exitCode === 0) {
+      return null;
+    }
+
+    return {
+      exitCode: 1,
+      message:
+        'Go toolchain is not installed or not available on PATH. Install Go from https://go.dev/dl/ and retry.',
+    };
+  }
+
   private findWorkspaceRoot(startPath: string): string | null {
     let current = startPath;
     while (true) {
@@ -102,29 +115,46 @@ export class GoRuntimeAdapter implements RuntimeAdapter {
   }
 
   async initProject(projectPath: string): Promise<CommandResult> {
-    return this.withGoCacheEnv(projectPath, () => this.run('go', ['mod', 'tidy'], projectPath));
+    return this.withGoCacheEnv(projectPath, async () => {
+      const prereq = await this.ensureGoInstalled(projectPath);
+      if (prereq) return prereq;
+      return this.run('go', ['mod', 'tidy'], projectPath);
+    });
   }
 
   async runDev(projectPath: string): Promise<CommandResult> {
     return this.withGoCacheEnv(projectPath, () => {
-      const makefilePath = path.join(projectPath, 'Makefile');
-      if (fs.existsSync(makefilePath)) {
-        return this.run('make', ['run'], projectPath);
-      }
-      return this.run('go', ['run', './main.go'], projectPath);
+      return (async () => {
+        const prereq = await this.ensureGoInstalled(projectPath);
+        if (prereq) return prereq;
+
+        const makefilePath = path.join(projectPath, 'Makefile');
+        if (fs.existsSync(makefilePath)) {
+          return this.run('make', ['run'], projectPath);
+        }
+        return this.run('go', ['run', './main.go'], projectPath);
+      })();
     });
   }
 
   async runTest(projectPath: string): Promise<CommandResult> {
-    return this.withGoCacheEnv(projectPath, () => this.run('go', ['test', './...'], projectPath));
+    return this.withGoCacheEnv(projectPath, async () => {
+      const prereq = await this.ensureGoInstalled(projectPath);
+      if (prereq) return prereq;
+      return this.run('go', ['test', './...'], projectPath);
+    });
   }
 
   async runBuild(projectPath: string): Promise<CommandResult> {
-    return this.withGoCacheEnv(projectPath, () => this.run('go', ['build', './...'], projectPath));
+    return this.withGoCacheEnv(projectPath, async () => {
+      const prereq = await this.ensureGoInstalled(projectPath);
+      if (prereq) return prereq;
+      return this.run('go', ['build', './...'], projectPath);
+    });
   }
 
   async runStart(projectPath: string): Promise<CommandResult> {
-    return this.withGoCacheEnv(projectPath, () => {
+    return this.withGoCacheEnv(projectPath, async () => {
       const binaryCandidates = isWindowsPlatform()
         ? [path.join(projectPath, 'server.exe'), path.join(projectPath, 'server')]
         : [path.join(projectPath, 'server')];
@@ -133,6 +163,10 @@ export class GoRuntimeAdapter implements RuntimeAdapter {
       if (existingBinary) {
         return this.run(existingBinary, [], projectPath);
       }
+
+      const prereq = await this.ensureGoInstalled(projectPath);
+      if (prereq) return prereq;
+
       return this.run('go', ['run', './main.go'], projectPath);
     });
   }

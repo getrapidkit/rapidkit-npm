@@ -125,6 +125,34 @@ function workspaceVenvPythonBin(workspacePath: string): string {
   return getVenvPythonPath(path.join(workspacePath, '.venv'));
 }
 
+async function commandAvailable(command: string, cwd: string): Promise<boolean> {
+  const code = await runCommandInCwd(command, ['--version'], cwd);
+  return code === 0;
+}
+
+type InferredRuntime = 'python' | 'node' | 'go' | null;
+
+async function inferRuntimeByFiles(targetPath: string): Promise<InferredRuntime> {
+  const goMod = path.join(targetPath, 'go.mod');
+  if (await fsExtra.pathExists(goMod)) return 'go';
+
+  const packageJson = path.join(targetPath, 'package.json');
+  if (await fsExtra.pathExists(packageJson)) return 'node';
+
+  const pyproject = path.join(targetPath, 'pyproject.toml');
+  const requirements = path.join(targetPath, 'requirements.txt');
+  const poetryLock = path.join(targetPath, 'poetry.lock');
+  if (
+    (await fsExtra.pathExists(pyproject)) ||
+    (await fsExtra.pathExists(requirements)) ||
+    (await fsExtra.pathExists(poetryLock))
+  ) {
+    return 'python';
+  }
+
+  return null;
+}
+
 async function createWorkspaceVenv(workspacePath: string): Promise<number> {
   for (const candidate of hostPythonCandidates()) {
     const args = candidate === 'py' ? ['-3', '-m', 'venv', '.venv'] : ['-m', 'venv', '.venv'];
@@ -132,6 +160,124 @@ async function createWorkspaceVenv(workspacePath: string): Promise<number> {
     if (code === 0) return 0;
   }
   return 1;
+}
+
+async function createProjectVenv(projectPath: string): Promise<number> {
+  for (const candidate of hostPythonCandidates()) {
+    const args = candidate === 'py' ? ['-3', '-m', 'venv', '.venv'] : ['-m', 'venv', '.venv'];
+    const code = await runCommandInCwd(candidate, args, projectPath);
+    if (code === 0) return 0;
+  }
+  return 1;
+}
+
+async function ensurePythonProjectUsesLocalVenv(projectPath: string): Promise<number> {
+  const localVenvPython = getVenvPythonPath(path.join(projectPath, '.venv'));
+
+  if (!(await fsExtra.pathExists(localVenvPython))) {
+    const venvCode = await createProjectVenv(projectPath);
+    if (venvCode !== 0) return venvCode;
+  }
+
+  const hasPoetry = await commandAvailable('poetry', projectPath);
+  if (!hasPoetry) {
+    return 0;
+  }
+
+  const configCode = await runCommandInCwd(
+    'poetry',
+    ['config', 'virtualenvs.in-project', 'true', '--local'],
+    projectPath
+  );
+  if (configCode !== 0) return configCode;
+
+  const envUseCode = await runCommandInCwd('poetry', ['env', 'use', localVenvPython], projectPath);
+  if (envUseCode !== 0) return envUseCode;
+
+  return 0;
+}
+
+async function installPythonDependenciesWithPipFallback(projectPath: string): Promise<number> {
+  const localVenvPython = getVenvPythonPath(path.join(projectPath, '.venv'));
+  if (!(await fsExtra.pathExists(localVenvPython))) {
+    const venvCode = await createProjectVenv(projectPath);
+    if (venvCode !== 0) return venvCode;
+  }
+
+  await runCommandInCwd(
+    localVenvPython,
+    ['-m', 'pip', 'install', '--upgrade', 'pip', 'setuptools', 'wheel'],
+    projectPath
+  );
+
+  const requirementsTxt = path.join(projectPath, 'requirements.txt');
+  if (await fsExtra.pathExists(requirementsTxt)) {
+    const reqCode = await runCommandInCwd(
+      localVenvPython,
+      ['-m', 'pip', 'install', '-r', 'requirements.txt'],
+      projectPath
+    );
+    if (reqCode === 0) return 0;
+  }
+
+  const pyproject = path.join(projectPath, 'pyproject.toml');
+  if (await fsExtra.pathExists(pyproject)) {
+    const editableCode = await runCommandInCwd(
+      localVenvPython,
+      ['-m', 'pip', 'install', '-e', '.'],
+      projectPath
+    );
+    if (editableCode === 0) return 0;
+
+    const plainCode = await runCommandInCwd(
+      localVenvPython,
+      ['-m', 'pip', 'install', '.'],
+      projectPath
+    );
+    if (plainCode === 0) return 0;
+  }
+
+  return 1;
+}
+
+async function handlePythonInitSmart(
+  projectPath: string,
+  pythonAdapter: ReturnType<typeof getRuntimeAdapter>
+): Promise<number> {
+  const ensureCode = await ensurePythonProjectUsesLocalVenv(projectPath);
+  if (ensureCode !== 0) {
+    console.log(
+      chalk.yellow('⚠️  Could not fully configure Poetry local venv. Trying fallback installer...')
+    );
+  }
+
+  const adapterResult = await pythonAdapter.initProject(projectPath);
+  if (adapterResult.exitCode === 0 && (await fsExtra.pathExists(path.join(projectPath, '.venv')))) {
+    return 0;
+  }
+
+  console.log(
+    chalk.yellow('⚠️  Python init fallback: installing dependencies directly into project .venv')
+  );
+  return await installPythonDependenciesWithPipFallback(projectPath);
+}
+
+async function handleNodeInitSmart(projectPath: string): Promise<number> {
+  const primary = await handleNodeCommand('init', projectPath);
+  if (primary === 0) return 0;
+
+  const packageManagerCandidates = ['npm', 'pnpm', 'yarn'] as const;
+  for (const manager of packageManagerCandidates) {
+    const available = await commandAvailable(manager, projectPath);
+    if (!available) continue;
+    const fallbackCode = await runCommandInCwd(manager, ['install'], projectPath);
+    if (fallbackCode === 0) {
+      console.log(chalk.green(`✅ Node init fallback succeeded with ${manager} install`));
+      return 0;
+    }
+  }
+
+  return primary;
 }
 
 async function runGoFiberCreate(args: string[]): Promise<number> {
@@ -828,6 +974,10 @@ const NPM_ONLY_MANUAL_HANDLER_COMMANDS = ['bootstrap', 'setup', 'cache', 'mirror
 // creation parser when local delegation is unavailable.
 const PROJECT_COMMANDS_CORE_FALLBACK = ['lint', 'format', 'docs'] as const;
 
+// Project commands that are always orchestrated by the npm wrapper first
+// (runtime-aware + policy-aware + fallback-aware), even inside Python projects.
+export const WRAPPER_ORCHESTRATED_PROJECT_COMMANDS = ['init'] as const;
+
 const RUNTIME_LIFECYCLE_COMMANDS = ['build', 'dev', 'start', 'test'] as const;
 
 const STRICT_POLICY_PROJECT_COMMANDS = [
@@ -1302,6 +1452,11 @@ function resolveDefaultWorkspacePath(basePath: string): { name: string; targetPa
 async function handleGoInit(projectPath: string): Promise<number> {
   const adapter = getRuntimeAdapter('go', { runCommandInCwd, runCoreRapidkit });
   const result = await adapter.initProject(projectPath);
+
+  if (result.message) {
+    console.log(chalk.red(`❌ ${result.message}`));
+  }
+
   return result.exitCode;
 }
 
@@ -2650,15 +2805,16 @@ export async function handleInitCommand(args: string[]): Promise<number> {
         // If called with a path argument, check if that path is a Go project
         const targetPath = path.resolve(cwd, args[1]);
         const targetJson = readRapidkitProjectJson(targetPath);
-        if (isGoProject(targetJson, targetPath)) {
+        const inferredRuntime = await inferRuntimeByFiles(targetPath);
+
+        if (isGoProject(targetJson, targetPath) || inferredRuntime === 'go') {
           return await handleGoInit(targetPath);
         }
-        if (isNodeProject(targetJson, targetPath)) {
-          return await handleNodeCommand('init', targetPath);
+        if (isNodeProject(targetJson, targetPath) || inferredRuntime === 'node') {
+          return await handleNodeInitSmart(targetPath);
         }
-        if (isPythonProject(targetJson, targetPath)) {
-          const result = await pythonAdapter.initProject(targetPath);
-          return result.exitCode;
+        if (isPythonProject(targetJson, targetPath) || inferredRuntime === 'python') {
+          return await handlePythonInitSmart(targetPath, pythonAdapter);
         }
         return await runCoreRapidkit(args, { cwd });
       }
@@ -2670,12 +2826,19 @@ export async function handleInitCommand(args: string[]): Promise<number> {
       if (!cwdIsWorkspaceRoot && isGoProject(projectJsonNow, cwd)) {
         return await handleGoInit(cwd);
       }
-      if (!cwdIsWorkspaceRoot && isNodeProject(projectJsonNow, cwd)) {
-        return await handleNodeCommand('init', cwd);
+      const inferredRuntimeNow = await inferRuntimeByFiles(cwd);
+
+      if (
+        !cwdIsWorkspaceRoot &&
+        (isNodeProject(projectJsonNow, cwd) || inferredRuntimeNow === 'node')
+      ) {
+        return await handleNodeInitSmart(cwd);
       }
-      if (!cwdIsWorkspaceRoot && isPythonProject(projectJsonNow, cwd)) {
-        const result = await pythonAdapter.initProject(cwd);
-        return result.exitCode;
+      if (
+        !cwdIsWorkspaceRoot &&
+        (isPythonProject(projectJsonNow, cwd) || inferredRuntimeNow === 'python')
+      ) {
+        return await handlePythonInitSmart(cwd, pythonAdapter);
       }
 
       const workspacePath = workspacePathForPolicy || findWorkspaceUp(cwd);
@@ -2683,8 +2846,20 @@ export async function handleInitCommand(args: string[]): Promise<number> {
       const projectRoot = contextFile ? path.dirname(path.dirname(contextFile)) : null;
 
       if (projectRoot && projectRoot !== workspacePath) {
-        const result = await pythonAdapter.initProject(projectRoot);
-        return result.exitCode;
+        const projectRootJson = readRapidkitProjectJson(projectRoot);
+        const inferredRootRuntime = await inferRuntimeByFiles(projectRoot);
+
+        if (isGoProject(projectRootJson, projectRoot) || inferredRootRuntime === 'go') {
+          return await handleGoInit(projectRoot);
+        }
+        if (isNodeProject(projectRootJson, projectRoot) || inferredRootRuntime === 'node') {
+          return await handleNodeInitSmart(projectRoot);
+        }
+        if (isPythonProject(projectRootJson, projectRoot) || inferredRootRuntime === 'python') {
+          return await handlePythonInitSmart(projectRoot, pythonAdapter);
+        }
+
+        return await runCoreRapidkit(['init'], { cwd: projectRoot });
       }
 
       if (workspacePath && cwd === workspacePath) {
@@ -2731,13 +2906,13 @@ export async function handleInitCommand(args: string[]): Promise<number> {
             if (code !== 0) return code;
           } else {
             if (isNodeProject(projJson, projectPath)) {
-              const nodeCode = await handleNodeCommand('init', projectPath);
+              const nodeCode = await handleNodeInitSmart(projectPath);
               if (nodeCode !== 0) return nodeCode;
               continue;
             }
             if (isPythonProject(projJson, projectPath)) {
-              const result = await pythonAdapter.initProject(projectPath);
-              if (result.exitCode !== 0) return result.exitCode;
+              const pythonCode = await handlePythonInitSmart(projectPath, pythonAdapter);
+              if (pythonCode !== 0) return pythonCode;
               continue;
             }
             const projectInitCode = await runCoreRapidkit(['init'], { cwd: projectPath });
@@ -2882,9 +3057,16 @@ async function delegateToLocalCLI(): Promise<boolean> {
   const cwd = process.cwd();
   const args = process.argv.slice(2);
   const firstArg = args[0];
+  const isInitCommand = firstArg === 'init';
+  const runtimeLifecycleCommands = new Set(['dev', 'start', 'build', 'test']);
   const isHelpLike = !firstArg || firstArg === '--help' || firstArg === '-h' || firstArg === 'help';
   const isWorkspaceRoot = hasWorkspaceRootMarkers(cwd);
   const hasProjectJsonInCwd = fs.existsSync(path.join(cwd, '.rapidkit', 'project.json'));
+  const cwdProjectJson = readRapidkitProjectJson(cwd);
+  const isGoOrNodeProjectInCwd =
+    isGoProject(cwdProjectJson, cwd) || isNodeProject(cwdProjectJson, cwd);
+  const shouldKeepLifecycleOnWrapper =
+    !!firstArg && runtimeLifecycleCommands.has(firstArg) && isGoOrNodeProjectInCwd;
 
   // CRITICAL: npm-only commands must NEVER be delegated to the Python core CLI.
   // These commands are implemented exclusively in the npm wrapper.
@@ -2916,7 +3098,13 @@ async function delegateToLocalCLI(): Promise<boolean> {
       // These commands are handled exclusively by the npm wrapper and must never be delegated
       // to the Python core CLI, even when inside a Python workspace.
       const isNpmOnlyCommand = isCreateCommand || isNpmOnlyTopLevelCommand(firstArg);
-      if (!isHelpLike && !allowShellActivate && !isNpmOnlyCommand) {
+      if (
+        !isHelpLike &&
+        !allowShellActivate &&
+        !isNpmOnlyCommand &&
+        !isInitCommand &&
+        !shouldKeepLifecycleOnWrapper
+      ) {
         // Strict policy pre-flight for lifecycle commands
         if (firstArg && (STRICT_POLICY_PROJECT_COMMANDS as readonly string[]).includes(firstArg)) {
           const violations = await checkStrictPolicyPreflightForDelegation(cwd).catch(
@@ -2987,7 +3175,14 @@ async function delegateToLocalCLI(): Promise<boolean> {
 
   // If we have a local script AND the command is a local command, delegate immediately
   // This works for projects created with --template (npm engine) and workspace projects
-  if (localScript && firstArg && LOCAL_COMMANDS.includes(firstArg) && !isCreateCommand) {
+  if (
+    localScript &&
+    firstArg &&
+    LOCAL_COMMANDS.includes(firstArg) &&
+    !isCreateCommand &&
+    !isInitCommand &&
+    !shouldKeepLifecycleOnWrapper
+  ) {
     logger.debug(`Delegating to local CLI: ${localScript} ${args.join(' ')}`);
 
     const delegationEnv = firstArg === 'init' ? buildDelegationEnvForInit() : process.env;
@@ -3036,7 +3231,13 @@ async function delegateToLocalCLI(): Promise<boolean> {
           }
         }
 
-        if (localScriptEarly && firstArg && LOCAL_COMMANDS.includes(firstArg)) {
+        if (
+          localScriptEarly &&
+          firstArg &&
+          LOCAL_COMMANDS.includes(firstArg) &&
+          firstArg !== 'init' &&
+          !shouldKeepLifecycleOnWrapper
+        ) {
           // Delegate to local CLI and return
           logger.debug(
             `Delegating to local CLI (early detection): ${localScriptEarly} ${args.join(' ')}`
@@ -3072,7 +3273,12 @@ async function delegateToLocalCLI(): Promise<boolean> {
 
         // Delegate all other commands to core.
         // But never delegate npm-only commands (bootstrap, cache, mirror, setup, workspace, doctor).
-        if (!isHelpLike && !isNpmOnlyTopLevelCommand(firstArg)) {
+        if (
+          !isHelpLike &&
+          !isNpmOnlyTopLevelCommand(firstArg) &&
+          firstArg !== 'init' &&
+          !shouldKeepLifecycleOnWrapper
+        ) {
           const code = await runCoreRapidkit(args, { cwd });
           process.exit(code);
         }
@@ -3105,6 +3311,8 @@ export async function shouldForwardToCore(args: string[]): Promise<boolean> {
 
   const first = args[0];
   const second = args[1];
+
+  if ((WRAPPER_ORCHESTRATED_PROJECT_COMMANDS as readonly string[]).includes(first)) return false;
 
   if ((PROJECT_COMMANDS_CORE_FALLBACK as readonly string[]).includes(first)) return true;
 
@@ -4044,10 +4252,20 @@ if (shouldBootstrapCli) {
           const lifecycle = await withWorkspaceDependencyPolicyContext(process.cwd(), async () => {
             if (isGoProject(projectJson, process.cwd())) {
               const adapter = getRuntimeAdapter('go', { runCommandInCwd, runCoreRapidkit });
-              if (action === 'dev') return (await adapter.runDev(process.cwd())).exitCode;
-              if (action === 'test') return (await adapter.runTest(process.cwd())).exitCode;
-              if (action === 'build') return (await adapter.runBuild(process.cwd())).exitCode;
-              return (await adapter.runStart(process.cwd())).exitCode;
+              const result =
+                action === 'dev'
+                  ? await adapter.runDev(process.cwd())
+                  : action === 'test'
+                    ? await adapter.runTest(process.cwd())
+                    : action === 'build'
+                      ? await adapter.runBuild(process.cwd())
+                      : await adapter.runStart(process.cwd());
+
+              if (result.message) {
+                console.log(chalk.red(`❌ ${result.message}`));
+              }
+
+              return result.exitCode;
             }
 
             if (isNodeProject(projectJson, process.cwd())) {

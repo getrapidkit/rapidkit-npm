@@ -1,6 +1,40 @@
 # Release Notes
 
-## Latest Release: v0.25.1 (February 27, 2026)
+## Latest Release: v0.25.2 (February 27, 2026)
+
+### 🧠 v0.25.2 — Smart Init Orchestration, Clearer Go UX, and Delegation Boundary Hardening (Patch)
+
+This patch makes `rapidkit init` significantly more resilient across Python/Node/Go projects by enforcing wrapper-owned orchestration with runtime-aware fallbacks, then closes delegation edge-cases that caused noisy/misleading Go command failures.
+
+**What's New:**
+
+- 🧭 **Explicit command ownership matrix for wrapper vs core**
+  - `init` is now an explicitly wrapper-orchestrated project command to keep policy + fallback behavior consistent.
+  - Added contract doc: `docs/contracts/COMMAND_OWNERSHIP_MATRIX.md`.
+
+- 🚀 **Smart multi-runtime `init` behavior**
+  - Runtime inference improved via project metadata + file heuristics (`go.mod`, `package.json`, `pyproject.toml`, `requirements.txt`).
+  - Python init now enforces project-local `.venv` usage and has pip-based fallback install paths.
+  - Node init now attempts package-manager fallbacks when primary install path fails.
+
+- 🛡️ **Delegation boundary hardening**
+  - Go/Node lifecycle commands (`dev/start/build/test`) remain on wrapper/runtime adapter path where needed.
+  - Prevents misrouting of flags (e.g., `dev --port`) into unintended local-launcher/Makefile paths.
+
+- 🗣️ **Go missing-toolchain UX fix**
+  - `rapidkit init` and lifecycle commands now emit clear actionable error messages when Go is missing, instead of silent/noisy failure patterns.
+
+**Upgrade:**
+
+```bash
+npm install -g rapidkit@0.25.2
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.25.2.md)
+
+---
+
+## Previous Release: v0.25.1 (February 27, 2026)
 
 ### 🛠️ v0.25.1 — Poetry Fallback Stabilization, Multi-Platform Doctor Hardening, and Windows Workspace Launcher Coverage (Patch)
 
@@ -213,6 +247,7 @@ npm install -g rapidkit@0.24.0
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.25.2](releases/RELEASE_NOTES_v0.25.2.md) | Feb 27, 2026 | Smart init orchestration, wrapper/core ownership matrix, Go UX + delegation hardening |
 | [v0.25.1](releases/RELEASE_NOTES_v0.25.1.md) | Feb 27, 2026 | Poetry fallback stabilization, cross-platform doctor hardening, Windows workspace launcher parity |
 | [v0.25.0](releases/RELEASE_NOTES_v0.25.0.md) | Feb 26, 2026 | Help surface unification, workspace policy/list contract completion, reliability hardening |
 | [v0.24.2](releases/RELEASE_NOTES_v0.24.2.md) | Feb 25, 2026 | Workspace docs governance, docs drift/link/smoke gates, CI ownership hardening |
