@@ -156,7 +156,7 @@ describe('Create Module - Internal Functions', () => {
       );
     });
 
-    it('should prompt to install Poetry with pipx when missing', async () => {
+    it('should auto-fallback to venv when Poetry is missing', async () => {
       // Route prompt responses by question name to avoid leaking mockResolvedValueOnce
       // into subsequent tests if something changes.
       vi.mocked(inquirer.prompt).mockImplementation(async (questions: any) => {
@@ -173,25 +173,8 @@ describe('Create Module - Internal Functions', () => {
       let poetryVersionChecks = 0;
       vi.mocked(execa).mockImplementation((command: string, args?: readonly string[]) => {
         if (command === 'poetry' && args?.[0] === '--version') {
-          // Availability pre-check + ensurePoetry check should both fail first.
-          if (poetryVersionChecks < 2) {
-            poetryVersionChecks += 1;
-            return Promise.reject(new Error('Command not found: poetry'));
-          }
           poetryVersionChecks += 1;
-          return Promise.resolve({ stdout: 'Poetry 2.0.0', stderr: '', exitCode: 0 } as any);
-        }
-        if (command === 'pipx' && args?.[0] === '--version') {
-          return Promise.resolve({ stdout: '1.4.0', stderr: '', exitCode: 0 } as any);
-        }
-        if (command === 'pipx' && args?.[0] === 'install' && args?.[1] === 'poetry') {
-          return Promise.resolve({ stdout: 'installed', stderr: '', exitCode: 0 } as any);
-        }
-        if (command === 'poetry' && args?.[0] === 'init') {
-          return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
-        }
-        if (command === 'poetry' && args?.[0] === 'add') {
-          return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
+          return Promise.reject(new Error('Command not found: poetry'));
         }
         return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 } as any);
       });
@@ -200,13 +183,18 @@ describe('Create Module - Internal Functions', () => {
 
       await createProject('test-project', { profile: 'python-only' });
 
-      // Confirm we offered to install Poetry, then used pipx.
-      expect(inquirer.prompt).toHaveBeenCalledTimes(2);
-      expect(execa).toHaveBeenCalledWith('pipx', ['install', 'poetry']);
+      // Prompt should only be for python/install method selection; no installPoetry/installPipx prompts.
+      expect(inquirer.prompt).toHaveBeenCalledTimes(1);
+      expect(poetryVersionChecks).toBeGreaterThan(0);
+      expect(execa).not.toHaveBeenCalledWith('pipx', ['install', 'poetry']);
+      expect(execa).toHaveBeenCalledWith(
+        expect.stringMatching(/^python(3)?$/),
+        ['-m', 'venv', '.venv'],
+        expect.any(Object)
+      );
     });
 
-    it('should prompt to install pipx when missing (for Poetry install)', async () => {
-      // 1) choose poetry, 2) confirm installPoetry, 3) confirm installPipx
+    it('should not prompt to install pipx when Poetry is missing (fallback to venv)', async () => {
       vi.mocked(inquirer.prompt).mockImplementation(async (questions: any) => {
         const names = Array.isArray(questions) ? questions.map((q) => q?.name) : [];
         if (names.includes('installPoetry')) return { installPoetry: true } as any;
@@ -221,19 +209,13 @@ describe('Create Module - Internal Functions', () => {
         // Accept both python and python3
         const isPython = command === 'python' || command === 'python3';
 
-        // Poetry is missing first, then available.
+        // Poetry is missing, so flow should fallback before any installation prompts.
         if (command === 'poetry' && args?.[0] === '--version') {
-          // Fail both availability pre-check and ensurePoetry check, then succeed
-          // after Poetry gets installed through pipx.
-          if (poetryVersionChecks < 2) {
-            poetryVersionChecks += 1;
-            return Promise.reject(new Error('Command not found: poetry'));
-          }
           poetryVersionChecks += 1;
-          return Promise.resolve({ stdout: 'Poetry 2.0.0', stderr: '', exitCode: 0 } as any);
+          return Promise.reject(new Error('Command not found: poetry'));
         }
 
-        // pipx binary is missing.
+        // These branches should not be reached in fallback path; keep counters to assert no usage.
         if (command === 'pipx' && args?.[0] === '--version') {
           pipxBinaryChecks += 1;
           return Promise.reject(new Error('Command not found: pipx'));
@@ -275,17 +257,19 @@ describe('Create Module - Internal Functions', () => {
 
       await createProject('test-project', { profile: 'python-only' });
 
-      expect(pipxBinaryChecks).toBeGreaterThan(0);
-      // We should have prompted for both: installing pipx and installing poetry.
+      expect(poetryVersionChecks).toBeGreaterThan(0);
+      // Availability probing may check pipx once, but fallback must avoid pipx install flow.
+      expect(pipxBinaryChecks).toBeLessThanOrEqual(1);
+      // No installPoetry/installPipx prompts should be shown in fallback path.
       const promptCalls = vi.mocked(inquirer.prompt).mock.calls;
       const askedNames = promptCalls
         .flatMap(([questions]) => (Array.isArray(questions) ? questions : [questions]))
         .map((q: any) => q?.name)
         .filter(Boolean);
 
-      expect(askedNames).toContain('installPipx');
-      expect(askedNames).toContain('installPoetry');
-      expect(execa).toHaveBeenCalledWith(expect.stringMatching(/^python(3)?$/), [
+      expect(askedNames).not.toContain('installPipx');
+      expect(askedNames).not.toContain('installPoetry');
+      expect(execa).not.toHaveBeenCalledWith(expect.stringMatching(/^python(3)?$/), [
         '-m',
         'pip',
         'install',
@@ -293,12 +277,17 @@ describe('Create Module - Internal Functions', () => {
         '--upgrade',
         'pipx',
       ]);
-      expect(execa).toHaveBeenCalledWith(expect.stringMatching(/^python(3)?$/), [
+      expect(execa).not.toHaveBeenCalledWith(expect.stringMatching(/^python(3)?$/), [
         '-m',
         'pipx',
         'install',
         'poetry',
       ]);
+      expect(execa).toHaveBeenCalledWith(
+        expect.stringMatching(/^python(3)?$/),
+        ['-m', 'venv', '.venv'],
+        expect.any(Object)
+      );
     });
   });
 

@@ -1,5 +1,38 @@
 # Release Notes
 
+## Latest Release: v0.25.1 (February 27, 2026)
+
+### 🛠️ v0.25.1 — Poetry Fallback Stabilization, Multi-Platform Doctor Hardening, and Windows Workspace Launcher Coverage (Patch)
+
+This patch release finalizes the new Poetry-missing fallback behavior, hardens cross-platform doctor/tool detection, and closes the remaining legacy Windows workspace launcher gap.
+
+**What's New:**
+
+- 🐍 **Poetry fallback stabilization in create flow**
+  - If `installMethod=poetry` is selected but Poetry is unavailable, workspace creation now reliably auto-falls back to `venv` without blocking install prompts.
+  - Behavior is applied consistently across interactive create and registration paths.
+
+- 🌍 **Cross-platform detection hardening**
+  - `doctor` now checks `python -m poetry` and `python -m pipx` across Python candidates when binaries are missing.
+  - Tool path probing now relies on centralized platform-capability helpers rather than fragmented ad-hoc path assumptions.
+
+- 🪟 **Legacy workspace launcher parity on Windows**
+  - Workspace creation now emits both `rapidkit` and `rapidkit.cmd` wrappers so local workspace commands have native Windows entry points.
+
+- 🧪 **Test contract alignment**
+  - Updated create-internal Poetry tests to match intentional fallback semantics while preserving pipx behavior guarantees.
+  - Full test suite remains green after alignment.
+
+**Upgrade:**
+
+```bash
+npm install -g rapidkit@0.25.1
+```
+
+[📖 Full Release Notes](./releases/RELEASE_NOTES_v0.25.1.md)
+
+---
+
 ## Latest Release: v0.25.0 (February 26, 2026)
 
 ### 🧭 v0.25.0 — Help Surface Unification, Workspace Policy/List Contract Completion, and Reliability Hardening (Minor)
@@ -180,6 +213,7 @@ npm install -g rapidkit@0.24.0
 
 | Version                                      | Date         | Highlights                                                           |
 | -------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| [v0.25.1](releases/RELEASE_NOTES_v0.25.1.md) | Feb 27, 2026 | Poetry fallback stabilization, cross-platform doctor hardening, Windows workspace launcher parity |
 | [v0.25.0](releases/RELEASE_NOTES_v0.25.0.md) | Feb 26, 2026 | Help surface unification, workspace policy/list contract completion, reliability hardening |
 | [v0.24.2](releases/RELEASE_NOTES_v0.24.2.md) | Feb 25, 2026 | Workspace docs governance, docs drift/link/smoke gates, CI ownership hardening |
 | [v0.24.1](releases/RELEASE_NOTES_v0.24.1.md) | Feb 25, 2026 | Setup contract fixes, cross-OS matrix reliability, workspace flow alignment |

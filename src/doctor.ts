@@ -6,10 +6,79 @@ import { logger } from './logger.js';
 import inquirer from 'inquirer';
 import {
   getPythonCommandCandidates,
+  getRapidkitLocalScriptCandidates,
+  getUserLocalBinCandidates,
+  getVenvRapidkitPath,
   getVenvPythonPath,
   isWindowsPlatform,
   shouldUseShellExecution,
 } from './utils/platform-capabilities.js';
+
+function uniquePaths(paths: string[]): string[] {
+  return [
+    ...new Set(paths.filter((candidatePath) => candidatePath && candidatePath.trim().length > 0)),
+  ];
+}
+
+function getPoetryPathCandidates(): string[] {
+  const fromLocalBins = getUserLocalBinCandidates().map((dir) =>
+    path.join(dir, isWindowsPlatform() ? 'poetry.exe' : 'poetry')
+  );
+
+  const windowsExtras = isWindowsPlatform()
+    ? [
+        path.join(process.env.APPDATA || '', 'Python', 'Scripts', 'poetry.exe'),
+        path.join(
+          process.env.USERPROFILE || '',
+          'AppData',
+          'Roaming',
+          'Python',
+          'Scripts',
+          'poetry.exe'
+        ),
+      ]
+    : [];
+
+  const unixExtras = isWindowsPlatform() ? [] : ['/usr/local/bin/poetry', '/usr/bin/poetry'];
+  return uniquePaths([...fromLocalBins, ...windowsExtras, ...unixExtras]);
+}
+
+function getRapidkitBinaryCandidates(homeDir: string): Array<{ location: string; path: string }> {
+  const localBinCandidates = getUserLocalBinCandidates().map((dir) => ({
+    location: 'Global (user-local)',
+    path: path.join(dir, isWindowsPlatform() ? 'rapidkit.exe' : 'rapidkit'),
+  }));
+
+  const defaults = [
+    { location: 'Global (pipx)', path: path.join(homeDir, '.local', 'bin', 'rapidkit') },
+    {
+      location: 'Global (pipx)',
+      path: path.join(homeDir, 'AppData', 'Roaming', 'Python', 'Scripts', 'rapidkit.exe'),
+    },
+    { location: 'Global (pyenv)', path: path.join(homeDir, '.pyenv', 'shims', 'rapidkit') },
+    { location: 'Global (system)', path: '/usr/local/bin/rapidkit' },
+    { location: 'Global (system)', path: '/usr/bin/rapidkit' },
+  ];
+
+  const workspaceVenvPath = getVenvRapidkitPath(path.join(process.cwd(), '.venv'));
+  const workspaceLaunchers = getRapidkitLocalScriptCandidates(process.cwd());
+
+  const workspaceCandidates = [
+    { location: 'Workspace (.venv)', path: workspaceVenvPath },
+    ...workspaceLaunchers.map((launcherPath) => ({
+      location: 'Workspace (launcher)',
+      path: launcherPath,
+    })),
+  ];
+
+  const all = [...localBinCandidates, ...defaults, ...workspaceCandidates];
+  const seen = new Set<string>();
+  return all.filter((entry) => {
+    if (seen.has(entry.path)) return false;
+    seen.add(entry.path);
+    return true;
+  });
+}
 
 interface HealthCheckResult {
   status: 'ok' | 'warn' | 'error';
@@ -130,12 +199,10 @@ async function checkPoetry(): Promise<HealthCheckResult> {
     }
     return { status: 'warn', message: 'Poetry version unknown' };
   } catch {
-    const candidates = isWindowsPlatform()
-      ? [
-          { cmd: 'python', args: ['-m', 'poetry', '--version'] },
-          { cmd: 'py', args: ['-3', '-m', 'poetry', '--version'] },
-        ]
-      : [{ cmd: 'python3', args: ['-m', 'poetry', '--version'] }];
+    const candidates = getPythonCommandCandidates().map((cmd) => ({
+      cmd,
+      args: cmd === 'py' ? ['-3', '-m', 'poetry', '--version'] : ['-m', 'poetry', '--version'],
+    }));
 
     for (const candidate of candidates) {
       try {
@@ -154,38 +221,23 @@ async function checkPoetry(): Promise<HealthCheckResult> {
       }
     }
 
-    if (isWindowsPlatform()) {
-      const winPathCandidates = [
-        path.join(process.env.APPDATA || '', 'Python', 'Scripts', 'poetry.exe'),
-        path.join(process.env.USERPROFILE || '', '.local', 'bin', 'poetry.exe'),
-        path.join(
-          process.env.USERPROFILE || '',
-          'AppData',
-          'Roaming',
-          'Python',
-          'Scripts',
-          'poetry.exe'
-        ),
-      ].filter((candidatePath) => candidatePath && candidatePath.trim().length > 0);
-
-      for (const poetryPath of winPathCandidates) {
-        try {
-          if (!(await fsExtra.pathExists(poetryPath))) {
-            continue;
-          }
-          const { stdout } = await execa(poetryPath, ['--version'], {
-            timeout: 3000,
-            shell: true,
-          });
-          const match = stdout.match(/Poetry .*version ([\d.]+)/) || stdout.match(/([\d.]+)/);
-          return {
-            status: 'ok',
-            message: match?.[1] ? `Poetry ${match[1]}` : 'Poetry detected',
-            details: `Available at ${poetryPath}`,
-          };
-        } catch {
+    for (const poetryPath of getPoetryPathCandidates()) {
+      try {
+        if (!(await fsExtra.pathExists(poetryPath))) {
           continue;
         }
+        const { stdout } = await execa(poetryPath, ['--version'], {
+          timeout: 3000,
+          shell: shouldUseShellExecution(),
+        });
+        const match = stdout.match(/Poetry .*version ([\d.]+)/) || stdout.match(/([\d.]+)/);
+        return {
+          status: 'ok',
+          message: match?.[1] ? `Poetry ${match[1]}` : 'Poetry detected',
+          details: `Available at ${poetryPath}`,
+        };
+      } catch {
+        continue;
       }
     }
 
@@ -207,6 +259,25 @@ async function checkPipx(): Promise<HealthCheckResult> {
       details: 'Available for global tool installation',
     };
   } catch {
+    const pythonCandidates = getPythonCommandCandidates();
+    for (const cmd of pythonCandidates) {
+      try {
+        const args = cmd === 'py' ? ['-3', '-m', 'pipx', '--version'] : ['-m', 'pipx', '--version'];
+        const { stdout } = await execa(cmd, args, {
+          timeout: 3000,
+          shell: shouldUseShellExecution(),
+        });
+        const version = stdout.trim();
+        return {
+          status: 'ok',
+          message: `pipx ${version}`,
+          details: `Available via ${cmd} ${args.join(' ')}`,
+        };
+      } catch {
+        continue;
+      }
+    }
+
     return {
       status: 'warn',
       message: 'pipx not installed',
@@ -242,29 +313,10 @@ async function checkRapidKitCore(): Promise<HealthCheckResult> {
   const homeDir = process.env.HOME || process.env.USERPROFILE || '';
   const foundPaths: { location: string; path: string; version: string }[] = [];
 
-  // Global installation paths
-  const globalPaths = [
-    { location: 'Global (pipx)', path: path.join(homeDir, '.local', 'bin', 'rapidkit') },
-    {
-      location: 'Global (pipx)',
-      path: path.join(homeDir, 'AppData', 'Roaming', 'Python', 'Scripts', 'rapidkit.exe'),
-    },
-    { location: 'Global (pyenv)', path: path.join(homeDir, '.pyenv', 'shims', 'rapidkit') },
-    { location: 'Global (system)', path: '/usr/local/bin/rapidkit' },
-    { location: 'Global (system)', path: '/usr/bin/rapidkit' },
-  ];
-
-  // Workspace installation paths
-  const workspacePaths = [
-    { location: 'Workspace (.venv)', path: path.join(process.cwd(), '.venv', 'bin', 'rapidkit') },
-    {
-      location: 'Workspace (.venv)',
-      path: path.join(process.cwd(), '.venv', 'Scripts', 'rapidkit.exe'),
-    },
-  ];
+  const candidates = getRapidkitBinaryCandidates(homeDir);
 
   // Check all paths
-  for (const { location, path: rapidkitPath } of [...globalPaths, ...workspacePaths]) {
+  for (const { location, path: rapidkitPath } of candidates) {
     try {
       if (await fsExtra.pathExists(rapidkitPath)) {
         const { stdout, exitCode } = await execa(rapidkitPath, ['--version'], {

@@ -1,8 +1,8 @@
 {
   "name": "rapidkit",
-  "version": "0.25.0",
+  "version": "0.25.1",
   "type": "module",
-  "description": "Create RapidKit projects with a single command - The official CLI for RapidKit framework",
+  "description": "Official CLI for RapidKit, an open-source workspace platform that standardizes how teams build, scale, and deploy backend services.",
   "keywords": [
     "rapidkit",
     "cli",

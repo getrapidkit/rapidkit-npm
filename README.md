@@ -1,6 +1,6 @@
 # RapidKit NPM CLI
 
-### Build Production-Ready APIs in Seconds
+> RapidKit is an open-source workspace platform that standardizes how teams build, scale, and deploy backend services.
 
 FastAPI, NestJS, Go/Fiber, and Go/Gin scaffolding with production-ready defaults.  
 **27+ plug-and-play modules** are available for FastAPI & NestJS projects.  
@@ -10,6 +10,7 @@ Clean architecture • Zero boilerplate • Instant deployment.
 [![Downloads](https://img.shields.io/npm/dm/rapidkit.svg?style=flat-square)](https://www.npmjs.com/package/rapidkit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![GitHub Stars](https://img.shields.io/github/stars/getrapidkit/rapidkit-npm.svg?style=flat-square)](https://github.com/getrapidkit/rapidkit-npm/stargazers)
+[![Part of RapidKit Platform](https://img.shields.io/badge/Part%20of-RapidKit%20Workspace%20Platform-0f172a?logo=github)](https://github.com/getrapidkit/rapidkit)
 
 Official CLI for creating and operating RapidKit workspaces and projects.
 
@@ -17,6 +18,17 @@ Official CLI for creating and operating RapidKit workspaces and projects.
 - Multi-runtime support (Python, Node.js, Go)
 - Profile + policy enforcement (`warn` / `strict`)
 - Cache and mirror lifecycle commands for stable environments
+
+## Part of the RapidKit Ecosystem
+
+RapidKit NPM CLI is the developer entrypoint layer of the platform.
+
+| Layer | Repository |
+|---|---|
+| Ecosystem Hub | [getrapidkit/rapidkit](https://github.com/getrapidkit/rapidkit) |
+| IDE | [getrapidkit/rapidkit-vscode](https://github.com/getrapidkit/rapidkit-vscode) |
+| Core Engine | [getrapidkit/rapidkit-core](https://github.com/getrapidkit/rapidkit-core) |
+| Examples | [getrapidkit/rapidkit-examples](https://github.com/getrapidkit/rapidkit-examples) |
 
 ## Requirements
 

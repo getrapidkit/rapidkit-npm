@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-02-27
+
+### Added
+- 🪟 Added Windows workspace launcher generation (`rapidkit.cmd`) for legacy workspace-local CLI wrappers.
+- 🧭 Added cross-platform local-bin path candidates utility for Python tool discovery:
+  - `src/utils/platform-capabilities.ts`
+
+### Changed
+- 🐍 Updated Poetry-missing behavior in workspace creation to auto-fallback to `venv` without blocking on Poetry installation prompts.
+- 🌍 Hardened cross-platform tool/path detection in doctor checks:
+  - Poetry detection now probes `python -m poetry` across Python candidates.
+  - pipx detection now probes `python -m pipx` when `pipx` binary is unavailable.
+  - RapidKit binary discovery now uses centralized platform capability helpers.
+- 🧪 Updated internal create-flow tests to reflect Poetry→venv fallback behavior while keeping pipx flow expectations intact.
+
+### Fixed
+- ⛔ Fixed blocking UX where selecting Poetry could trigger install-prompt expectations/tests even when fallback-to-venv path should proceed non-interactively.
+- 🧹 Removed hardcoded Unix-only Python path assumptions in runtime Python discovery for create flow.
+- 🧱 Closed legacy cross-platform gap for workspace-local launcher availability on Windows.
+
 ## [0.25.0] - 2026-02-26
 
 ### Added

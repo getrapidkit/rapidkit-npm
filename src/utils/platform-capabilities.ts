@@ -108,3 +108,26 @@ export function getWorkspaceRegistryDirectory(
     ? path.join(configHome, 'rapidkit')
     : path.join(os.homedir(), '.rapidkit');
 }
+
+export function getUserLocalBinCandidates(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform
+): string[] {
+  const candidates: string[] = [];
+
+  if (isWindowsPlatform(platform)) {
+    if (env.USERPROFILE) {
+      candidates.push(path.join(env.USERPROFILE, '.local', 'bin'));
+    }
+    if (env.APPDATA) {
+      candidates.push(path.join(env.APPDATA, 'Python', 'Scripts'));
+    }
+    if (env.LOCALAPPDATA) {
+      candidates.push(path.join(env.LOCALAPPDATA, 'Programs', 'Python', 'Scripts'));
+    }
+  } else {
+    candidates.push(path.join(os.homedir(), '.local', 'bin'));
+  }
+
+  return [...new Set(candidates.filter(Boolean))];
+}

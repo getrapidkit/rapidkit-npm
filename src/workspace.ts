@@ -311,6 +311,10 @@ export async function createWorkspace(
     await fs.writeFile(path.join(workspacePath, 'rapidkit'), cliScript);
     await fs.chmod(path.join(workspacePath, 'rapidkit'), 0o755);
 
+    // Create Windows launcher
+    const cliScriptCmd = generateCLIScriptCmd();
+    await fs.writeFile(path.join(workspacePath, 'rapidkit.cmd'), cliScriptCmd);
+
     // Create README.md
     const readme = generateReadme(options.name);
     await fs.writeFile(path.join(workspacePath, 'README.md'), readme);
@@ -380,6 +384,7 @@ ${chalk.green('✨ RapidKit workspace created successfully!')}
 ${chalk.bold('📂 Workspace structure:')}
 ${workspacePath}/
   ├── rapidkit            # Local CLI wrapper
+  ├── rapidkit.cmd        # Windows local CLI wrapper
   ├── .rapidkit/          # Workspace configuration
   │   ├── config.json     # Workspace settings
   │   └── templates/      # Project templates
@@ -402,7 +407,7 @@ ${chalk.bold('📚 Commands:')}
   npx rapidkit dev                        Start dev server
   npx rapidkit help                       Show all commands
 
-${chalk.gray('Alternative: ./rapidkit dev, make dev')}
+${chalk.gray('Alternative: ./rapidkit dev (Windows: .\\rapidkit.cmd dev), make dev')}
 ${chalk.gray('💡 Tip: Install globally (npm i -g rapidkit) to use without npx')}\n`);
   } catch (error) {
     spinner.fail('Failed to create workspace');
@@ -759,6 +764,30 @@ main() {
 }
 
 main "$@"
+`;
+}
+
+function generateCLIScriptCmd(): string {
+  return `@echo off
+setlocal enabledelayedexpansion
+
+set "SCRIPT_DIR=%~dp0"
+
+where sh >nul 2>nul
+if %ERRORLEVEL%==0 (
+  sh "%SCRIPT_DIR%rapidkit" %*
+  exit /b %ERRORLEVEL%
+)
+
+where bash >nul 2>nul
+if %ERRORLEVEL%==0 (
+  bash "%SCRIPT_DIR%rapidkit" %*
+  exit /b %ERRORLEVEL%
+)
+
+echo [RapidKit] No sh/bash found. Falling back to npx rapidkit.
+npx rapidkit %*
+exit /b %ERRORLEVEL%
 `;
 }
 

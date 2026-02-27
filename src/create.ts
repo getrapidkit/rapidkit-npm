@@ -1,6 +1,5 @@
 import { promises as fsPromises } from 'fs';
 import * as fsExtra from 'fs-extra';
-import * as os from 'os';
 import path from 'path';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
@@ -20,7 +19,9 @@ import {
 import { getPythonCommand } from './utils.js';
 import {
   getDefaultPythonCommand,
+  getPythonCommandCandidates,
   getPythonVersionProbeCandidates,
+  getUserLocalBinCandidates,
   getVenvPythonPath,
   isWindowsPlatform,
 } from './utils/platform-capabilities.js';
@@ -346,14 +347,17 @@ async function writePythonVersion(workspacePath: string, pythonVersion: string):
 }
 
 function ensureUserLocalBinOnPath(): void {
-  // pipx typically installs shims into ~/.local/bin on Linux/macOS.
-  // Add it for this process so we can run `poetry` immediately after installing.
-  const localBin = path.join(os.homedir(), '.local', 'bin');
   const current = process.env.PATH || '';
   const parts = current.split(path.delimiter).filter(Boolean);
-  if (!parts.includes(localBin)) {
-    process.env.PATH = [localBin, ...parts].join(path.delimiter);
+  const nextParts = [...parts];
+
+  for (const candidate of getUserLocalBinCandidates()) {
+    if (!nextParts.includes(candidate)) {
+      nextParts.unshift(candidate);
+    }
   }
+
+  process.env.PATH = nextParts.join(path.delimiter);
 }
 
 async function ensurePipxAvailable(spinner: Ora, yes: boolean): Promise<PipxInvoker> {
@@ -380,6 +384,10 @@ async function ensurePipxAvailable(spinner: Ora, yes: boolean): Promise<PipxInvo
   if (yes) {
     throw new PipxNotFoundError();
   }
+
+  // Prevent spinner redraw from interfering with interactive prompt rendering.
+  // Some mocked Ora instances in tests do not implement `stop`.
+  (spinner as unknown as { stop?: () => void }).stop?.();
 
   const { installPipx } = (await inquirer.prompt([
     {
@@ -558,6 +566,16 @@ async function detectInstallMethodAvailability(): Promise<InstallMethodAvailabil
   }
 
   return { poetry, pipx };
+}
+
+async function isPoetryAvailable(): Promise<boolean> {
+  ensureUserLocalBinOnPath();
+  try {
+    await execa('poetry', ['--version'], { timeout: 2500 });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function resolveInteractiveInstallMethodDefault(
@@ -1102,6 +1120,13 @@ export async function createProject(
       }
     }
 
+    // Auto-fallback: if user selected Poetry but Poetry is not installed,
+    // continue with pip + venv instead of blocking.
+    if (pythonAnswers.installMethod === 'poetry' && !(await isPoetryAvailable())) {
+      spinner.warn('Poetry not found — auto-fallback to pip + venv');
+      pythonAnswers.installMethod = 'venv';
+    }
+
     // Create workspace marker with actual Python version
     await writeWorkspaceMarker(
       projectPath,
@@ -1322,30 +1347,17 @@ async function findRealPython(pythonVersion: string): Promise<string | null> {
     }
   }
 
-  // 2. Try direct python commands
-  candidates.push(
-    `python${pythonVersion}`,
-    `python3.${pythonVersion.split('.')[1]}`,
-    'python3',
-    'python'
-  );
+  // 2. Try utility-driven cross-platform commands
+  const preferredMinor = Number(pythonVersion.split('.')[1]);
+  const probeCommands = getPythonVersionProbeCandidates(preferredMinor, 10)
+    .map((probe) => probe.command)
+    .filter(Boolean);
+  candidates.push(`python${pythonVersion}`, ...probeCommands, ...getPythonCommandCandidates());
 
-  if (isWindowsPlatform()) {
-    candidates.push('py');
-  }
-
-  // 3. Try common installation paths
-  if (!isWindowsPlatform()) {
-    candidates.push(
-      `/usr/bin/python${pythonVersion}`,
-      `/usr/bin/python3`,
-      `/usr/local/bin/python${pythonVersion}`,
-      `/usr/local/bin/python3`
-    );
-  }
+  const uniqueCandidates = [...new Set(candidates)];
 
   // Test each candidate
-  for (const candidate of candidates) {
+  for (const candidate of uniqueCandidates) {
     try {
       const versionArgs = candidate === 'py' ? ['-3', '--version'] : ['--version'];
       const probeArgs =
@@ -1374,9 +1386,9 @@ async function installWithPoetry(
   spinner: Ora,
   testMode?: boolean,
   userConfig?: UserConfig,
-  yes = false
+  _yes = false
 ) {
-  await ensurePoetryAvailable(spinner, yes);
+  await ensurePoetryAvailable(spinner, _yes);
 
   // Find a working Python before initializing Poetry
   spinner.start('Finding Python interpreter');
@@ -1645,9 +1657,10 @@ async function installWithPoetry(
     const isGloballyAvailable = await checkRapidkitCoreAvailable();
 
     if (!isGloballyAvailable && !testMode) {
-      spinner.start('Installing RapidKit globally with pipx for CLI access');
-      const pipx = await ensurePipxAvailable(spinner, yes);
+      spinner.start('Checking optional global pipx installation');
+      const pipx = await ensurePipxAvailable(spinner, true);
       try {
+        spinner.start('Installing RapidKit globally with pipx for CLI access');
         await execaPipx(pipx, ['install', 'rapidkit-core']);
         spinner.succeed('RapidKit installed globally');
       } catch (pipxError) {
@@ -1657,7 +1670,8 @@ async function installWithPoetry(
       }
     }
   } catch (checkError) {
-    // Non-fatal - just skip global install
+    // Non-fatal - optional global install should never block workspace creation
+    spinner.succeed('Skipped optional global pipx installation');
     logger.debug(`Global install check skipped: ${checkError}`);
   }
 }
@@ -1669,7 +1683,7 @@ async function installWithVenv(
   spinner: Ora,
   testMode?: boolean,
   userConfig?: UserConfig,
-  yes = false
+  _yes = false
 ) {
   spinner.start(`Checking Python ${pythonVersion}`);
 
@@ -1810,9 +1824,10 @@ async function installWithVenv(
     const isGloballyAvailable = await checkRapidkitCoreAvailable();
 
     if (!isGloballyAvailable && !testMode) {
-      spinner.start('Installing RapidKit globally with pipx for CLI access');
-      const pipx = await ensurePipxAvailable(spinner, yes);
+      spinner.start('Checking optional global pipx installation');
+      const pipx = await ensurePipxAvailable(spinner, true);
       try {
+        spinner.start('Installing RapidKit globally with pipx for CLI access');
         await execaPipx(pipx, ['install', 'rapidkit-core']);
         spinner.succeed('RapidKit installed globally');
       } catch (pipxError) {
@@ -1822,7 +1837,8 @@ async function installWithVenv(
       }
     }
   } catch (checkError) {
-    // Non-fatal - just skip global install
+    // Non-fatal - optional global install should never block workspace creation
+    spinner.succeed('Skipped optional global pipx installation');
     logger.debug(`Global install check skipped: ${checkError}`);
   }
 }
@@ -1909,13 +1925,16 @@ export async function registerWorkspaceAtPath(
       }
     })());
 
+  const resolvedMethod: InstallMethod =
+    method === 'poetry' && !(await isPoetryAvailable()) ? 'venv' : method;
+
   // Create marker and gitignore
-  await writeWorkspaceMarker(workspacePath, path.basename(workspacePath), method);
+  await writeWorkspaceMarker(workspacePath, path.basename(workspacePath), resolvedMethod);
   await writeWorkspaceGitignore(workspacePath);
   await writeWorkspaceFoundationFiles(
     workspacePath,
     path.basename(workspacePath),
-    method,
+    resolvedMethod,
     pythonVersion,
     options?.profile
   );
@@ -1923,18 +1942,18 @@ export async function registerWorkspaceAtPath(
   const spinner = ora('Registering workspace').start();
 
   try {
-    if (method === 'poetry') {
+    if (resolvedMethod === 'poetry') {
       // Write pyproject.toml stub so installWithPoetry can skip poetry init + poetry add.
       await writePyprojectStub(workspacePath, path.basename(workspacePath));
       await installWithPoetry(workspacePath, pythonVersion, spinner, testMode, userConfig, yes);
-    } else if (method === 'venv') {
+    } else if (resolvedMethod === 'venv') {
       await installWithVenv(workspacePath, pythonVersion, spinner, testMode, userConfig);
     } else {
       await installWithPipx(workspacePath, spinner, testMode, userConfig, yes);
     }
 
-    await writeWorkspaceLauncher(workspacePath, method);
-    await createReadme(workspacePath, method);
+    await writeWorkspaceLauncher(workspacePath, resolvedMethod);
+    await createReadme(workspacePath, resolvedMethod);
 
     spinner.succeed('Workspace registered');
 
@@ -1980,6 +1999,10 @@ async function createReadme(projectPath: string, installMethod: string) {
       : installMethod === 'venv'
         ? '# No activation needed (recommended):\n./rapidkit --help\n# or direct:\n./.venv/bin/rapidkit --help'
         : '# Optional: use the local launcher\n./rapidkit --help\n# (pipx installs may require Poetry/venv to be present in this folder)';
+
+  const pythonVersionCheckCmd = isWindowsPlatform()
+    ? 'python --version (or: py -3 --version)'
+    : 'python3 --version (or: python --version)';
 
   const readmeContent = `# RapidKit Workspace
 
@@ -2079,7 +2102,7 @@ README.md       # This file
 
 If you encounter issues:
 
-1. Ensure Python 3.10+ is installed: \`python3 --version\`
+1. Ensure Python 3.10+ is installed: \`${pythonVersionCheckCmd}\`
 2. Check RapidKit installation: \`rapidkit --version\`
 3. Run diagnostics: \`rapidkit doctor\`
 4. Visit RapidKit documentation or GitHub issues
